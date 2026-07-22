@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-emerald-deep: #011F15;
+    --color-emerald-card: #033524;
+    --color-gold: #D4AF37;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    background-color: #011F15;
+    color: #FFFFFF;
+    font-family: var(--font-inter), sans-serif;
+  }
+
+  body {
+    background-color: #011F15;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #011F15;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #054731;
+    border-radius: 4px;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #D4AF37;
+  }
+}
+
+@layer utilities {
+  .text-gold-gradient {
+    background: linear-gradient(135deg, #FFF6D1 0%, #D4AF37 50%, #AA8417 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .bg-gold-gradient {
+    background: linear-gradient(135deg, #FBEB9B 0%, #D4AF37 50%, #B89223 100%);
+  }
+
+  .gold-border-glow {
+    position: relative;
+  }
+
+  .gold-border-glow::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.6), transparent 50%, rgba(212, 175, 55, 0.3));
+    border-radius: inherit;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .glass-card {
+    background: rgba(3, 53, 36, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+  }
+
+  .glass-card-hover {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .glass-card-hover:hover {
+    background: rgba(5, 71, 49, 0.85);
+    border-color: rgba(212, 175, 55, 0.6);
+    box-shadow: 0 10px 30px -10px rgba(212, 175, 55, 0.25);
+    transform: translateY(-4px);
+  }
+
+  .glass-nav {
+    background: rgba(1, 31, 21, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  }
+}
+
+/* Subtitle shine animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #FFFFFF 0%, #F3E5AB 50%, #FFFFFF 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 4s infinite linear;
+}
