@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { Sparkles, MapPin, Phone, Mail, Instagram, Linkedin, Facebook } from "lucide-react";
+import { Sparkles, MapPin, Phone, Mail } from "lucide-react";
+import { FaInstagram, FaLinkedin, FaFacebook } from "react-icons/fa";
 
 export default function Footer() {
   return (
@@ -23,13 +24,13 @@ export default function Footer() {
             </p>
             <div className="flex items-center space-x-4 pt-2">
               <a href="#" className="w-9 h-9 rounded-full bg-emerald-900/80 border border-emerald-800 flex items-center justify-center text-gold-400 hover:border-gold-500 hover:text-white transition-colors" aria-label="Instagram">
-                <Instagram className="w-4 h-4" />
+                <FaInstagram className="w-4 h-4" />
               </a>
               <a href="#" className="w-9 h-9 rounded-full bg-emerald-900/80 border border-emerald-800 flex items-center justify-center text-gold-400 hover:border-gold-500 hover:text-white transition-colors" aria-label="LinkedIn">
-                <Linkedin className="w-4 h-4" />
+                <FaLinkedin className="w-4 h-4" />
               </a>
               <a href="#" className="w-9 h-9 rounded-full bg-emerald-900/80 border border-emerald-800 flex items-center justify-center text-gold-400 hover:border-gold-500 hover:text-white transition-colors" aria-label="Facebook">
-                <Facebook className="w-4 h-4" />
+                <FaFacebook className="w-4 h-4" />
               </a>
             </div>
           </div>

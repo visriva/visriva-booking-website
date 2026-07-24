@@ -1,30 +1,29 @@
 {
-  "name": "visriva-live-station",
+  "name": "visriva-booking-app",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node ./node_modules/next/dist/bin/next dev",
-    "build": "node ./node_modules/next/dist/bin/next build",
-    "start": "node ./node_modules/next/dist/bin/next start",
-    "lint": "node ./node_modules/next/dist/bin/next lint"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
-    "clsx": "^2.1.1",
-    "firebase": "^10.12.2",
-    "framer-motion": "^11.2.10",
-    "lucide-react": "^0.395.0",
-    "next": "^14.2.35",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tailwind-merge": "^2.3.0"
+    "autoprefixer": "10.4.17",
+    "firebase": "10.8.1",
+    "lucide-react": "^1.26.0",
+    "next": "13.5.6",
+    "postcss": "8.4.31",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-icons": "^5.7.0",
+    "tailwindcss": "3.4.0"
   },
   "devDependencies": {
-    "@types/node": "^20.14.8",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.4",
-    "typescript": "^5.5.2"
+    "@types/node": "20.10.5",
+    "@types/react": "18.2.38",
+    "eslint": "8.55.0",
+    "eslint-config-next": "13.5.6",
+    "typescript": "5.3.3"
   }
 }
