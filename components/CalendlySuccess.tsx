@@ -52,6 +52,20 @@ export default function CalendlySuccess({ leadData, leadId }: CalendlySuccessPro
             <span className="font-mono text-emerald-200 truncate block">{leadId || "REF-CONFIRMED"}</span>
           </div>
         </div>
+
+        {/* Instant WhatsApp Alert Trigger Button */}
+        <div className="pt-4 flex justify-center">
+          <a
+            href={`https://wa.me/918884484828?text=${encodeURIComponent(
+              `Hello Visriva Live Station! I just submitted a booking inquiry (Ref: ${leadId || "CONFIRMED"}). My event is on ${leadData.eventDate || "selected date"} at ${leadData.venue || "Bengaluru"}. Please confirm availability!`
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-6 py-3 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg hover:scale-105 transition-all flex items-center space-x-2"
+          >
+            <span>💬 Instant Chat &amp; Confirm on WhatsApp</span>
+          </a>
+        </div>
       </div>
 
       {/* Step 2: Calendly Consultation Section */}

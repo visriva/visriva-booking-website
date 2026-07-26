@@ -1,0 +1,673 @@
+<!doctype html>
+<html
+  {% if request.design_mode %}
+    class="shopify-design-mode"
+  {% endif %}
+  lang="{{ request.locale.iso_code }}"
+>
+  <head>
+    {%- if settings.favicon != blank -%}
+      <link
+        rel="icon"
+        type="image/png"
+        href="{{ settings.favicon | image_url: width: 32, height: 32 }}"
+      >
+    {%- endif -%}
+
+    {% # theme-check-disable RemoteAsset %}
+    {% comment %} This a way to wait for main content to load when navigating to a new page so that the view transitions can work consistently {% endcomment %}
+    {% if settings.transition_to_main_product or settings.page_transition_enabled %}
+      <link
+        rel="expect"
+        href="#MainContent"
+        blocking="render"
+        id="view-transition-render-blocker"
+      >
+    {% endif %}
+
+    {%- render 'meta-tags' -%}
+    {%- render 'stylesheets' -%}
+    {%- render 'fonts' -%}
+    {%- render 'scripts' -%}
+    {%- render 'theme-styles-variables' -%}
+    {%- render 'color-schemes' -%}
+
+    {% if request.design_mode %}
+      {%- render 'theme-editor' -%}
+    {% endif %}
+
+    {{ content_for_header }}
+    {% # theme-check-enable RemoteAsset %}
+    <style>
+      /* Global Background Image (All Pages) */
+      html, body {
+        background-color: #040d0a !important;
+        background-image: url("{{ 'Backgroundimage.png' | asset_url }}") !important;
+        background-size: cover !important;
+        background-position: center top !important;
+        background-repeat: no-repeat !important;
+        background-attachment: fixed !important;
+      }
+      /* Force Custom Image Logo and Remove Text Logo Fallbacks */
+      .logo-monogram {
+        display: none !important; 
+      }
+      .header-logo, .logo-title {
+        font-size: 0 !important;
+        color: transparent !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        outline: none !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+      .header-logo:hover, .header-logo:focus, .header-logo:active, .header-logo:focus-visible,
+      .logo-title:hover, .logo-title:focus, .logo-title:active {
+        background: transparent !important;
+        background-color: transparent !important;
+        outline: none !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+      .logo-section jumbo-text, .logo-block jumbo-text {
+        display: none !important;
+      }
+      /* ============================================
+         LOGO — Real image, contained, no overlap
+      ============================================ */
+
+      @keyframes logo-breathe {
+        0%   { transform: scale(1); }
+        50%  { transform: scale(1.04); }
+        100% { transform: scale(1); }
+      }
+
+      /* Container: never grows beyond its column */
+      .header-logo {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+        max-width: clamp(120px, 16vw, 240px) !important;
+        flex-shrink: 1 !important;
+        flex-grow: 0 !important;
+        background: transparent !important;
+        outline: none !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+
+      /* The actual logo image */
+      .header-logo__image {
+        width: auto !important;
+        height: clamp(40px, 5.5vw, 72px) !important;
+        max-width: 100% !important;
+        object-fit: contain !important;
+        display: block !important;
+        animation: logo-breathe 4s ease-in-out infinite !important;
+        transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+        filter: drop-shadow(0 2px 8px rgba(212, 175, 55, 0.35)) !important;
+      }
+
+      /* Hover: clean scale-up lift, NO glow */
+      .header-logo:hover .header-logo__image {
+        transform: scale(1.1) translateY(-3px) !important;
+        animation-play-state: paused !important;
+        filter: none !important;
+      }
+
+      /* Mobile */
+      @media screen and (max-width: 749px) {
+        .header-logo {
+          max-width: 130px !important;
+        }
+        .header-logo__image {
+          height: 38px !important;
+        }
+      }
+
+      /* Remove the old ::after fake logo — prevent double rendering */
+      .header-logo::after,
+      .logo-inline::after,
+      .logo-section::after {
+        display: none !important;
+        content: none !important;
+      }
+
+      /* ============================================
+         FROZEN HEADER — Solid background layer & no overlap
+      ============================================ */
+      #header-component {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 100000 !important;
+        background: rgba(4, 13, 10, 0.85) !important;
+        backdrop-filter: blur(24px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+        border-bottom: 1px solid rgba(212, 175, 55, 0.25) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+        transition: transform 0.3s ease !important;
+      }
+
+      /* Push content down so it never overlaps the logo/header */
+      body {
+        padding-top: var(--header-height, 80px) !important;
+      }
+
+      /* Ensure the transparent header absolute positioning doesn't override fixed positioning */
+      .header[transparent] {
+        position: fixed !important;
+      }
+
+      /* Make all inner header elements (rows and underlays) completely transparent so only outer header solid background is shown */
+      .header__underlay,
+      .header__underlay-closed,
+      .header__underlay-open,
+      .header__row {
+        background-color: transparent !important;
+        background: transparent !important;
+      }
+
+      /* Global Transparency & Glassmorphism for Global Background Visibility */
+      body,
+      #MainContent,
+      .section,
+      .section-background,
+      .color-scheme-1,
+      .color-scheme-2,
+      .color-scheme-3,
+      .color-scheme-4,
+      .color-scheme-5,
+      .color-scheme-6,
+      .color-scheme-7,
+      .color-scheme-8,
+      [class*="color-scheme-"],
+      .cart-drawer__header,
+      .cart-drawer__items,
+      .cart-drawer__summary,
+      predictive-search-component,
+      .predictive-search,
+      .predictive-search-form__header,
+      .predictive-search-form__content,
+      .predictive-search-form__content-wrapper,
+      .predictive-search-form__header-inner,
+      .predictive-search-form__footer,
+      footer,
+      .footer-section,
+      .layered-slide, 
+      .slide, 
+      .carousel-content,
+      .marquee {
+        background-color: transparent !important;
+        background: transparent !important;
+      }
+      
+      /* Royal Luminous Glassmorphic Cards */
+      .card,
+      .product-card,
+      .collection-card,
+      .blog-post-card,
+      .cart-drawer__dialog,
+      .dialog-drawer,
+      .cart-drawer__inner,
+      .cart-drawer__content,
+      .search-modal__content,
+      .cart-items__wrapper,
+      .cart-summary__inner {
+        background: rgba(255, 255, 255, 0.08) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(212, 175, 55, 0.45) !important; /* Luminous Royal Gold Border */
+        border-radius: 16px !important;
+        padding: 20px !important;
+        box-shadow: 0 8px 32px 0 rgba(212, 175, 55, 0.2), inset 0 0 15px rgba(255, 255, 255, 0.05) !important;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+      }
+      
+      .card:hover,
+      .product-card:hover,
+      .collection-card:hover,
+      .blog-post-card:hover {
+        transform: translateY(-8px) scale(1.02) !important;
+        border-color: #fcf6ba !important;
+        box-shadow: 0 15px 45px 0 rgba(212, 175, 55, 0.35), inset 0 0 20px rgba(255, 255, 255, 0.1) !important;
+      }
+
+      .card__image,
+      .product-card__image,
+      .collection-card__image,
+      .image-element img {
+        background-color: transparent !important;
+      }
+
+      /* Royal Look Typography */
+      h1, h2, h3, h4, h5, h6,
+      .h1, .h2, .h3, .h4, .h5, .h6,
+      .section-title, .heading, .title,
+      .card__heading, .product-card__title, .collection-card__title {
+        font-family: 'Cinzel', serif !important;
+        letter-spacing: 0.12em !important;
+        text-transform: uppercase !important;
+        color: #fcf6ba !important; /* Royal Golden Sand text */
+        text-shadow: 0 0 10px rgba(252, 246, 186, 0.25) !important;
+      }
+      
+      p:not(#visriva-superdesigner-root *), 
+      li:not(#visriva-superdesigner-root *), 
+      a:not(#visriva-superdesigner-root *) {
+        color: #ffffff;
+      }
+      
+      /* Navigation Bar Styling & Animations */
+      .menu-list__link-title {
+        font-family: 'Cinzel', serif !important;
+        font-size: 1.15rem !important;
+        letter-spacing: 0.1em !important;
+        color: #fcf6ba !important; /* Golden text */
+        text-shadow: 0 2px 4px rgba(0,0,0,0.8) !important;
+        transition: all 0.3s ease !important;
+        position: relative;
+      }
+
+      .menu-list__link-title::after {
+        content: '';
+        position: absolute;
+        width: 0;
+        height: 2px;
+        bottom: -4px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #d4af37;
+        transition: width 0.3s ease;
+        box-shadow: 0 0 8px rgba(212, 175, 55, 0.8);
+      }
+
+      .menu-list__link:hover .menu-list__link-title::after,
+      .menu-list__link--active .menu-list__link-title::after {
+        width: 100%;
+      }
+
+      .menu-list__link:hover .menu-list__link-title,
+      .menu-list__link--active .menu-list__link-title {
+        color: #ffffff !important;
+        text-shadow: 0 0 15px rgba(252, 246, 186, 0.8) !important;
+      }
+
+      /* Mega Menu Glassmorphism */
+      .menu-list__submenu-inner {
+        background: rgba(255, 255, 255, 0.08) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border-top: 1px solid rgba(212, 175, 55, 0.45) !important;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.5) !important;
+        border-radius: 0 0 16px 16px;
+      }
+
+      .mega-menu__link {
+        font-family: 'Cinzel', serif !important;
+        color: #ffffff !important;
+        transition: color 0.3s ease, transform 0.3s ease !important;
+      }
+
+      .mega-menu__link:hover {
+        color: #d4af37 !important;
+        transform: translateX(5px) !important;
+      }
+
+      /* ============================================
+         LEFT MENU (HAMBURGER) ICON — Elegant & Animated
+      ============================================ */
+
+      /* Button container — match same 36px box as right icons */
+      .header__icon--menu {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 36px !important;
+        height: 36px !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        cursor: pointer !important;
+        transition: background 0.2s ease !important;
+        color: rgba(252, 246, 186, 0.85) !important;
+      }
+
+      /* Hover — same golden shimmer as right icons */
+      .header__icon--menu:hover {
+        background: rgba(212, 175, 55, 0.12) !important;
+      }
+
+      /* The SVG itself — small and clean */
+      .header__icon--menu svg,
+      .header-drawer-icon--open svg {
+        width: 18px !important;
+        height: 18px !important;
+        color: rgba(252, 246, 186, 0.85) !important;
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+                    filter 0.3s ease !important;
+      }
+
+      /* On hover — lines spread with a golden glow */
+      .header__icon--menu:hover svg,
+      .header__icon--menu:hover .header-drawer-icon--open svg {
+        transform: scale(1.15) !important;
+        filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.9)) !important;
+      }
+
+      /* Close icon (X) when drawer is open — same style */
+      .header-drawer-icon--close svg {
+        width: 18px !important;
+        height: 18px !important;
+        color: rgba(252, 246, 186, 0.85) !important;
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+      }
+
+      /* Spin close icon on hover */
+      .header__icon--menu[aria-expanded="true"]:hover .header-drawer-icon--close svg,
+      .menu-drawer__close-button:hover svg {
+        transform: rotate(90deg) scale(1.1) !important;
+        filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.9)) !important;
+      }
+
+      /* ============================================
+         HEADER ICONS — Unified, Consistent, Animated
+      ============================================ */
+
+      @keyframes icon-pop {
+        0%   { transform: scale(1); filter: drop-shadow(0 0 0px rgba(212,175,55,0)); }
+        50%  { transform: scale(1.18); filter: drop-shadow(0 0 6px rgba(212,175,55,0.9)); }
+        100% { transform: scale(1.1); filter: drop-shadow(0 0 4px rgba(212,175,55,0.6)); }
+      }
+
+      /* Fix right-side icon container */
+      header-actions {
+        display: flex !important;
+        align-items: center !important;
+        gap: 2px !important;
+      }
+
+      /* Every icon button — identical box */
+      .header-actions__action,
+      .header-actions__customizer,
+      .account-button,
+      header-actions > a,
+      header-actions > button {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 36px !important;
+        height: 36px !important;
+        min-width: 36px !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        cursor: pointer !important;
+        transition: background 0.2s ease !important;
+        position: relative !important;
+      }
+
+      /* Every SVG — identical 18px, same golden tint */
+      header-actions svg,
+      header-actions .svg-wrapper svg,
+      .header-actions__action svg,
+      .header-actions__customizer svg,
+      .customizer-action-icon,
+      .account-button__icon,
+      .search-action svg {
+        width: 18px !important;
+        height: 18px !important;
+        stroke-width: 1.6 !important;
+        color: rgba(252, 246, 186, 0.85) !important;
+        fill: none !important;
+        flex-shrink: 0 !important;
+        display: block !important;
+        transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+                    filter 0.25s ease !important;
+      }
+
+      /* svg-wrapper — no extra space */
+      header-actions .svg-wrapper,
+      .header-actions__action .svg-wrapper,
+      .header-actions__customizer .svg-wrapper {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        line-height: 0 !important;
+      }
+
+      /* Unified hover — same golden shimmer for all */
+      .header-actions__action:hover,
+      .header-actions__customizer:hover,
+      .account-button:hover,
+      header-actions > a:hover,
+      header-actions > button:hover {
+        background: rgba(212, 175, 55, 0.12) !important;
+      }
+
+      /* ONE animation for every icon on hover — pop + golden glow */
+      .header-actions__action:hover svg,
+      .header-actions__customizer:hover svg,
+      .header-actions__customizer:hover .customizer-action-icon,
+      .account-button:hover .account-button__icon,
+      .account-button:hover shopify-account svg,
+      header-actions > a:hover svg,
+      header-actions > button:hover svg {
+        animation: icon-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+      }
+
+      /* Cart bubble */
+      .cart-bubble {
+        width: 15px !important;
+        height: 15px !important;
+        font-size: 9px !important;
+      }
+
+      /* Account fallback avatar dot */
+      .account-button__fallback {
+        width: 20px !important;
+        height: 20px !important;
+      }
+
+      /* Suppress stray text labels */
+      header-actions .hidden,
+      header-actions .mobile\:hidden,
+      header-actions .desktop\:hidden {
+        display: none !important;
+      }
+
+      /* === premium cart typography & legibility harmony === */
+      .cart-drawer,
+      .cart-drawer-component,
+      .cart-items__wrapper,
+      .cart-summary__inner,
+      .cart-form,
+      .cart-items,
+      .cart-drawer__inner,
+      .cart-drawer__dialog {
+        color: #ffffff !important;
+      }
+
+      /* Gold Headings, Titles & Prices */
+      .cart-drawer__heading,
+      .cart-drawer__heading--empty,
+      .cart-items__title,
+      .cart__total-label,
+      .cart__total-value,
+      .cart-items__price,
+      .cart-items__price *,
+      .cart-drawer__summary *,
+      .cart-drawer__header *,
+      .cart-items__details a {
+        font-family: 'Cinzel', serif !important;
+        color: #fcf6ba !important;
+        text-shadow: 0 0 8px rgba(252, 246, 186, 0.2) !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+      }
+
+      /* White Details, Variants, & Text */
+      .cart-items__property,
+      .cart-items__property *,
+      .cart-items__variants,
+      .cart-items__variants *,
+      .cart-items__variant,
+      .cart-items__variant *,
+      .cart-items__product-info *,
+      .cart-drawer__close-button,
+      .cart-drawer__close-button svg,
+      .cart-items__remove svg,
+      .cart-item__error-text,
+      .volume-pricing-info,
+      .volume-pricing-info *,
+      .cart-items__details dt,
+      .cart-items__details dd,
+      .cart-items__details dl {
+        color: rgba(255, 255, 255, 0.9) !important;
+        fill: #ffffff !important;
+      }
+
+      /* Legible quantity selector text */
+      .cart-items__quantity-controls input,
+      .cart-items__quantity-controls button {
+        color: #ffffff !important;
+      }
+
+      /* Checkout Button Styling (Match Brand Serifs) */
+      .cart-drawer__summary button[type="submit"],
+      .cart-summary__inner button[type="submit"] {
+        font-family: 'Cinzel', serif !important;
+        font-size: 1.1rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.1em !important;
+        color: #fcf6ba !important;
+        border: 1px solid rgba(212, 175, 55, 0.6) !important;
+        transition: all 0.3s ease !important;
+      }
+
+      .cart-drawer__summary button[type="submit"]:hover,
+      .cart-summary__inner button[type="submit"]:hover {
+        background: rgba(212, 175, 55, 0.2) !important;
+        box-shadow: 0 0 15px rgba(212, 175, 55, 0.5) !important;
+      }
+
+      /* Align Cart Page Layout & Wrapped Titles */
+      .cart-items__title {
+        white-space: normal !important;
+        word-break: normal !important;
+        overflow-wrap: break-word !important;
+        line-height: 1.4 !important;
+        font-size: 1rem !important;
+      }
+    </style>
+    <link href="{{ 'visriva-global.css' | asset_url }}" rel="stylesheet">
+  </head>
+
+  <body class="template-{{ template.name }} page-width-{{ settings.page_width }} card-hover-effect-{{ settings.card_hover_effect }}">
+    {% render 'skip-to-content-link', href: '#MainContent', text: 'accessibility.skip_to_text' %}
+    <div id="header-group">
+      {% sections 'header-group' %}
+    </div>
+
+    <script>
+      // Inline header height and menu style calculations to prevent layout shift
+      // Note: Updates in calculateHeaderGroupHeight(), updateTransparentHeaderOffset() and setHeaderMenuStyle() utilities.js should be kept in sync with this function
+      (function setHeaderHeighCustomProperties() {
+        /*
+         * Header calculation functions for maintaining CSS variables
+         * Mimic calculateHeaderGroupHeight() in utilities.js
+         */
+        const header = document.querySelector('header-component');
+        const headerGroup = document.querySelector('#header-group');
+        const hasHeaderSection = headerGroup?.querySelector('.header-section');
+
+        if (!header || !headerGroup) return;
+
+        const headerTopRow = header.querySelector('.header__row--top');
+        const headerHeight = header.offsetHeight;
+
+        // Calculate the total height of the header group
+        let headerGroupHeight = 0;
+        const children = headerGroup.children;
+        for (let i = 0; i < children.length; i++) {
+          const element = children[i];
+          if (element === header || !(element instanceof HTMLElement)) continue;
+          headerGroupHeight += element.offsetHeight;
+        }
+
+        // Check for transparent header special case
+        if (header.hasAttribute('transparent') && header.parentElement?.nextElementSibling) {
+          headerGroupHeight += headerHeight;
+        }
+
+        // Set CSS variables
+        document.body.style.setProperty('--header-height', `${headerHeight}px`);
+        document.body.style.setProperty('--header-group-height', `${headerGroupHeight}px`);
+
+        if (headerTopRow) {
+          window.requestAnimationFrame(function () {
+            document.body.style.setProperty('--top-row-height', `${headerTopRow.offsetHeight}px`);
+          });
+        }
+
+        /**
+         * Updates CSS custom properties for transparent header offset calculation
+         * Mimic updateTransparentHeaderOffset() in utilities.js
+         */
+
+        if (!hasHeaderSection || !header?.hasAttribute('transparent')) {
+          document.body.style.setProperty('--transparent-header-offset-boolean', '0');
+          return;
+        }
+
+        const hasImmediateSection = hasHeaderSection.nextElementSibling?.classList.contains('shopify-section');
+
+        const shouldApplyOffset = !hasImmediateSection ? '1' : '0';
+        document.body.style.setProperty('--transparent-header-offset-boolean', shouldApplyOffset);
+      })();
+
+      (function setHeaderMenuStyle() {
+        const headerComponent = document.querySelector('#header-component');
+        if (headerComponent) {
+          const isTouchDevice = 'ontouchstart' in window && navigator.maxTouchPoints > 0;
+          const overflowList = headerComponent?.querySelector('overflow-list');
+          const hasReachedMinimum = overflowList && overflowList.hasAttribute('minimum-reached');
+          headerComponent.dataset.menuStyle = isTouchDevice || hasReachedMinimum ? 'drawer' : 'menu';
+        }
+      })();
+    </script>
+
+    <main
+      id="MainContent"
+      class="content-for-layout"
+      role="main"
+      data-page-transition-enabled="{{ settings.page_transition_enabled }}"
+      data-product-transition="{{ settings.transition_to_main_product }}"
+      data-template="{{ template }}"
+    >
+      {{ content_for_layout }}
+    </main>
+
+    <footer>
+      {% sections 'footer-group' %}
+    </footer>
+
+    {% render 'search-modal' %}
+
+    {% if settings.quick_add or settings.mobile_quick_add %}
+      {% render 'quick-add-modal' %}
+    {% endif %}
+
+    {% if template.name == 'index' %}
+      <a href="/pages/studio-v2" class="visriva-fab">
+        <span class="visriva-fab-text">Design Custom T-Shirt</span>
+      </a>
+    {% endif %}
+  </body>
+</html>

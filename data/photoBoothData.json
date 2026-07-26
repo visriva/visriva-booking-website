@@ -1,0 +1,18 @@
+{
+  "services": [
+    {"title": "Premium DSLR Photo Booth","description": "High‑resolution DSLR captures with instant prints."},
+    {"title": "iPad Interactive Booth","description": "Touch‑screen iPad experience with custom filters and GIFs."},
+    {"title": "Custom Branding","description": "Branded backdrops, overlays and photo frame designs."},
+    {"title": "Live Social Sharing","description": "Instant upload to Instagram, WhatsApp and email."}
+  ],
+  "pricing": [
+    {"feature": "Setup Fee","dslr": "$200","ipad": "$150"},
+    {"feature": "Hourly Rate","dslr": "$120/hr","ipad": "$100/hr"},
+    {"feature": "Custom Prints","dslr": "$2.5 per print","ipad": "$2 per print"},
+    {"feature": "Social Media Package","dslr": "$300","ipad": "$250"}
+  ],
+  "testimonials": [
+    {"quote": "The DSLR booth captured every smile perfectly – guests still talk about it!","author": "Rohan Mehta, Corporate Event"},
+    {"quote": "The iPad mode gave our wedding a fun, modern vibe. Loved the instant GIFs!","author": "Anita Sharma, Bride"}
+  ]
+}

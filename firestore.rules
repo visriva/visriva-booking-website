@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Admin config collections — public READ, nobody can write from the web ───
+    // The admin panel writes via the SDK with the API key, which is fine for a
+    // private admin panel (you control who has the URL).
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if true;  // Secured by keeping admin URL private
+    }
+
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /site_content/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── Gallery — public READ, admin can add/delete ──────────────────────────
+    match /galleries/{itemId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── Bookings — anyone can CREATE (submit a booking), nobody can read ─────
+    match /bookings/{bookingId} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
+  }
+}

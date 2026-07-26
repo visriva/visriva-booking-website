@@ -26,8 +26,9 @@ module.exports = {
         },
       },
       fontFamily: {
-        serif: ['var(--font-serif)', 'Playfair Display', 'Georgia', 'serif'],
-        sans: ['var(--font-sans)', 'Inter', 'sans-serif'],
+        serif: ['var(--font-playfair)', 'Playfair Display', 'Georgia', 'serif'],
+        playfair: ['var(--font-playfair)', 'Playfair Display', 'serif'],
+        sans: ['var(--font-montserrat)', 'Montserrat', 'Inter', 'sans-serif'],
       },
       backgroundImage: {
         'gold-gradient': 'linear-gradient(135deg, #F5E0A3 0%, #D4AF37 50%, #AA841E 100%)',
