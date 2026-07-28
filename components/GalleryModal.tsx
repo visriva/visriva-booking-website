@@ -132,6 +132,18 @@ export default function GalleryModal({
                   <h3 className="font-serif text-2xl sm:text-4xl font-bold text-white leading-tight drop-shadow-md">
                     {currentItem.tagline || "Exclusive VIP Setup"}
                   </h3>
+                  <div className="pt-2">
+                    <a
+                      href={`https://wa.me/918884484828?text=${encodeURIComponent(
+                        `Hello Visriva! I would like to inquire about booking this setup: ${currentItem?.tagline || serviceName}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center space-x-2 px-5 py-2 rounded-full bg-[#25D366] text-black font-extrabold text-xs uppercase tracking-wider hover:bg-white transition-all shadow-lg cursor-pointer"
+                    >
+                      <span>Inquire this Setup via WhatsApp</span>
+                    </a>
+                  </div>
                 </motion.div>
               </AnimatePresence>
 

@@ -11,11 +11,15 @@ import {
   subscribeWebsiteText,
   DEFAULT_WEBSITE_TEXT,
   WebsiteTextConfig,
+  subscribeFeatureToggles,
+  DEFAULT_FEATURE_TOGGLES,
+  FeatureTogglesConfig,
 } from "@/lib/firebase";
 
 export default function Footer() {
   const [contact, setContact] = useState<GlobalSettingsConfig>(DEFAULT_GLOBAL_SETTINGS);
   const [websiteText, setWebsiteText] = useState<WebsiteTextConfig>(DEFAULT_WEBSITE_TEXT);
+  const [toggles, setToggles] = useState<FeatureTogglesConfig>(DEFAULT_FEATURE_TOGGLES);
 
   useEffect(() => {
     const unsubContact = subscribeGlobalContactSettings((data) => {
@@ -24,9 +28,13 @@ export default function Footer() {
     const unsubText = subscribeWebsiteText((data) => {
       if (data) setWebsiteText(data);
     });
+    const unsubToggles = subscribeFeatureToggles((data) => {
+      if (data) setToggles(data);
+    });
     return () => {
       unsubContact();
       unsubText();
+      unsubToggles();
     };
   }, []);
 
@@ -69,30 +77,46 @@ export default function Footer() {
               Virtual Assistant Services
             </h4>
             <ul className="space-y-2.5 text-xs font-graven">
-              <li>
-                <a href="/photo-booth" className="hover:text-[#D4AF37] transition-colors flex items-center justify-between group">
-                  <span>Photo Booth Collections</span>
-                  <ArrowUpRight className="w-3.5 h-3.5 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
-                </a>
-              </li>
-              <li>
-                <a href="/services/magnet-station" className="hover:text-[#D4AF37] transition-colors flex items-center justify-between group">
-                  <span>Custom Fridge Magnets</span>
-                  <ArrowUpRight className="w-3.5 h-3.5 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
-                </a>
-              </li>
-              <li>
-                <a href="/services/keychain-station" className="hover:text-[#D4AF37] transition-colors flex items-center justify-between group">
-                  <span>Bespoke Keychains</span>
-                  <ArrowUpRight className="w-3.5 h-3.5 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
-                </a>
-              </li>
-              <li>
-                <a href="/services/mug-printing" className="hover:text-[#D4AF37] transition-colors flex items-center justify-between group">
-                  <span>Live Mug Printing</span>
-                  <ArrowUpRight className="w-3.5 h-3.5 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
-                </a>
-              </li>
+              {toggles.enablePhotoBoothService !== false && (
+                <li>
+                  <a href="/photo-booth" className="hover:text-[#D4AF37] transition-colors flex items-center justify-between group">
+                    <span>Photo Booth Collections</span>
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                </li>
+              )}
+              {toggles.enableMagnetService !== false && (
+                <li>
+                  <a href="/services/magnet-station" className="hover:text-[#D4AF37] transition-colors flex items-center justify-between group">
+                    <span>Custom Fridge Magnets</span>
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                </li>
+              )}
+              {toggles.enableKeychainService !== false && (
+                <li>
+                  <a href="/services/keychain-station" className="hover:text-[#D4AF37] transition-colors flex items-center justify-between group">
+                    <span>Bespoke Keychains</span>
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                </li>
+              )}
+              {toggles.enableMugService !== false && (
+                <li>
+                  <a href="/services/mug-printing" className="hover:text-[#D4AF37] transition-colors flex items-center justify-between group">
+                    <span>Live Mug Printing</span>
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                </li>
+              )}
+              {toggles.enableToteTshirtService !== false && (
+                <li>
+                  <a href="/services/tote-tshirt-station" className="hover:text-[#D4AF37] transition-colors flex items-center justify-between group">
+                    <span>Tote Bag &amp; T-Shirt Station</span>
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
 

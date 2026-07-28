@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowRight, Sparkles, Camera, Play, Layers, Printer, Magnet, Key, Coffee } from "lucide-react";
+import { ArrowRight, Sparkles, Camera, Play, Layers, Printer, Magnet, Key, Coffee, ShoppingBag, Calendar as CalendarIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   subscribeSiteSettings,
@@ -11,17 +11,24 @@ import {
   subscribeWebsiteText,
   DEFAULT_WEBSITE_TEXT,
   WebsiteTextConfig,
+  subscribeFeatureToggles,
+  DEFAULT_FEATURE_TOGGLES,
+  FeatureTogglesConfig,
+  subscribeHeroCardStackConfig,
+  DEFAULT_HERO_CARD_STACK_CONFIG,
+  HeroCardStackConfig,
 } from "@/lib/firebase";
 import Magnetic3DButton from "@/components/Magnetic3DButton";
 import TiltCard from "@/components/TiltCard";
 import MaskedText from "@/components/MaskedText";
+import AIConciergeWidget from "@/components/AIConciergeWidget";
 
 export default function HeroSection() {
   const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SITE_SETTINGS);
   const [webText, setWebText] = useState<WebsiteTextConfig>(DEFAULT_WEBSITE_TEXT);
+  const [toggles, setToggles] = useState<FeatureTogglesConfig>(DEFAULT_FEATURE_TOGGLES);
+  const [cardStackConfig, setCardStackConfig] = useState<HeroCardStackConfig>(DEFAULT_HERO_CARD_STACK_CONFIG);
   const containerRef = useRef<HTMLDivElement>(null);
-
-
 
   useEffect(() => {
     const unsub = subscribeSiteSettings((newSettings) => {
@@ -30,9 +37,17 @@ export default function HeroSection() {
     const unsubText = subscribeWebsiteText((data) => {
       if (data) setWebText(data);
     });
+    const unsubToggles = subscribeFeatureToggles((data) => {
+      if (data) setToggles(data);
+    });
+    const unsubCards = subscribeHeroCardStackConfig((data) => {
+      if (data) setCardStackConfig(data);
+    });
     return () => {
       unsub();
       unsubText();
+      unsubToggles();
+      unsubCards();
     };
   }, []);
 
@@ -69,13 +84,13 @@ export default function HeroSection() {
 
               {/* H1 Hero Headline */}
               <MaskedText
-                text={webText.heroTitle || settings.heroTitle || "Visriva Live Station"}
+                text={webText.heroTitle || settings.heroTitle || "Bengaluru's Premium Live Keepsake Stations"}
                 className="font-playfair text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-white leading-[1.08] text-left"
               />
 
               {/* Subheadline & Description */}
               <p className="font-cormorant text-xl sm:text-2xl md:text-3xl text-[#D4AF37] font-semibold tracking-wide">
-                {webText.heroSubtitle || settings.heroSubtitle}
+                {webText.heroSubtitle || settings.heroSubtitle || "Elevate your weddings and corporate events with instant photos, magnets, keychains, and custom apparel."}
               </p>
 
               <p className="font-sans text-sm sm:text-base md:text-lg text-emerald-100/90 font-light leading-relaxed max-w-xl">
@@ -85,9 +100,9 @@ export default function HeroSection() {
               {/* Primary Call to Action Buttons */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2 w-full max-w-xl">
                 <Magnetic3DButton onClick={scrollToBooking} href="#booking-engine">
-                  <div className="w-full sm:w-auto min-w-[180px] px-8 py-4 rounded-full bg-gold-gradient text-[#011F15] font-extrabold text-sm shadow-gold-lg hover:shadow-gold-md flex items-center justify-center space-x-2 cursor-pointer">
-                    <span>Book Station</span>
-                    <ArrowRight className="w-4 h-4" />
+                  <div className="w-full sm:w-auto min-w-[220px] px-8 py-4 rounded-full bg-gold-gradient text-[#011F15] font-extrabold text-sm shadow-gold-lg hover:shadow-gold-md flex items-center justify-center space-x-2 cursor-pointer">
+                    <CalendarIcon className="w-4 h-4" />
+                    <span>Check Date Availability</span>
                   </div>
                 </Magnetic3DButton>
 
@@ -110,53 +125,89 @@ export default function HeroSection() {
               <div className="pt-6 w-full max-w-xl">
                 <div className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold mb-3 flex items-center space-x-2">
                   <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
-                  <span>Our 4 Luxury Live Stations</span>
+                  <span>Our Signature Live Stations</span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <Link
-                    href="/services/photo-booth"
-                    className="p-3.5 rounded-2xl bg-black/40 border border-[#D4AF37]/30 text-white hover:text-[#D4AF37] hover:bg-black/60 hover:border-[#D4AF37] transition-all duration-300 backdrop-blur-md flex flex-col items-center justify-center text-center group shadow-md"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] group-hover:scale-110 transition-transform mb-2 shadow-gold-sm">
-                      <Camera className="w-5 h-5" />
-                    </div>
-                    <span className="text-xs font-bold font-serif leading-tight">Photo Booth</span>
-                    <span className="text-[10px] text-emerald-200/80 font-mono mt-0.5">Live Studio</span>
-                  </Link>
+                <div className="flex flex-wrap gap-3">
+                  {toggles.enablePhotoBoothService !== false && (
+                    <Link
+                      href="/photo-booth"
+                      className="p-3 py-2.5 rounded-2xl bg-black/40 border border-[#D4AF37]/30 text-white hover:text-[#D4AF37] hover:bg-black/60 hover:border-[#D4AF37] transition-all duration-300 backdrop-blur-md flex items-center space-x-2.5 group shadow-md"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] group-hover:scale-110 transition-transform shadow-gold-sm">
+                        <Camera className="w-4 h-4" />
+                      </div>
+                      <div className="text-left">
+                        <span className="text-xs font-bold font-serif leading-tight block">Photo Booth</span>
+                        <span className="text-[9px] text-emerald-200/80 font-mono block">8s Dye-Sub</span>
+                      </div>
+                    </Link>
+                  )}
 
-                  <Link
-                    href="/services/magnet-station"
-                    className="p-3.5 rounded-2xl bg-black/40 border border-[#D4AF37]/30 text-white hover:text-[#D4AF37] hover:bg-black/60 hover:border-[#D4AF37] transition-all duration-300 backdrop-blur-md flex flex-col items-center justify-center text-center group shadow-md"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] group-hover:scale-110 transition-transform mb-2 shadow-gold-sm">
-                      <Magnet className="w-5 h-5" />
-                    </div>
-                    <span className="text-xs font-bold font-serif leading-tight">Magnets</span>
-                    <span className="text-[10px] text-emerald-200/80 font-mono mt-0.5">Acrylic Gloss</span>
-                  </Link>
+                  {toggles.enableMagnetService !== false && (
+                    <Link
+                      href="/services/magnet-station"
+                      className="p-3 py-2.5 rounded-2xl bg-black/40 border border-[#D4AF37]/30 text-white hover:text-[#D4AF37] hover:bg-black/60 hover:border-[#D4AF37] transition-all duration-300 backdrop-blur-md flex items-center space-x-2.5 group shadow-md"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] group-hover:scale-110 transition-transform shadow-gold-sm">
+                        <Magnet className="w-4 h-4" />
+                      </div>
+                      <div className="text-left">
+                        <span className="text-xs font-bold font-serif leading-tight block">Magnets</span>
+                        <span className="text-[9px] text-emerald-200/80 font-mono block">Acrylic Gloss</span>
+                      </div>
+                    </Link>
+                  )}
 
-                  <Link
-                    href="/services/keychain-station"
-                    className="p-3.5 rounded-2xl bg-black/40 border border-[#D4AF37]/30 text-white hover:text-[#D4AF37] hover:bg-black/60 hover:border-[#D4AF37] transition-all duration-300 backdrop-blur-md flex flex-col items-center justify-center text-center group shadow-md"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] group-hover:scale-110 transition-transform mb-2 shadow-gold-sm">
-                      <Key className="w-5 h-5" />
-                    </div>
-                    <span className="text-xs font-bold font-serif leading-tight">Keychains</span>
-                    <span className="text-[10px] text-emerald-200/80 font-mono mt-0.5">Dual-Sided</span>
-                  </Link>
+                  {toggles.enableKeychainService !== false && (
+                    <Link
+                      href="/services/keychain-station"
+                      className="p-3 py-2.5 rounded-2xl bg-black/40 border border-[#D4AF37]/30 text-white hover:text-[#D4AF37] hover:bg-black/60 hover:border-[#D4AF37] transition-all duration-300 backdrop-blur-md flex items-center space-x-2.5 group shadow-md"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] group-hover:scale-110 transition-transform shadow-gold-sm">
+                        <Key className="w-4 h-4" />
+                      </div>
+                      <div className="text-left">
+                        <span className="text-xs font-bold font-serif leading-tight block">Keychains</span>
+                        <span className="text-[9px] text-emerald-200/80 font-mono block">Dual-Sided</span>
+                      </div>
+                    </Link>
+                  )}
 
-                  <Link
-                    href="/services/mug-printing"
-                    className="p-3.5 rounded-2xl bg-black/40 border border-[#D4AF37]/30 text-white hover:text-[#D4AF37] hover:bg-black/60 hover:border-[#D4AF37] transition-all duration-300 backdrop-blur-md flex flex-col items-center justify-center text-center group shadow-md"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] group-hover:scale-110 transition-transform mb-2 shadow-gold-sm">
-                      <Coffee className="w-5 h-5" />
-                    </div>
-                    <span className="text-xs font-bold font-serif leading-tight">Mugs</span>
-                    <span className="text-[10px] text-emerald-200/80 font-mono mt-0.5">VIP Sublimation</span>
-                  </Link>
+                  {toggles.enableMugService !== false && (
+                    <Link
+                      href="/services/mug-printing"
+                      className="p-3 py-2.5 rounded-2xl bg-black/40 border border-[#D4AF37]/30 text-white hover:text-[#D4AF37] hover:bg-black/60 hover:border-[#D4AF37] transition-all duration-300 backdrop-blur-md flex items-center space-x-2.5 group shadow-md"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] group-hover:scale-110 transition-transform shadow-gold-sm">
+                        <Coffee className="w-4 h-4" />
+                      </div>
+                      <div className="text-left">
+                        <span className="text-xs font-bold font-serif leading-tight block">Live Mugs</span>
+                        <span className="text-[9px] text-emerald-200/80 font-mono block">VIP Sublimation</span>
+                      </div>
+                    </Link>
+                  )}
+
+                  {toggles.enableToteTshirtService !== false && (
+                    <Link
+                      href="/services/tote-tshirt-station"
+                      className="p-3 py-2.5 rounded-2xl bg-black/40 border border-[#D4AF37]/30 text-white hover:text-[#D4AF37] hover:bg-black/60 hover:border-[#D4AF37] transition-all duration-300 backdrop-blur-md flex items-center space-x-2.5 group shadow-md"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] group-hover:scale-110 transition-transform shadow-gold-sm">
+                        <ShoppingBag className="w-4 h-4" />
+                      </div>
+                      <div className="text-left">
+                        <span className="text-xs font-bold font-serif leading-tight block">Tote &amp; Tees</span>
+                        <span className="text-[9px] text-emerald-200/80 font-mono block">Canvas Press</span>
+                      </div>
+                    </Link>
+                  )}
                 </div>
+              </div>
+
+              {/* AI Event Concierge Banner */}
+              <div className="pt-2 pb-1 max-w-xl">
+                <AIConciergeWidget />
               </div>
 
               {/* Spec Highlights Bar */}
@@ -177,69 +228,180 @@ export default function HeroSection() {
 
             </div>
 
-            {/* RIGHT COLUMN: Interactive 3D Staggered Floating Cards Deck (lg:col-span-5) */}
-            <div className="lg:col-span-5 w-full relative h-[480px] sm:h-[520px] flex items-center justify-center">
-              <TiltCard maxDegree={12} className="w-full h-full relative flex items-center justify-center">
-                
-                {/* Card 1: Back Layer (Keychains & Mugs) */}
-                <div className="absolute top-2 left-0 sm:left-2 w-[85%] sm:w-72 p-5 sm:p-6 rounded-2xl border border-white/10 bg-[#01281c] shadow-[0_15px_35px_rgba(0,0,0,0.6)] transform -rotate-6 transition-all duration-500 hover:rotate-0 hover:scale-[1.04] hover:z-40 hover:border-[#D4AF37]/50 hover:bg-[#023b29] hover:shadow-[0_25px_50px_rgba(0,0,0,0.85)] group cursor-pointer z-10">
-                  <div className="flex items-center justify-between mb-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-black/50 border border-white/15 flex items-center justify-center text-[#D4AF37] group-hover:border-[#D4AF37] group-hover:bg-[#D4AF37] group-hover:text-[#011F15] transition-all">
-                      <Printer className="w-5 h-5" />
-                    </div>
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#D4AF37] bg-[#D4AF37]/15 px-2.5 py-1 rounded-full border border-[#D4AF37]/30 group-hover:bg-[#D4AF37] group-hover:text-[#011F15] transition-all">
-                      Sublimation
-                    </span>
-                  </div>
-                  <h4 className="font-serif text-lg sm:text-xl font-bold text-white group-hover:text-[#D4AF37] transition-colors mb-1">
-                    Keychains &amp; Live Mugs
-                  </h4>
-                  <p className="text-xs sm:text-sm text-emerald-100/80 group-hover:text-white font-sans font-normal leading-relaxed transition-colors">
-                    High-heat transfer mug &amp; dual-sided keychain station for corporate branding.
-                  </p>
-                </div>
+            {/* RIGHT COLUMN: Interactive 3D Staggered & Fan-Out Deck (lg:col-span-5) */}
+            <div className="lg:col-span-5 w-full relative min-h-[480px] sm:min-h-[520px] flex items-center justify-center group/deck">
+              <TiltCard maxDegree={10} className="w-full h-full relative flex items-center justify-center min-h-[480px] sm:min-h-[520px]">
+                {(() => {
+                  const CARDS_DEF = [
+                    {
+                      id: "mugs",
+                      title: "Live Mug Printing",
+                      badge: "Sublimation",
+                      badgeClass: "bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30",
+                      icon: Coffee,
+                      desc: "High-heat transfer mug printing station live for corporate branding.",
+                      href: "/services/mug-printing",
+                      toggleKey: "enableMugService",
+                      restClass: "top-0 left-0 sm:left-2 -rotate-6 z-10",
+                      hoverClass: "group-hover/deck:-translate-y-10 group-hover/deck:-translate-x-8 group-hover/deck:-rotate-12",
+                      bgColor: "bg-[#01281c]",
+                      width: "w-[85%] sm:w-72",
+                    },
+                    {
+                      id: "keychains",
+                      title: "Bespoke Keychains",
+                      badge: "Keepsake",
+                      badgeClass: "bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30",
+                      icon: Key,
+                      desc: "Double-sided crystal acrylic & metallic keychains with guest portraits.",
+                      href: "/services/keychain-station",
+                      toggleKey: "enableKeychainService",
+                      restClass: "top-12 left-4 sm:left-8 -rotate-3 z-20",
+                      hoverClass: "group-hover/deck:-translate-y-6 group-hover/deck:-translate-x-4 group-hover/deck:-rotate-6",
+                      bgColor: "bg-[#013022]",
+                      width: "w-[85%] sm:w-72",
+                    },
+                    {
+                      id: "magnets",
+                      title: "Custom Fridge Magnets",
+                      badge: "Bespoke",
+                      badgeClass: "bg-emerald-950/80 text-emerald-300 border border-emerald-400/30",
+                      icon: Layers,
+                      desc: "Glossy acrylic magnetic keepsakes customized live with event branding.",
+                      href: "/services/magnet-station",
+                      toggleKey: "enableMagnetService",
+                      restClass: "top-24 right-0 sm:right-2 rotate-3 z-30",
+                      hoverClass: "group-hover/deck:translate-x-10 group-hover/deck:-translate-y-2 group-hover/deck:rotate-6",
+                      bgColor: "bg-[#013324]",
+                      width: "w-[85%] sm:w-72",
+                    },
+                    {
+                      id: "totes",
+                      title: "Tote Bag & T-Shirt Station",
+                      badge: "Canvas Press",
+                      badgeClass: "bg-amber-950/80 text-amber-300 border border-amber-400/30",
+                      icon: ShoppingBag,
+                      desc: "Live heat-press canvas tote bags and custom apparel printing activation.",
+                      href: "/services/tote-tshirt-station",
+                      toggleKey: "enableToteTshirtService",
+                      restClass: "top-36 right-2 sm:right-6 -rotate-2 z-40",
+                      hoverClass: "group-hover/deck:translate-y-6 group-hover/deck:translate-x-8 group-hover/deck:-rotate-4",
+                      bgColor: "bg-[#022c1e]",
+                      width: "w-[88%] sm:w-76",
+                    },
+                    {
+                      id: "photo-booth",
+                      title: "Instant Photo Booth",
+                      badge: "Flagship",
+                      badgeClass: "bg-[#D4AF37] text-[#011F15] font-extrabold shadow-md",
+                      icon: Camera,
+                      desc: "Studio-grade Full-Frame optics with high-speed dye-sublimation print engine.",
+                      footer: "Full-Frame Optics • Instant QR Gallery",
+                      href: "/photo-booth",
+                      toggleKey: "enablePhotoBoothService",
+                      restClass: "top-48 left-2 sm:left-6 rotate-6 z-50",
+                      hoverClass: "group-hover/deck:translate-y-10 group-hover/deck:-translate-x-4 group-hover/deck:rotate-4",
+                      bgColor: "bg-[#022419]",
+                      width: "w-[90%] sm:w-80",
+                      isFlagship: true,
+                    },
+                  ];
 
-                {/* Card 2: Middle Layer (Custom Fridge Magnets) */}
-                <div className="absolute top-28 right-0 sm:right-2 w-[85%] sm:w-72 p-5 sm:p-6 rounded-2xl border border-white/10 bg-[#013324] shadow-[0_15px_35px_rgba(0,0,0,0.7)] transform rotate-3 transition-all duration-500 hover:rotate-0 hover:scale-[1.04] hover:z-40 hover:border-[#D4AF37]/50 hover:bg-[#02422e] hover:shadow-[0_25px_50px_rgba(0,0,0,0.85)] group cursor-pointer z-20">
-                  <div className="flex items-center justify-between mb-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-black/50 border border-white/15 flex items-center justify-center text-[#D4AF37] group-hover:border-[#D4AF37] group-hover:bg-[#D4AF37] group-hover:text-[#011F15] transition-all">
-                      <Layers className="w-5 h-5" />
-                    </div>
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-emerald-300 bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-400/30 group-hover:bg-[#D4AF37] group-hover:text-[#011F15] transition-all">
-                      Bespoke
-                    </span>
-                  </div>
-                  <h4 className="font-serif text-lg sm:text-xl font-bold text-white group-hover:text-[#D4AF37] transition-colors mb-1">
-                    Custom Fridge Magnets
-                  </h4>
-                  <p className="text-xs sm:text-sm text-emerald-100/80 group-hover:text-white font-sans font-normal leading-relaxed transition-colors">
-                    Glossy acrylic magnetic keepsakes customized live with event branding.
-                  </p>
-                </div>
+                  const activeCards = CARDS_DEF.filter(
+                    (c) => toggles[c.toggleKey as keyof FeatureTogglesConfig] !== false
+                  );
 
-                {/* Card 3: Front Featured Layer (Instant Photo Booth) */}
-                <div className="absolute top-56 left-2 sm:left-6 w-[90%] sm:w-80 p-6 rounded-2xl border border-[#D4AF37]/40 bg-[#022419] shadow-[0_20px_45px_rgba(0,0,0,0.8)] transform rotate-6 transition-all duration-500 hover:rotate-0 hover:scale-[1.04] hover:z-40 hover:border-[#D4AF37]/80 hover:bg-[#023624] hover:shadow-[0_30px_60px_rgba(0,0,0,0.9)] group cursor-pointer z-30">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-11 h-11 rounded-xl bg-gold-gradient flex items-center justify-center text-[#011F15] shadow-md group-hover:scale-110 transition-transform">
-                      <Camera className="w-6 h-6" />
-                    </div>
-                    <span className="text-xs font-extrabold uppercase tracking-widest text-[#011F15] bg-[#D4AF37] px-3.5 py-1 rounded-full shadow-md group-hover:bg-white group-hover:text-[#011F15] transition-all">
-                      Flagship
-                    </span>
-                  </div>
-                  <h3 className="font-serif text-2xl font-bold text-white group-hover:text-[#D4AF37] transition-colors mb-1.5">
-                    Instant Photo Booth
-                  </h3>
-                  <p className="text-xs sm:text-sm text-emerald-50 group-hover:text-white font-sans font-normal leading-relaxed mb-4 transition-colors">
-                    Studio-grade Full-Frame optics with high-speed dye-sublimation print engine.
-                  </p>
-                  <div className="flex items-center justify-between pt-3 border-t border-white/15 text-xs font-bold text-[#D4AF37] group-hover:text-white transition-colors">
-                    <span>Full-Frame Optics</span>
-                    <span className="text-white/40">•</span>
-                    <span>Instant QR Gallery</span>
-                  </div>
-                </div>
+                  if (activeCards.length === 0) return null;
 
+                  return activeCards.map((card, idx) => {
+                    const Icon = card.icon;
+                    const cardConfig = cardStackConfig.cards[card.id];
+                    const zIndex = (idx + 1) * 10;
+
+                    const isRedirectEnabled = cardStackConfig.enableCardRedirect !== false && cardConfig?.redirectOnClick !== false;
+
+                    // Custom Admin offsets or default fallbacks
+                    const topPx = cardConfig?.topPx !== undefined ? cardConfig.topPx : (idx * 14);
+                    const rotateDeg = cardConfig?.rotateDeg !== undefined ? cardConfig.rotateDeg : (idx % 2 === 0 ? -4 : 4);
+                    const hOffset = cardConfig?.horizontalOffsetPx || 0;
+                    const scaleVal = cardConfig?.scale || 1.0;
+
+                    const titleText = cardConfig?.customTitle || card.title;
+                    const badgeText = cardConfig?.customBadge || card.badge;
+                    const descText = cardConfig?.customDesc || card.desc;
+                    const footerText = cardConfig?.customFooter !== undefined ? cardConfig.customFooter : card.footer;
+
+                    const innerContent = (
+                      <>
+                        <div className="flex items-center justify-between mb-2.5">
+                          <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-transform group-hover/card:scale-110 ${
+                            card.isFlagship
+                              ? "bg-gold-gradient text-[#011F15] shadow-md"
+                              : "bg-black/50 border border-white/15 text-[#D4AF37] group-hover/card:border-[#D4AF37] group-hover/card:bg-[#D4AF37] group-hover/card:text-[#011F15]"
+                          }`}>
+                            <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                          </div>
+                          <span className={`text-[10px] sm:text-xs uppercase tracking-widest px-2.5 py-1 rounded-full ${card.badgeClass}`}>
+                            {badgeText}
+                          </span>
+                        </div>
+
+                        <h3 className={`font-serif font-bold text-white group-hover/card:text-[#D4AF37] transition-colors mb-1 ${
+                          card.isFlagship ? "text-xl sm:text-2xl" : "text-lg sm:text-xl"
+                        }`}>
+                          {titleText}
+                        </h3>
+
+                        <p className="text-xs sm:text-sm text-emerald-100/80 group-hover/card:text-white font-sans font-normal leading-relaxed transition-colors mb-2">
+                          {descText}
+                        </p>
+
+                        {footerText && (
+                          <div className="flex items-center justify-between pt-2.5 border-t border-white/15 text-xs font-bold text-[#D4AF37] group-hover/card:text-white transition-colors">
+                            <span>{footerText}</span>
+                          </div>
+                        )}
+                      </>
+                    );
+
+                    const cardClasses = `absolute ${card.width} ${card.bgColor} p-5 sm:p-6 rounded-2xl border transition-all duration-500 ease-out hover:!scale-105 hover:!z-[100] group/card ${
+                      isRedirectEnabled ? "cursor-pointer" : "cursor-default"
+                    } ${
+                      card.isFlagship
+                        ? "border-[#D4AF37]/50 shadow-[0_20px_45px_rgba(0,0,0,0.8)] hover:border-[#D4AF37] hover:bg-[#023b29] hover:shadow-[0_0_50px_rgba(212,175,55,0.4)]"
+                        : "border-white/15 shadow-[0_15px_35px_rgba(0,0,0,0.65)] hover:border-[#D4AF37]/80 hover:bg-[#023b29] hover:shadow-[0_0_40px_rgba(212,175,55,0.3)]"
+                    }`;
+
+                    const cardStyle: React.CSSProperties = {
+                      top: `${topPx}px`,
+                      transform: `translateX(${hOffset}px) rotate(${rotateDeg}deg) scale(${scaleVal})`,
+                      zIndex,
+                    };
+
+                    if (isRedirectEnabled) {
+                      return (
+                        <Link
+                          key={card.id}
+                          href={card.href}
+                          style={cardStyle}
+                          className={cardClasses}
+                        >
+                          {innerContent}
+                        </Link>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={card.id}
+                        style={cardStyle}
+                        className={cardClasses}
+                      >
+                        {innerContent}
+                      </div>
+                    );
+                  });
+                })()}
               </TiltCard>
             </div>
 

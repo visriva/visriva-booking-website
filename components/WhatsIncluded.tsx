@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Camera, Sparkles, Zap, Palette, Smile, UserCheck } from "lucide-react";
+import { Camera, Sparkles, Zap, Palette, Smile, UserCheck, CheckCircle2 } from "lucide-react";
 import Image from "next/image";
 import {
   subscribeWebsiteText,
@@ -9,32 +9,7 @@ import {
   WebsiteTextConfig,
 } from "@/lib/firebase";
 
-const INCLUDED_ITEMS = [
-  {
-    icon: Camera,
-    text: "A high-quality studio camera for sharp, professional-grade images.",
-  },
-  {
-    icon: Sparkles,
-    text: "Professional studio lighting that guarantees you and your guests look flawless.",
-  },
-  {
-    icon: Zap,
-    text: "Super-fast, lab-quality prints (ready in just 8 seconds!) so the fun never stops.",
-  },
-  {
-    icon: Palette,
-    text: "Custom-designed print templates tailored to match your event's unique theme.",
-  },
-  {
-    icon: Smile,
-    text: "A curated selection of premium, fun props to keep your guests entertained.",
-  },
-  {
-    icon: UserCheck,
-    text: "A friendly, dedicated booth attendant to assist your guests and keep things running smoothly.",
-  },
-];
+const DEFAULT_ICONS = [Camera, Sparkles, Zap, Palette, Smile, UserCheck];
 
 const DEFAULT_IMAGE_FALLBACK = "https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=1200&q=80";
 
@@ -57,6 +32,9 @@ export default function WhatsIncluded() {
   }, []);
 
   const showcasePhotoUrl = getValidImageUrl(webText.whatsIncludedImageUrl);
+  const items = webText.whatsIncludedItems && webText.whatsIncludedItems.length > 0
+    ? webText.whatsIncludedItems
+    : DEFAULT_WEBSITE_TEXT.whatsIncludedItems || [];
 
   return (
     <section className="py-20 relative bg-transparent overflow-hidden">
@@ -68,23 +46,23 @@ export default function WhatsIncluded() {
             <div>
               <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-white/5 border border-white/10 text-[#D4AF37] text-xs font-bold uppercase tracking-widest mb-4 font-cinzel">
                 <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
-                <span>The Visriva Guarantee</span>
+                <span>{webText.whatsIncludedBadge || "The Visriva Guarantee"}</span>
               </div>
               <h2 className="font-catilya text-3xl sm:text-4xl md:text-5xl font-bold text-white tracking-tight leading-[1.15]">
-                What&apos;s Included in Every Standard Photo Booth Package:
+                {webText.whatsIncludedHeading || "What's Included in Every Standard Photo Booth Package:"}
               </h2>
             </div>
 
             <ul className="space-y-6">
-              {INCLUDED_ITEMS.map((item, idx) => {
-                const IconComponent = item.icon;
+              {items.map((itemText, idx) => {
+                const IconComponent = DEFAULT_ICONS[idx % DEFAULT_ICONS.length] || CheckCircle2;
                 return (
                   <li key={idx} className="flex items-start space-x-4 group">
                     <div className="w-10 h-10 rounded-xl bg-black/40 border border-[#D4AF37]/30 flex items-center justify-center text-[#D4AF37] flex-shrink-0 group-hover:scale-110 group-hover:border-[#D4AF37] transition-all duration-300 shadow-gold-sm">
                       <IconComponent className="w-5 h-5 text-[#D4AF37]" />
                     </div>
                     <p className="font-graven text-emerald-100/90 text-sm sm:text-base font-normal leading-relaxed pt-1">
-                      {item.text}
+                      {itemText}
                     </p>
                   </li>
                 );
@@ -92,9 +70,8 @@ export default function WhatsIncluded() {
             </ul>
           </div>
 
-          {/* RIGHT COLUMN: Perfect Visual Showcase Frame (No 3D motion, zero top clipping) */}
+          {/* RIGHT COLUMN: Visual Showcase Frame */}
           <div className="relative flex items-center justify-center w-full">
-            {/* Ambient Radial Gold Glow */}
             <div className="absolute -inset-4 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-[#D4AF37]/20 via-emerald-950/10 to-transparent rounded-full blur-3xl pointer-events-none" />
 
             <div className="relative glass-card rounded-3xl p-3 sm:p-4 border-2 border-[#D4AF37]/40 shadow-gold-lg max-w-lg w-full bg-white/5 overflow-hidden group">
@@ -109,7 +86,6 @@ export default function WhatsIncluded() {
                   unoptimized={showcasePhotoUrl.startsWith("data:")}
                 />
 
-                {/* Subtle Frosted Bottom Caption Overlay */}
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent p-5 pt-10">
                   <div className="text-[11px] font-cinzel uppercase tracking-widest text-[#D4AF37] mb-1 font-bold">
                     {webText.whatsIncludedBadge || DEFAULT_WEBSITE_TEXT.whatsIncludedBadge}

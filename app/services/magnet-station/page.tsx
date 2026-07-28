@@ -7,19 +7,49 @@ import SharedTerms from "@/components/SharedTerms";
 import GalleryModal from "@/components/GalleryModal";
 import MaskedText from "@/components/MaskedText";
 import { motion } from "framer-motion";
-import { Magnet, Sparkles, CheckCircle2, Calendar, ArrowRight } from "lucide-react";
-import { subscribeGalleryVisibility, DEFAULT_VISIBILITY_CONFIG, GalleryVisibilityConfig } from "@/lib/firebase";
+import { Magnet, Sparkles, CheckCircle2, Calendar, ArrowRight, Lock } from "lucide-react";
+import {
+  subscribeGalleryVisibility,
+  DEFAULT_VISIBILITY_CONFIG,
+  GalleryVisibilityConfig,
+  subscribeFeatureToggles,
+  DEFAULT_FEATURE_TOGGLES,
+  FeatureTogglesConfig,
+} from "@/lib/firebase";
 
 export default function MagnetStationServicePage() {
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [visibility, setVisibility] = useState<GalleryVisibilityConfig>(DEFAULT_VISIBILITY_CONFIG);
+  const [toggles, setToggles] = useState<FeatureTogglesConfig>(DEFAULT_FEATURE_TOGGLES);
 
   useEffect(() => {
     const unsub = subscribeGalleryVisibility((config) => {
       if (config) setVisibility(config);
     });
-    return () => unsub();
+    const unsubToggles = subscribeFeatureToggles((data) => {
+      if (data) setToggles(data);
+    });
+    return () => {
+      unsub();
+      unsubToggles();
+    };
   }, []);
+
+  if (toggles.enableMagnetService === false) {
+    return (
+      <main className="min-h-screen bg-[#011F15] text-white selection:bg-[#D4AF37] selection:text-[#011F15]">
+        <Navbar />
+        <div className="pt-44 pb-28 px-4 text-center max-w-md mx-auto space-y-4">
+          <Lock className="w-12 h-12 text-[#D4AF37] mx-auto opacity-70" />
+          <h2 className="font-serif text-2xl font-bold text-white">Fridge Magnet Station Offline</h2>
+          <p className="text-xs text-emerald-100/70">
+            This service is currently under maintenance or turned OFF by the Administrator.
+          </p>
+        </div>
+        <Footer />
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-transparent text-white selection:bg-[#D4AF37] selection:text-[#011F15]">

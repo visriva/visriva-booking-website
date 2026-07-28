@@ -26,10 +26,11 @@ service cloud.firestore {
       allow write: if true;
     }
 
-    // ─── Bookings — anyone can CREATE (submit a booking), nobody can read ─────
+    // ─── Bookings — public CREATE, READ & UPDATE for contracts & admin management ─────
     match /bookings/{bookingId} {
       allow create: if true;
-      allow read, update, delete: if false;
+      allow read, update: if true;
+      allow delete: if true;
     }
   }
 }

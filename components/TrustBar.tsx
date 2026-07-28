@@ -1,17 +1,18 @@
 "use client";
 
-import React from "react";
-import { Star, ShieldCheck, Award, Sparkles, Building2, Crown, Heart, CheckCircle2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Star, ShieldCheck, Sparkles, Building2, Crown, Heart, CheckCircle2 } from "lucide-react";
+import { subscribeLiveImpactStats, DEFAULT_LIVE_IMPACT_STATS, LiveImpactStatsConfig } from "@/lib/firebase";
 
 export default function TrustBar() {
-  const brandPartners = [
-    "Luxury Event Agencies",
-    "Corporate Galas & Summits",
-    "Destination Weddings",
-    "Tech Summits & Product Launches",
-    "VIP Private Celebrations",
-    "High-Fashion Activations",
-  ];
+  const [stats, setStats] = useState<LiveImpactStatsConfig>(DEFAULT_LIVE_IMPACT_STATS);
+
+  useEffect(() => {
+    const unsub = subscribeLiveImpactStats((data) => {
+      if (data) setStats(data);
+    });
+    return () => unsub();
+  }, []);
 
   return (
     <section className="w-full py-5 bg-white/5 backdrop-blur-xl border-y border-white/10 overflow-hidden">
@@ -20,23 +21,29 @@ export default function TrustBar() {
           
           <div className="flex items-center space-x-3 text-xs uppercase tracking-widest font-catilya text-[#D4AF37] whitespace-nowrap">
             <Crown className="w-4 h-4 text-[#D4AF37]" />
-            <span>Trusted for High-Profile Celebrations</span>
+            <span>Trusted Luxury Event Printing Partner</span>
           </div>
 
           <div className="flex items-center space-x-6 sm:space-x-10 text-xs text-emerald-100/90 overflow-x-auto no-scrollbar py-1 font-graven">
             <div className="flex items-center space-x-2 whitespace-nowrap">
               <Star className="w-3.5 h-3.5 text-[#D4AF37]" />
-              <span>500+ Luxury Events</span>
+              <span>
+                {stats.eventsExecuted > 0 ? `${stats.eventsExecuted}+ Completed Events` : "Studio-Grade On-Site Optics"}
+              </span>
             </div>
 
             <div className="flex items-center space-x-2 whitespace-nowrap">
               <Building2 className="w-3.5 h-3.5 text-[#D4AF37]" />
-              <span>Corporate Galas</span>
+              <span>
+                {stats.souvenirsDelivered > 0 ? `${stats.souvenirsDelivered.toLocaleString("en-IN")}+ Keepsakes Created` : "Corporate Galas & Launch Events"}
+              </span>
             </div>
 
             <div className="flex items-center space-x-2 whitespace-nowrap">
               <Heart className="w-3.5 h-3.5 text-[#D4AF37]" />
-              <span>Destination Weddings</span>
+              <span>
+                {stats.guestsServed > 0 ? `${stats.guestsServed.toLocaleString("en-IN")}+ Guests Served` : "Weddings & Milestone Celebrations"}
+              </span>
             </div>
 
             <div className="flex items-center space-x-2 whitespace-nowrap">

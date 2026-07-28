@@ -34,27 +34,50 @@ import {
   DEFAULT_BLOCKED_DATES,
   WheelPerk,
   compressImageFile,
+  subscribeFeatureToggles,
+  DEFAULT_FEATURE_TOGGLES,
+  FeatureTogglesConfig,
 } from "@/lib/firebase";
 import CalendlySuccess from "./CalendlySuccess";
 import LocationAutocomplete from "./LocationAutocomplete";
+import AIConciergeWidget from "./AIConciergeWidget";
 
-const SERVICE_OPTIONS = [
-  { id: "Photos", label: "Instant Photo Booth", speed: "8-Sec Print" },
-  { id: "Magnets", label: "Custom Fridge Magnets", speed: "Live Gloss Finish" },
-  { id: "Keychains", label: "Instant Keepsake Keychains", speed: "Acrylic / Metal" },
-  { id: "Mugs", label: "Live Mug Printing", speed: "VIP Return Gift" },
+const ALL_SERVICE_OPTIONS = [
+  { id: "Photos", label: "Instant Photo Booth", speed: "8-Sec Print", toggleKey: "enablePhotoBoothService" },
+  { id: "Magnets", label: "Custom Fridge Magnets", speed: "Live Gloss Finish", toggleKey: "enableMagnetService" },
+  { id: "Keychains", label: "Instant Keepsake Keychains", speed: "Acrylic / Metal", toggleKey: "enableKeychainService" },
+  { id: "Mugs", label: "Live Mug Printing", speed: "VIP Return Gift", toggleKey: "enableMugService" },
+  { id: "ToteTshirt", label: "Tote Bag & T-Shirt Station", speed: "Sublimation Press", toggleKey: "enableToteTshirtService" },
 ];
 
 export default function BookingEngine() {
   // Global Pricing Matrix Firestore Subscription
   const [settings, setSettings] = useState<GlobalPricingMatrix>(DEFAULT_PRICING_MATRIX);
+  const [featureToggles, setFeatureToggles] = useState<FeatureTogglesConfig>(DEFAULT_FEATURE_TOGGLES);
 
   const [blockedDates, setBlockedDates] = useState<BlockedDatesConfig>(DEFAULT_BLOCKED_DATES);
   const [appliedPerk, setAppliedPerk] = useState<WheelPerk | null>(null);
 
+  const [selectedTotePkgId, setSelectedTotePkgId] = useState("tt_100");
+
   useEffect(() => {
     const unsub = subscribePricingMatrix((data) => {
       if (data) setSettings(data);
+    });
+    const unsubToggles = subscribeFeatureToggles((data) => {
+      if (data) {
+        setFeatureToggles(data);
+        // Auto-clean selectedServices to exclude any service turned OFF by Admin
+        setSelectedServices((prev) => {
+          const cleaned = prev.filter((serviceId) => {
+            const match = ALL_SERVICE_OPTIONS.find((s) => s.id === serviceId);
+            if (!match) return true;
+            return data[match.toggleKey as keyof FeatureTogglesConfig] !== false;
+          });
+          // Keep empty if nothing was selected — do NOT auto-add defaults
+          return cleaned;
+        });
+      }
     });
     const unsubBlocked = subscribeBlockedDates((data) => {
       if (data) setBlockedDates(data);
@@ -94,14 +117,11 @@ export default function BookingEngine() {
   // Form State & Expanded Fields
   const [eventDate, setEventDate] = useState("");
   const [venue, setVenue] = useState("");
-  const [eventType, setEventType] = useState("Corporate Tech Gala");
-  const [reportingTime, setReportingTime] = useState("16:00");
-  const [endingTime, setEndingTime] = useState("21:00");
-  const [pax, setPax] = useState<number>(200);
-  const [selectedServices, setSelectedServices] = useState<string[]>([
-    "Photos",
-    "Magnets",
-  ]);
+  const [eventType, setEventType] = useState("");
+  const [reportingTime, setReportingTime] = useState("");
+  const [endingTime, setEndingTime] = useState("");
+  const [pax, setPax] = useState<number>(0);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
   // Station Sub-Option Package Tiers State (Includes DSLR & iPad for Photo Booth)
   const [pbHardware, setPbHardware] = useState<"dslr" | "ipad">("dslr");
@@ -144,8 +164,11 @@ export default function BookingEngine() {
     const mugMatrix = settings.mugs || DEFAULT_PRICING_MATRIX.mugs;
     const kcMatrix = settings.keychains || DEFAULT_PRICING_MATRIX.keychains;
 
+    const activeSelectedServices: string[] = [];
+
     // 1. Photo Booth Calculation (Supports DSLR vs iPad packages)
-    if (selectedServices.includes("Photos")) {
+    if (selectedServices.includes("Photos") && featureToggles.enablePhotoBoothService !== false) {
+      activeSelectedServices.push("Photos");
       const pbPackages = pbHardware === "dslr"
         ? (pbMatrix.dslrPackages && pbMatrix.dslrPackages.length > 0 ? pbMatrix.dslrPackages : DEFAULT_PRICING_MATRIX.photoBooth.dslrPackages)
         : (pbMatrix.ipadPackages && pbMatrix.ipadPackages.length > 0 ? pbMatrix.ipadPackages : DEFAULT_PRICING_MATRIX.photoBooth.ipadPackages);
@@ -163,7 +186,8 @@ export default function BookingEngine() {
     }
 
     // 2. Magnets Calculation
-    if (selectedServices.includes("Magnets")) {
+    if (selectedServices.includes("Magnets") && featureToggles.enableMagnetService !== false) {
+      activeSelectedServices.push("Magnets");
       const magPackages = magMatrix.packages && magMatrix.packages.length > 0 ? magMatrix.packages : DEFAULT_PRICING_MATRIX.magnets.packages;
       const chosenMagPkg = magPackages.find((p) => p.id === selectedMagPkgId) || magPackages[0];
       let magPrice = chosenMagPkg?.price || 25000;
@@ -178,7 +202,8 @@ export default function BookingEngine() {
     }
 
     // 3. Mugs Calculation
-    if (selectedServices.includes("Mugs")) {
+    if (selectedServices.includes("Mugs") && featureToggles.enableMugService !== false) {
+      activeSelectedServices.push("Mugs");
       const mugPackages = mugMatrix.packages && mugMatrix.packages.length > 0 ? mugMatrix.packages : DEFAULT_PRICING_MATRIX.mugs.packages;
       const chosenMugPkg = mugPackages.find((p) => p.id === selectedMugPkgId) || mugPackages[0];
       const mugPrice = chosenMugPkg?.price || 15000;
@@ -187,12 +212,24 @@ export default function BookingEngine() {
     }
 
     // 4. Keychains Calculation
-    if (selectedServices.includes("Keychains")) {
+    if (selectedServices.includes("Keychains") && featureToggles.enableKeychainService !== false) {
+      activeSelectedServices.push("Keychains");
       const kcPackages = kcMatrix.packages && kcMatrix.packages.length > 0 ? kcMatrix.packages : DEFAULT_PRICING_MATRIX.keychains.packages;
       const chosenKcPkg = kcPackages.find((p) => p.id === selectedKcPkgId) || kcPackages[0];
       const kcPrice = chosenKcPkg?.price || 16000;
       total += kcPrice;
       lineItems.push(`Keychains [${chosenKcPkg?.name}]: ₹${kcPrice.toLocaleString("en-IN")}`);
+    }
+
+    // 5. Tote Bag & T-Shirt Calculation
+    if (selectedServices.includes("ToteTshirt") && featureToggles.enableToteTshirtService !== false) {
+      activeSelectedServices.push("ToteTshirt");
+      const toteMatrix = settings.toteTshirt || DEFAULT_PRICING_MATRIX.toteTshirt;
+      const totePackages = toteMatrix.packages && toteMatrix.packages.length > 0 ? toteMatrix.packages : DEFAULT_PRICING_MATRIX.toteTshirt.packages;
+      const chosenTotePkg = totePackages.find((p) => p.id === selectedTotePkgId) || totePackages[0];
+      const totePrice = chosenTotePkg?.price || 18999;
+      total += totePrice;
+      lineItems.push(`Tote & T-Shirt [${chosenTotePkg?.name}]: ₹${totePrice.toLocaleString("en-IN")}`);
     }
 
     // 5. Idle Time Calculation
@@ -239,7 +276,7 @@ export default function BookingEngine() {
     }
 
     const subtotal = total;
-    const isComboEligible = selectedServices.length >= 2;
+    const isComboEligible = activeSelectedServices.length >= 2;
     const comboDiscount = isComboEligible ? Math.round(subtotal * 0.10) : 0;
     const totalDiscounts = comboDiscount + perkDiscount;
     const finalTotal = Math.max(0, subtotal - totalDiscounts);
@@ -270,15 +307,33 @@ export default function BookingEngine() {
       lineItems,
       description: lineItems.length > 0 ? lineItems.join(" • ") : "Select stations to view instant calculation.",
     };
-  }, [pax, selectedServices, reportingTime, endingTime, settings, pbHardware, selectedPbPkgId, selectedMagPkgId, selectedKcPkgId, selectedMugPkgId, appliedPerk]);
+  }, [pax, selectedServices, reportingTime, endingTime, settings, pbHardware, selectedPbPkgId, selectedMagPkgId, selectedKcPkgId, selectedMugPkgId, selectedTotePkgId, appliedPerk, featureToggles]);
 
   const toggleService = (serviceId: string) => {
+    const match = ALL_SERVICE_OPTIONS.find((s) => s.id === serviceId);
+    if (match && featureToggles[match.toggleKey as keyof FeatureTogglesConfig] === false) {
+      return; // Service disabled by Admin
+    }
     if (selectedServices.includes(serviceId)) {
       if (selectedServices.length > 1) {
         setSelectedServices(selectedServices.filter((s) => s !== serviceId));
       }
     } else {
       setSelectedServices([...selectedServices, serviceId]);
+    }
+  };
+
+  const handleApplyAIRecommendation = (recServiceIds: string[]) => {
+    const map: Record<string, string> = {
+      "photo-booth": "Photos",
+      magnets: "Magnets",
+      keychains: "Keychains",
+      mugs: "Mugs",
+      totes: "ToteTshirt",
+    };
+    const mapped = recServiceIds.map((id) => map[id] || id).filter(Boolean);
+    if (mapped.length > 0) {
+      setSelectedServices(mapped);
     }
   };
 
@@ -414,6 +469,11 @@ export default function BookingEngine() {
                   </button>
                 </div>
               )}
+
+              {/* AI Concierge Widget Banner */}
+              <div className="my-4">
+                <AIConciergeWidget onApplyRecommendation={handleApplyAIRecommendation} />
+              </div>
 
               {/* Form Grid Section 1: Event Details & New Expanded Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -557,7 +617,7 @@ export default function BookingEngine() {
                   <div className="flex items-center space-x-3 pt-1">
                     <input
                       type="range"
-                      min={50}
+                      min={0}
                       max={1000}
                       step={25}
                       value={pax}
@@ -598,7 +658,10 @@ export default function BookingEngine() {
                   Select Required Stations *
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {SERVICE_OPTIONS.map((service) => {
+                  {ALL_SERVICE_OPTIONS.filter((s) => {
+                    const toggleVal = featureToggles[s.toggleKey as keyof FeatureTogglesConfig];
+                    return toggleVal !== false;
+                  }).map((service) => {
                     const isSelected = selectedServices.includes(service.id);
                     return (
                       <div
@@ -786,6 +849,39 @@ export default function BookingEngine() {
                               <div
                                 key={pkg.id}
                                 onClick={() => setSelectedKcPkgId(pkg.id)}
+                                className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
+                                  isSelectedPkg
+                                    ? "bg-[#D4AF37]/20 border-[#D4AF37] shadow-gold-sm"
+                                    : "bg-black/40 border-white/10 hover:border-white/25"
+                                }`}
+                              >
+                                <div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-serif font-bold text-xs text-white">{pkg.name}</span>
+                                    <span className="font-mono text-xs font-bold text-[#D4AF37]">₹{pkg.price.toLocaleString("en-IN")}</span>
+                                  </div>
+                                  <span className="text-[10px] text-emerald-100/60 font-mono block mt-0.5">{pkg.subtitle || pkg.duration}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 5. Tote Bag & T-Shirt Station Package Tier Selection */}
+                    {selectedServices.includes("ToteTshirt") && (
+                      <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                        <span className="text-xs font-bold uppercase tracking-wider text-[#D4AF37] block font-mono">
+                          👜 Canvas Tote Bag &amp; T-Shirt Sublimation Package Tier
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                          {((settings.toteTshirt?.packages?.length ? settings.toteTshirt.packages : DEFAULT_PRICING_MATRIX.toteTshirt?.packages) || []).map((pkg) => {
+                            const isSelectedPkg = (selectedTotePkgId || "tt_100") === pkg.id;
+                            return (
+                              <div
+                                key={pkg.id}
+                                onClick={() => setSelectedTotePkgId(pkg.id)}
                                 className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
                                   isSelectedPkg
                                     ? "bg-[#D4AF37]/20 border-[#D4AF37] shadow-gold-sm"

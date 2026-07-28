@@ -32,10 +32,15 @@ import {
   Briefcase,
   Calendar,
   ChevronRight,
+  Layers,
+  Crown,
+  ShoppingBag,
+  TrendingUp,
 } from "lucide-react";
 import { FaInstagram, FaLinkedin } from "react-icons/fa";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
 import { doc, setDoc } from "firebase/firestore";
 import {
   subscribePricingMatrix,
@@ -76,7 +81,41 @@ import {
   DEFAULT_WEBSITE_TEXT,
   compressImageFile,
   db,
+  subscribeOperatorConfig,
+  saveOperatorConfig,
+  OperatorConfig,
+  DEFAULT_OPERATOR_CONFIG,
+  subscribeFeatureToggles,
+  saveFeatureToggles,
+  FeatureTogglesConfig,
+  DEFAULT_FEATURE_TOGGLES,
+  subscribeBentoGridConfig,
+  saveBentoGridConfig,
+  BentoGridConfig,
+  DEFAULT_BENTO_GRID_CONFIG,
+  subscribeHeroCardStackConfig,
+  saveHeroCardStackConfig,
+  HeroCardStackConfig,
+  DEFAULT_HERO_CARD_STACK_CONFIG,
+  HeroCardItemConfig,
+  subscribeAIConciergeConfig,
+  saveAIConciergeConfig,
+  AIConciergeConfig,
+  DEFAULT_AI_CONCIERGE_CONFIG,
+  subscribeAIWhatsAppConfig,
+  saveAIWhatsAppConfig,
+  AIWhatsAppConfig,
+  DEFAULT_AI_WHATSAPP_CONFIG,
+  subscribeLiveImpactStats,
+  saveLiveImpactStats,
+  LiveImpactStatsConfig,
+  DEFAULT_LIVE_IMPACT_STATS,
+  subscribePlannersConfig,
+  savePlannersConfig,
+  PlannersPageConfig,
+  DEFAULT_PLANNERS_CONFIG,
 } from "@/lib/firebase";
+import { fetchGoogleSheetColumns } from "@/lib/googleSheet";
 
 export default function AdminDashboardPage() {
   const [pin, setPin] = useState("");
@@ -89,19 +128,34 @@ export default function AdminDashboardPage() {
   // Authorized Admin Passwords
   const AUTHORIZED_PASSWORDS = ["jeevan", "drupitha", "punith", "arpitha", "4848", "0315"];
 
-  // Admin Dashboard Tabs: 1. Global Settings | 2. Website Text | 3. Print Previewer | 4. Golden Wheel | 5. Pricing & Services | 6. Gallery Manager | 7. Booking CRM
+  // Admin Dashboard Tabs: 1. Global Settings | 2. Website Text | 3. Print Previewer | 4. Golden Wheel | 5. Pricing & Services | 6. Gallery Manager | 7. Booking CRM | 8. Feature Toggles | 9. Bento Grid CMS | 10. Service Toggles | 11. Hero Card Studio | 12. AI Concierge CMS | 13. AI WhatsApp CMS | 14. Real Impact Stats CMS | 15. Planners CMS
   const [activeTab, setActiveTab] = useState<
-    "globalSettings" | "websiteText" | "printPreviewer" | "goldenWheel" | "pricingServices" | "galleryManager" | "bookingCRM"
+    "globalSettings" | "websiteText" | "printPreviewer" | "goldenWheel" | "pricingServices" | "galleryManager" | "bookingCRM" | "featureToggles" | "bentoGrid" | "serviceToggles" | "heroCardStudio" | "aiConciergeCMS" | "aiWhatsAppCMS" | "impactStatsCMS" | "plannersCMS"
   >("globalSettings");
 
   // Subtabs inside Pricing & Services
-  const [pricingSubTab, setPricingSubTab] = useState<"photoBooth" | "magnets" | "keychains" | "mugs">("photoBooth");
+  const [pricingSubTab, setPricingSubTab] = useState<"photoBooth" | "magnets" | "keychains" | "mugs" | "toteTshirt">("photoBooth");
   const [pbHardwareSubTab, setPbHardwareSubTab] = useState<"dslr" | "ipad">("dslr");
 
   // State Collections
   const [matrix, setMatrix] = useState<GlobalPricingMatrix>(DEFAULT_PRICING_MATRIX);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettingsConfig>(DEFAULT_GLOBAL_SETTINGS);
   const [websiteText, setWebsiteText] = useState<WebsiteTextConfig>(DEFAULT_WEBSITE_TEXT);
+  const [operatorConfig, setOperatorConfig] = useState<OperatorConfig>(DEFAULT_OPERATOR_CONFIG);
+  const [featureToggles, setFeatureToggles] = useState<FeatureTogglesConfig>(DEFAULT_FEATURE_TOGGLES);
+  const [bentoConfig, setBentoConfig] = useState<BentoGridConfig>(DEFAULT_BENTO_GRID_CONFIG);
+  const [heroCardsConfig, setHeroCardsConfig] = useState<HeroCardStackConfig>(DEFAULT_HERO_CARD_STACK_CONFIG);
+  const [aiConciergeConfig, setAiConciergeConfig] = useState<AIConciergeConfig>(DEFAULT_AI_CONCIERGE_CONFIG);
+  const [aiWhatsAppConfig, setAiWhatsAppConfig] = useState<AIWhatsAppConfig>(DEFAULT_AI_WHATSAPP_CONFIG);
+  const [impactStats, setImpactStats] = useState<LiveImpactStatsConfig>(DEFAULT_LIVE_IMPACT_STATS);
+  const [plannersConfig, setPlannersConfig] = useState<PlannersPageConfig>(DEFAULT_PLANNERS_CONFIG);
+  const [newClientBrandInput, setNewClientBrandInput] = useState("");
+  const [newWhyCardTitle, setNewWhyCardTitle] = useState("");
+  const [newWhyCardDesc, setNewWhyCardDesc] = useState("");
+  const [newFaqQ, setNewFaqQ] = useState("");
+  const [newFaqA, setNewFaqA] = useState("");
+  const [newPresetChip, setNewPresetChip] = useState("");
+  const [fetchingSheetHeaders, setFetchingSheetHeaders] = useState(false);
   const [visibility, setVisibility] = useState<GalleryVisibilityConfig>({
     isPhotoBoothGalleryVisible: true,
     isMagnetGalleryVisible: true,
@@ -146,6 +200,10 @@ export default function AdminDashboardPage() {
   const [successToast, setSuccessToast] = useState("");
   const [errorToast, setErrorToast] = useState("");
 
+  // AI WhatsApp Assistant State for Admin Leads
+  const [adminAiModalOpen, setAdminAiModalOpen] = useState(false);
+  const [adminSelectedLeadForAI, setAdminSelectedLeadForAI] = useState<any>(null);
+
   // Subscriptions on mount
   useEffect(() => {
     const unsubMatrix = subscribePricingMatrix((data) => {
@@ -156,6 +214,12 @@ export default function AdminDashboardPage() {
     });
     const unsubText = subscribeWebsiteText((data) => {
       if (data) setWebsiteText(data);
+    });
+    const unsubOp = subscribeOperatorConfig((data) => {
+      if (data) setOperatorConfig(data);
+    });
+    const unsubToggles = subscribeFeatureToggles((data) => {
+      if (data) setFeatureToggles(data);
     });
     const unsubVis = subscribeGalleryVisibility((data) => {
       if (data) setVisibility(data);
@@ -175,19 +239,56 @@ export default function AdminDashboardPage() {
     const unsubWheel = subscribeGoldenWheelConfig((data) => {
       if (data) setGoldenWheelConfig(data);
     });
+    const unsubBento = subscribeBentoGridConfig((data) => {
+      if (data) setBentoConfig(data);
+    });
+    const unsubHeroCards = subscribeHeroCardStackConfig((data) => {
+      if (data) setHeroCardsConfig(data);
+    });
+    const unsubAIConcierge = subscribeAIConciergeConfig((data) => {
+      if (data) setAiConciergeConfig(data);
+    });
+    const unsubAIWhatsApp = subscribeAIWhatsAppConfig((data) => {
+      if (data) setAiWhatsAppConfig(data);
+    });
+    const unsubImpact = subscribeLiveImpactStats((data) => {
+      if (data) setImpactStats(data);
+    });
+    const unsubPlanners = subscribePlannersConfig((data) => {
+      if (data) setPlannersConfig(data);
+    });
 
     return () => {
       unsubMatrix();
       unsubContact();
       unsubText();
+      unsubOp();
+      unsubToggles();
       unsubVis();
       unsubGal();
       unsubLeads();
       unsubPrev();
       unsubBlocked();
       unsubWheel();
+      unsubBento();
+      unsubHeroCards();
+      unsubAIConcierge();
+      unsubAIWhatsApp();
+      unsubImpact();
+      unsubPlanners();
     };
   }, []);
+
+  const handleSaveBentoConfig = async () => {
+    setIsSaving(true);
+    const res = await saveBentoGridConfig(bentoConfig);
+    setIsSaving(false);
+    if (res.success) {
+      showToast("Section 1 Bento Grid CMS saved successfully!");
+    } else {
+      showToast(res.error || "Failed to save Bento Grid settings", true);
+    }
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -231,6 +332,40 @@ export default function AdminDashboardPage() {
     } else {
       showToast("Failed to save Website Text", true);
     }
+  };
+
+  const handleSaveOperatorConfig = async () => {
+    setIsSaving(true);
+    const res = await saveOperatorConfig(operatorConfig);
+    setIsSaving(false);
+    if (res.success) {
+      showToast("Crew Command & Google Sheet Settings Saved!");
+    } else {
+      showToast("Failed to save Crew Command Settings", true);
+    }
+  };
+
+  const handleSaveFeatureToggles = async () => {
+    setIsSaving(true);
+    const res = await saveFeatureToggles(featureToggles);
+    setIsSaving(false);
+    if (res.success) {
+      showToast("Master Feature Toggles Saved & Synced Across Website!");
+    } else {
+      showToast("Failed to save Feature Toggles", true);
+    }
+  };
+
+  const handleSyncGoogleSheetHeaders = async () => {
+    if (!operatorConfig.googleSheetUrl) {
+      showToast("Please enter a valid Google Sheet URL first", true);
+      return;
+    }
+    setFetchingSheetHeaders(true);
+    const columns = await fetchGoogleSheetColumns(operatorConfig.googleSheetUrl);
+    setFetchingSheetHeaders(false);
+    setOperatorConfig({ ...operatorConfig, customQuestions: columns });
+    showToast(`Successfully synced ${columns.length} question columns from Row 1!`);
   };
 
   const [showcaseSavedMsg, setShowcaseSavedMsg] = useState("");
@@ -680,6 +815,102 @@ export default function AdminDashboardPage() {
               >
                 <Briefcase className="w-4 h-4" />
                 <span>7. 💼 Booking CRM Pipeline</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("featureToggles")}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  activeTab === "featureToggles"
+                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>8. ⚙️ Feature Toggles &amp; Crew Config</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("bentoGrid")}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  activeTab === "bentoGrid"
+                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <Layers className="w-4 h-4" />
+                <span>9. 🍱 Homepage Sections 1, 2 &amp; 3 CMS</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("serviceToggles")}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  activeTab === "serviceToggles"
+                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <Lock className="w-4 h-4" />
+                <span>10. 🔌 Services &amp; Navbar Menu Toggles</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("heroCardStudio")}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  activeTab === "heroCardStudio"
+                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <Palette className="w-4 h-4" />
+                <span>11. 🎨 Hero 3D Cards Alignment Studio</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("aiConciergeCMS")}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  activeTab === "aiConciergeCMS"
+                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <Sparkles className="w-4 h-4 text-[#011F15]" />
+                <span>12. 🤖 AI Event Concierge CMS</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("aiWhatsAppCMS")}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  activeTab === "aiWhatsAppCMS"
+                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>13. 💬 AI WhatsApp Assistant CMS</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("impactStatsCMS")}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  activeTab === "impactStatsCMS"
+                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <TrendingUp className="w-4 h-4" />
+                <span>14. 📊 Real Impact &amp; Event Tracker CMS</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("plannersCMS")}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  activeTab === "plannersCMS"
+                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <Briefcase className="w-4 h-4" />
+                <span>15. 🤝 Planners &amp; B2B Portal CMS</span>
               </button>
             </nav>
           </div>
@@ -1192,6 +1423,16 @@ export default function AdminDashboardPage() {
                 >
                   <Coffee className="w-4 h-4" />
                   <span>Live Mugs</span>
+                </button>
+
+                <button
+                  onClick={() => setPricingSubTab("toteTshirt")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center space-x-2 ${
+                    pricingSubTab === "toteTshirt" ? "bg-[#D4AF37] text-[#011F15]" : "bg-white/5 text-white/70 hover:text-white"
+                  }`}
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>Tote Bag &amp; T-Shirt</span>
                 </button>
               </div>
 
@@ -1974,17 +2215,38 @@ export default function AdminDashboardPage() {
                                   <span>📜 Open Contract &amp; Invoice</span>
                                 </a>
 
-                                <button
-                                  onClick={() => {
-                                    const link = `${window.location.origin}/contract?leadId=${lead.id}`;
-                                    const msg = `Hello ${lead.clientName || "Valued Client"}! Here is your official Visriva Service Agreement & 40% Deposit Invoice: ${link}`;
-                                    window.open(`https://wa.me/${lead.clientPhone ? lead.clientPhone.replace(/[^0-9]/g, "") : "918884484828"}?text=${encodeURIComponent(msg)}`, "_blank");
-                                  }}
-                                  className="w-full py-1 px-2 rounded-lg bg-green-500/20 border border-green-500/40 text-green-300 hover:bg-green-500 hover:text-white font-bold text-[10px] uppercase tracking-wider transition flex items-center justify-center space-x-1 cursor-pointer"
-                                >
-                                  <MessageCircle className="w-3 h-3" />
-                                  <span>Share via WhatsApp</span>
-                                </button>
+                                <div className="grid grid-cols-2 gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setAdminSelectedLeadForAI({
+                                        customerName: lead.clientName,
+                                        phone: lead.clientPhone,
+                                        eventType: lead.eventType,
+                                        guestCount: lead.pax ? lead.pax.toString() : "TBD",
+                                        location: lead.venue,
+                                        selectedServices: lead.services,
+                                      });
+                                      setAdminAiModalOpen(true);
+                                    }}
+                                    className="w-full py-1.5 px-2 rounded-lg bg-gold-gradient text-[#011F15] font-extrabold text-[10px] uppercase tracking-wider hover:scale-105 transition shadow-gold-sm flex items-center justify-center space-x-1 cursor-pointer"
+                                  >
+                                    <Sparkles className="w-3 h-3" />
+                                    <span>AI Draft</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      const link = `${window.location.origin}/contract?leadId=${lead.id}`;
+                                      const msg = `Hello ${lead.clientName || "Valued Client"}! Here is your official Visriva Service Agreement & 40% Deposit Invoice: ${link}`;
+                                      window.open(`https://wa.me/${lead.clientPhone ? lead.clientPhone.replace(/[^0-9]/g, "") : "918884484828"}?text=${encodeURIComponent(msg)}`, "_blank");
+                                    }}
+                                    className="w-full py-1.5 px-2 rounded-lg bg-green-500/20 border border-green-500/40 text-green-300 hover:bg-green-500 hover:text-white font-bold text-[10px] uppercase tracking-wider transition flex items-center justify-center space-x-1 cursor-pointer"
+                                  >
+                                    <MessageCircle className="w-3 h-3" />
+                                    <span>WhatsApp</span>
+                                  </button>
+                                </div>
                               </div>
 
                               {/* Status Action Buttons */}
@@ -2028,10 +2290,2120 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
+          {/* TAB 8: FEATURE TOGGLES & CREW COMMAND CONFIG */}
+          {activeTab === "featureToggles" && (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              
+              {/* Card 1: Master Feature Enable/Disable Switches */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-6">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-white">Master Feature Enable / Disable Switches</h3>
+                      <p className="text-xs text-emerald-100/70">Enable or turn off public access to specific features whenever required.</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSaveFeatureToggles}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Feature Switches</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Switch 1: Operator Portal */}
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-white">On-Site Crew Command (/operator)</span>
+                      <input
+                        type="checkbox"
+                        checked={featureToggles.enableOperatorPortal}
+                        onChange={(e) =>
+                          setFeatureToggles({ ...featureToggles, enableOperatorPortal: e.target.checked })
+                        }
+                        className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Controls whether crew technicians can access the live operator dashboard on-site.
+                    </p>
+                    <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-mono uppercase font-bold ${featureToggles.enableOperatorPortal ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
+                      {featureToggles.enableOperatorPortal ? "ACTIVE / ONLINE" : "DISABLED BY ADMIN"}
+                    </span>
+                  </div>
+
+                  {/* Switch 2: Guest Gallery */}
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-white">Guest Photo Portal (/gallery)</span>
+                      <input
+                        type="checkbox"
+                        checked={featureToggles.enableGuestGallery}
+                        onChange={(e) =>
+                          setFeatureToggles({ ...featureToggles, enableGuestGallery: e.target.checked })
+                        }
+                        className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Controls whether guests can search event PINs and download high-res photo captures.
+                    </p>
+                    <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-mono uppercase font-bold ${featureToggles.enableGuestGallery ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
+                      {featureToggles.enableGuestGallery ? "ACTIVE / ONLINE" : "DISABLED BY ADMIN"}
+                    </span>
+                  </div>
+
+                  {/* Switch 3: Print Frame Customizer */}
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-white">Print Frame Customizer (/frame-customizer)</span>
+                      <input
+                        type="checkbox"
+                        checked={featureToggles.enableFrameCustomizer}
+                        onChange={(e) =>
+                          setFeatureToggles({ ...featureToggles, enableFrameCustomizer: e.target.checked })
+                        }
+                        className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Controls whether clients can access the live 4x6 print overlay design studio.
+                    </p>
+                    <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-mono uppercase font-bold ${featureToggles.enableFrameCustomizer ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
+                      {featureToggles.enableFrameCustomizer ? "ACTIVE / ONLINE" : "DISABLED BY ADMIN"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Google Sheet Question Sync & Crew Settings */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-6">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-white">Google Sheet Row 1 Question Column Sync</h3>
+                      <p className="text-xs text-emerald-100/70">
+                        Paste your event Google Sheet link. Row 1 header columns will automatically become active questions in /operator.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSaveOperatorConfig}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Crew &amp; Sheet Settings</span>
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Google Sheet URL Input */}
+                  <div>
+                    <label className="block text-xs font-mono text-emerald-200 mb-1.5">
+                      Google Sheet URL (Spreadsheet link, Published CSV, or Webhook)
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="text"
+                        value={operatorConfig.googleSheetUrl || ""}
+                        onChange={(e) =>
+                          setOperatorConfig({ ...operatorConfig, googleSheetUrl: e.target.value })
+                        }
+                        placeholder="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit..."
+                        className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/20 text-white font-mono text-xs focus:border-[#D4AF37] focus:outline-none"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={handleSyncGoogleSheetHeaders}
+                        disabled={fetchingSheetHeaders}
+                        className="px-5 py-3 rounded-xl bg-white/10 border border-white/20 text-[#D4AF37] font-bold text-xs uppercase tracking-wider hover:bg-white/20 transition flex items-center justify-center space-x-2 cursor-pointer"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${fetchingSheetHeaders ? "animate-spin" : ""}`} />
+                        <span>{fetchingSheetHeaders ? "Syncing..." : "Sync Row 1 Columns"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Question Columns & Hide/Show Toggles */}
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                    <h4 className="font-serif text-base font-bold text-[#D4AF37]">
+                      Active Question Columns ({operatorConfig.customQuestions?.length || 0})
+                    </h4>
+                    <p className="text-xs text-emerald-100/70">
+                      Check or uncheck fields to show or hide questions in the On-Site Crew Command token manager.
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {(operatorConfig.customQuestions || []).map((colName, idx) => {
+                        const isHidden = (operatorConfig.hiddenFields || []).includes(colName);
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-xl border flex items-center justify-between text-xs transition ${
+                              !isHidden
+                                ? "bg-emerald-950/40 border-emerald-400/40 text-emerald-200 font-semibold"
+                                : "bg-black/40 border-white/10 text-white/40 line-through"
+                            }`}
+                          >
+                            <span className="truncate pr-2 font-mono">
+                              {idx + 1}. {colName}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentHidden = operatorConfig.hiddenFields || [];
+                                const newHidden = isHidden
+                                  ? currentHidden.filter((f) => f !== colName)
+                                  : [...currentHidden, colName];
+                                setOperatorConfig({ ...operatorConfig, hiddenFields: newHidden });
+                              }}
+                              className={`px-2 py-1 rounded text-[10px] font-bold font-mono uppercase cursor-pointer ${
+                                !isHidden ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                              }`}
+                            >
+                              {!isHidden ? "Visible" : "Hidden"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Crew PIN Credentials & Admin Sync Card */}
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                    <h4 className="font-serif text-base font-bold text-[#D4AF37] flex items-center space-x-2">
+                      <Lock className="w-4 h-4 text-[#D4AF37]" />
+                      <span>On-Site Crew Security PIN Credentials</span>
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-mono text-emerald-200 mb-1">Dedicated Crew Security PIN</label>
+                        <input
+                          type="text"
+                          value={operatorConfig.pin || "visriva2026"}
+                          onChange={(e) =>
+                            setOperatorConfig({ ...operatorConfig, pin: e.target.value })
+                          }
+                          placeholder="e.g. visriva2026"
+                          className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white font-mono font-bold focus:border-[#D4AF37] focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="flex items-center space-x-3 pt-6">
+                        <input
+                          type="checkbox"
+                          id="allowAdminPass"
+                          checked={operatorConfig.allowAdminPass !== false}
+                          onChange={(e) =>
+                            setOperatorConfig({ ...operatorConfig, allowAdminPass: e.target.checked })
+                          }
+                          className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                        />
+                        <label htmlFor="allowAdminPass" className="text-xs font-semibold text-white cursor-pointer leading-tight">
+                          Allow Master Admin Passwords to unlock /operator (jeevan, drupitha, punith, arpitha, 4848, 0315)
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB 9: HOMEPAGE SECTIONS 1, 2 & 3 CMS */}
+          {activeTab === "bentoGrid" && (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              
+              {/* Card 1: Section 1 CMS - Our Signature Live Stations (Bento Grid) */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-6">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-white">Section 1 CMS: Our Signature Live Stations (Bento Grid)</h3>
+                      <p className="text-xs text-emerald-100/70">Edit badge text, main heading, descriptions, and show/hide individual station cards.</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSaveBentoConfig}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Section 1 CMS</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-mono text-emerald-200 mb-1">Section Badge Text</label>
+                    <input
+                      type="text"
+                      value={bentoConfig.badgeText || "Asymmetrical Live Services"}
+                      onChange={(e) => setBentoConfig({ ...bentoConfig, badgeText: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white text-xs focus:border-[#D4AF37] focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-mono text-emerald-200 mb-1">Main Heading Title</label>
+                    <input
+                      type="text"
+                      value={bentoConfig.headingTitle || "Our Signature Live Stations"}
+                      onChange={(e) => setBentoConfig({ ...bentoConfig, headingTitle: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white font-serif font-bold text-sm focus:border-[#D4AF37] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-emerald-200 mb-1">Subheading Description</label>
+                  <textarea
+                    rows={2}
+                    value={bentoConfig.subheadingText || ""}
+                    onChange={(e) => setBentoConfig({ ...bentoConfig, subheadingText: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white text-xs focus:border-[#D4AF37] focus:outline-none leading-relaxed"
+                  />
+                </div>
+
+                {/* 5 Station Cards Editor */}
+                <div className="space-y-4 pt-4 border-t border-white/10">
+                  <h4 className="font-serif text-base font-bold text-[#D4AF37]">Individual Station Cards ({bentoConfig.cards?.length || 0})</h4>
+
+                  <div className="space-y-4">
+                    {(bentoConfig.cards || DEFAULT_BENTO_GRID_CONFIG.cards).map((card, idx) => (
+                      <div key={card.id || idx} className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-bold text-[#D4AF37]">Card #{idx + 1}: {card.title}</span>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-[10px] font-mono text-emerald-200/70">Show Card</span>
+                            <input
+                              type="checkbox"
+                              checked={card.enabled !== false}
+                              onChange={(e) => {
+                                const newCards = [...(bentoConfig.cards || DEFAULT_BENTO_GRID_CONFIG.cards)];
+                                newCards[idx] = { ...newCards[idx], enabled: e.target.checked };
+                                setBentoConfig({ ...bentoConfig, cards: newCards });
+                              }}
+                              className="w-4 h-4 accent-[#D4AF37] cursor-pointer"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-mono text-emerald-200/70 mb-1">Badge</label>
+                            <input
+                              type="text"
+                              value={card.badgeText || ""}
+                              onChange={(e) => {
+                                const newCards = [...(bentoConfig.cards || DEFAULT_BENTO_GRID_CONFIG.cards)];
+                                newCards[idx] = { ...newCards[idx], badgeText: e.target.value };
+                                setBentoConfig({ ...bentoConfig, cards: newCards });
+                              }}
+                              className="w-full px-3 py-1.5 rounded-lg bg-black/40 border border-white/15 text-white text-xs"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-mono text-emerald-200/70 mb-1">Card Title</label>
+                            <input
+                              type="text"
+                              value={card.title || ""}
+                              onChange={(e) => {
+                                const newCards = [...(bentoConfig.cards || DEFAULT_BENTO_GRID_CONFIG.cards)];
+                                newCards[idx] = { ...newCards[idx], title: e.target.value };
+                                setBentoConfig({ ...bentoConfig, cards: newCards });
+                              }}
+                              className="w-full px-3 py-1.5 rounded-lg bg-black/40 border border-white/15 text-white text-xs font-bold"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-mono text-emerald-200/70 mb-1">Card Description</label>
+                          <textarea
+                            rows={2}
+                            value={card.description || ""}
+                            onChange={(e) => {
+                              const newCards = [...(bentoConfig.cards || DEFAULT_BENTO_GRID_CONFIG.cards)];
+                              newCards[idx] = { ...newCards[idx], description: e.target.value };
+                              setBentoConfig({ ...bentoConfig, cards: newCards });
+                            }}
+                            className="w-full px-3 py-1.5 rounded-lg bg-black/40 border border-white/15 text-white text-xs"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-mono text-emerald-200/70 mb-1">CTA Button Text</label>
+                            <input
+                              type="text"
+                              value={card.ctaText || "Explore Station"}
+                              onChange={(e) => {
+                                const newCards = [...(bentoConfig.cards || DEFAULT_BENTO_GRID_CONFIG.cards)];
+                                newCards[idx] = { ...newCards[idx], ctaText: e.target.value };
+                                setBentoConfig({ ...bentoConfig, cards: newCards });
+                              }}
+                              className="w-full px-3 py-1.5 rounded-lg bg-black/40 border border-white/15 text-white text-xs"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-mono text-emerald-200/70 mb-1">CTA Target Link</label>
+                            <input
+                              type="text"
+                              value={card.ctaUrl || "/photo-booth"}
+                              onChange={(e) => {
+                                const newCards = [...(bentoConfig.cards || DEFAULT_BENTO_GRID_CONFIG.cards)];
+                                newCards[idx] = { ...newCards[idx], ctaUrl: e.target.value };
+                                setBentoConfig({ ...bentoConfig, cards: newCards });
+                              }}
+                              className="w-full px-3 py-1.5 rounded-lg bg-black/40 border border-white/15 text-white text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Section 2 CMS - What's Included in Every Standard Package */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-6">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-white">Section 2 CMS: What&apos;s Included in Package</h3>
+                      <p className="text-xs text-emerald-100/70">Edit heading, 6 feature bullet items, showcase photo URL, badge, and title.</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSaveWebsiteText}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Section 2 CMS</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-mono text-emerald-200 mb-1">Badge Text</label>
+                    <input
+                      type="text"
+                      value={websiteText.whatsIncludedBadge || "The Visriva Guarantee"}
+                      onChange={(e) => setWebsiteText({ ...websiteText, whatsIncludedBadge: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white text-xs focus:border-[#D4AF37] focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-mono text-emerald-200 mb-1">Section Heading Title</label>
+                    <input
+                      type="text"
+                      value={websiteText.whatsIncludedHeading || "What's Included in Every Standard Photo Booth Package:"}
+                      onChange={(e) => setWebsiteText({ ...websiteText, whatsIncludedHeading: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white font-serif font-bold text-sm focus:border-[#D4AF37] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* 6 Feature Bullet Items Editor */}
+                <div className="space-y-3 pt-3 border-t border-white/10">
+                  <h4 className="font-serif text-sm font-bold text-[#D4AF37]">6 Feature Bullet Items</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {(websiteText.whatsIncludedItems || DEFAULT_WEBSITE_TEXT.whatsIncludedItems || []).map((itemStr, idx) => (
+                      <div key={idx} className="space-y-1">
+                        <label className="block text-[10px] font-mono text-emerald-200/70">Feature #{idx + 1}</label>
+                        <input
+                          type="text"
+                          value={itemStr}
+                          onChange={(e) => {
+                            const newItems = [...(websiteText.whatsIncludedItems || DEFAULT_WEBSITE_TEXT.whatsIncludedItems || [])];
+                            newItems[idx] = e.target.value;
+                            setWebsiteText({ ...websiteText, whatsIncludedItems: newItems });
+                          }}
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-xs focus:border-[#D4AF37] focus:outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right Visual Showcase Card Editor */}
+                <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                  <h4 className="font-serif text-sm font-bold text-[#D4AF37]">Right Side Showcase Visual Card</h4>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-mono text-emerald-200 mb-1">Card Badge</label>
+                      <input
+                        type="text"
+                        value={websiteText.whatsIncludedBadge || "Signature Station"}
+                        onChange={(e) => setWebsiteText({ ...websiteText, whatsIncludedBadge: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/15 text-white text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-mono text-emerald-200 mb-1">Card Title</label>
+                      <input
+                        type="text"
+                        value={websiteText.whatsIncludedTitle || "Vintage Wooden Booth Setup"}
+                        onChange={(e) => setWebsiteText({ ...websiteText, whatsIncludedTitle: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/15 text-white text-xs font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-mono text-emerald-200 mb-1">Card Subtitle / Specs</label>
+                      <input
+                        type="text"
+                        value={websiteText.whatsIncludedSubtitle || "Studio Strobe Lighting • 8-Sec Thermal Dye-Sublimation"}
+                        onChange={(e) => setWebsiteText({ ...websiteText, whatsIncludedSubtitle: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/15 text-white text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-emerald-200 mb-1">Showcase Photo Image URL</label>
+                    <input
+                      type="text"
+                      value={websiteText.whatsIncludedImageUrl || ""}
+                      onChange={(e) => setWebsiteText({ ...websiteText, whatsIncludedImageUrl: e.target.value })}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white font-mono text-xs focus:border-[#D4AF37] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Card 3: Section 3 CMS - Why Choose Visriva */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-6">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                      <Crown className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-white">Section 3 CMS: Why Choose Visriva?</h3>
+                      <p className="text-xs text-emerald-100/70">Edit section heading, description text, 4 bullet items, and 4 highlight stat boxes.</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSaveWebsiteText}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Section 3 CMS</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-mono text-emerald-200 mb-1">Badge Text</label>
+                    <input
+                      type="text"
+                      value={websiteText.whyChooseBadge || "The Visriva Standard"}
+                      onChange={(e) => setWebsiteText({ ...websiteText, whyChooseBadge: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white text-xs focus:border-[#D4AF37] focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-mono text-emerald-200 mb-1">Section Heading Title</label>
+                    <input
+                      type="text"
+                      value={websiteText.whyChooseTitle || "Why Choose Visriva?"}
+                      onChange={(e) => setWebsiteText({ ...websiteText, whyChooseTitle: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white font-serif font-bold text-sm focus:border-[#D4AF37] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-emerald-200 mb-1">Section Paragraph Description</label>
+                  <textarea
+                    rows={3}
+                    value={websiteText.whyChooseDescription || ""}
+                    onChange={(e) => setWebsiteText({ ...websiteText, whyChooseDescription: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white text-xs focus:border-[#D4AF37] focus:outline-none leading-relaxed"
+                  />
+                </div>
+
+                {/* 4 Feature Bullets Editor */}
+                <div className="space-y-3 pt-3 border-t border-white/10">
+                  <h4 className="font-serif text-sm font-bold text-[#D4AF37]">4 Bullet Point Highlights</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {(websiteText.whyChooseBullets || DEFAULT_WEBSITE_TEXT.whyChooseBullets || []).map((bulletStr, idx) => (
+                      <div key={idx} className="space-y-1">
+                        <label className="block text-[10px] font-mono text-emerald-200/70">Bullet #{idx + 1}</label>
+                        <input
+                          type="text"
+                          value={bulletStr}
+                          onChange={(e) => {
+                            const newBullets = [...(websiteText.whyChooseBullets || DEFAULT_WEBSITE_TEXT.whyChooseBullets || [])];
+                            newBullets[idx] = e.target.value;
+                            setWebsiteText({ ...websiteText, whyChooseBullets: newBullets });
+                          }}
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-xs focus:border-[#D4AF37] focus:outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4 Highlight Stat Cards Editor */}
+                <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                  <h4 className="font-serif text-sm font-bold text-[#D4AF37]">4 Luxury Stat Highlight Boxes</h4>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {(websiteText.whyChooseHighlights || DEFAULT_WEBSITE_TEXT.whyChooseHighlights || []).map((hItem, idx) => (
+                      <div key={idx} className="p-3 rounded-xl bg-black/40 border border-white/15 space-y-2">
+                        <span className="block text-[10px] font-mono text-[#D4AF37]">Stat #{idx + 1}</span>
+                        <div>
+                          <label className="block text-[9px] font-mono text-emerald-200/70">Value</label>
+                          <input
+                            type="text"
+                            value={hItem.val}
+                            onChange={(e) => {
+                              const newH = [...(websiteText.whyChooseHighlights || DEFAULT_WEBSITE_TEXT.whyChooseHighlights || [])];
+                              newH[idx] = { ...newH[idx], val: e.target.value };
+                              setWebsiteText({ ...websiteText, whyChooseHighlights: newH });
+                            }}
+                            className="w-full px-2.5 py-1 rounded bg-white/5 border border-white/10 text-white font-bold text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-mono text-emerald-200/70">Label</label>
+                          <input
+                            type="text"
+                            value={hItem.label}
+                            onChange={(e) => {
+                              const newH = [...(websiteText.whyChooseHighlights || DEFAULT_WEBSITE_TEXT.whyChooseHighlights || [])];
+                              newH[idx] = { ...newH[idx], label: e.target.value };
+                              setWebsiteText({ ...websiteText, whyChooseHighlights: newH });
+                            }}
+                            className="w-full px-2.5 py-1 rounded bg-white/5 border border-white/10 text-emerald-200 text-xs"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB 10: INDIVIDUAL SERVICES & NAVBAR MASTER TOGGLES */}
+          {activeTab === "serviceToggles" && (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              
+              {/* Card 1: Individual Service Pages Switches */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-6">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                      <Lock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-white">Individual Service Pages Enable / Disable Switches</h3>
+                      <p className="text-xs text-emerald-100/70">Turn off specific service pages or hide them from the Booking Engine and Navbar when unavailable.</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSaveFeatureToggles}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Service Toggles</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Service 1: Instant Photo Booth */}
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-white">Instant Photo Booth (/photo-booth)</span>
+                      <input
+                        type="checkbox"
+                        checked={featureToggles.enablePhotoBoothService !== false}
+                        onChange={(e) =>
+                          setFeatureToggles({ ...featureToggles, enablePhotoBoothService: e.target.checked })
+                        }
+                        className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Controls whether Photo Booth appears in Navbar, Booking Engine, and /photo-booth landing page.
+                    </p>
+                    <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-mono uppercase font-bold ${featureToggles.enablePhotoBoothService !== false ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
+                      {featureToggles.enablePhotoBoothService !== false ? "ACTIVE / ONLINE" : "DISABLED BY ADMIN"}
+                    </span>
+                  </div>
+
+                  {/* Service 2: Fridge Magnet Station */}
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-white">Fridge Magnet Station (/services/magnet-station)</span>
+                      <input
+                        type="checkbox"
+                        checked={featureToggles.enableMagnetService !== false}
+                        onChange={(e) =>
+                          setFeatureToggles({ ...featureToggles, enableMagnetService: e.target.checked })
+                        }
+                        className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Controls whether Fridge Magnet Station appears in Navbar, Booking Engine, and service page.
+                    </p>
+                    <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-mono uppercase font-bold ${featureToggles.enableMagnetService !== false ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
+                      {featureToggles.enableMagnetService !== false ? "ACTIVE / ONLINE" : "DISABLED BY ADMIN"}
+                    </span>
+                  </div>
+
+                  {/* Service 3: Keychain Station */}
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-white">Keychain Station (/services/keychain-station)</span>
+                      <input
+                        type="checkbox"
+                        checked={featureToggles.enableKeychainService !== false}
+                        onChange={(e) =>
+                          setFeatureToggles({ ...featureToggles, enableKeychainService: e.target.checked })
+                        }
+                        className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Controls whether Keychain Station appears in Navbar, Booking Engine, and service page.
+                    </p>
+                    <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-mono uppercase font-bold ${featureToggles.enableKeychainService !== false ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
+                      {featureToggles.enableKeychainService !== false ? "ACTIVE / ONLINE" : "DISABLED BY ADMIN"}
+                    </span>
+                  </div>
+
+                  {/* Service 4: Live Mug Printing */}
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-white">Live Mug Printing (/services/mug-printing)</span>
+                      <input
+                        type="checkbox"
+                        checked={featureToggles.enableMugService !== false}
+                        onChange={(e) =>
+                          setFeatureToggles({ ...featureToggles, enableMugService: e.target.checked })
+                        }
+                        className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Controls whether Live Mug Printing appears in Navbar, Booking Engine, and service page.
+                    </p>
+                    <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-mono uppercase font-bold ${featureToggles.enableMugService !== false ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
+                      {featureToggles.enableMugService !== false ? "ACTIVE / ONLINE" : "DISABLED BY ADMIN"}
+                    </span>
+                  </div>
+
+                  {/* Service 5: Tote Bag & T-Shirt Station */}
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-white">Tote Bag &amp; T-Shirt Station (/services/tote-tshirt-station)</span>
+                      <input
+                        type="checkbox"
+                        checked={featureToggles.enableToteTshirtService !== false}
+                        onChange={(e) =>
+                          setFeatureToggles({ ...featureToggles, enableToteTshirtService: e.target.checked })
+                        }
+                        className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Controls whether Tote Bag &amp; T-Shirt Station appears in Navbar, Booking Engine, and service page.
+                    </p>
+                    <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-mono uppercase font-bold ${featureToggles.enableToteTshirtService !== false ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
+                      {featureToggles.enableToteTshirtService !== false ? "ACTIVE / ONLINE" : "DISABLED BY ADMIN"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Navbar Menu Customization */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-6">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-white">Navbar Menu Controls</h3>
+                      <p className="text-xs text-emerald-100/70">Show or hide special portal links inside the top website navigation menu.</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSaveFeatureToggles}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Navbar Settings</span>
+                  </button>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3 max-w-md">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-white">Show Crew Command (/operator) in Navbar</span>
+                    <input
+                      type="checkbox"
+                      checked={featureToggles.showOperatorInNavbar !== false}
+                      onChange={(e) =>
+                        setFeatureToggles({ ...featureToggles, showOperatorInNavbar: e.target.checked })
+                      }
+                      className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                    />
+                  </div>
+                  <p className="text-xs text-emerald-100/70 leading-relaxed">
+                    Adds a direct link to the On-Site Crew Command Center (/operator) inside the site header menu.
+                  </p>
+                  <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-mono uppercase font-bold ${featureToggles.showOperatorInNavbar !== false ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
+                    {featureToggles.showOperatorInNavbar !== false ? "VISIBLE IN NAVBAR" : "HIDDEN FROM NAVBAR"}
+                  </span>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB 11: HERO 3D CARDS ALIGNMENT & CLICK REDIRECT STUDIO */}
+          {activeTab === "heroCardStudio" && (
+            <div className="space-y-6">
+              {/* Header Card */}
+              <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-2xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                        <Palette className="w-5 h-5" />
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-serif font-bold text-white">
+                        Hero 3D Cards Alignment &amp; Redirect Studio
+                      </h2>
+                    </div>
+                    <p className="text-xs text-emerald-100/70">
+                      Customize card positions, vertical step offsets, rotational tilt angles, horizontal nudges, and toggle whether clicking on cards redirects guests to service pages.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setHeroCardsConfig(DEFAULT_HERO_CARD_STACK_CONFIG)}
+                      className="px-4 py-2.5 rounded-xl border border-white/20 text-white font-bold text-xs hover:bg-white/10 transition cursor-pointer flex items-center space-x-1.5"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>Reset Defaults</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setIsSaving(true);
+                        const res = await saveHeroCardStackConfig(heroCardsConfig);
+                        setIsSaving(false);
+                        if (res.success) {
+                          setSuccessToast("✅ Hero 3D Card Stack settings saved successfully!");
+                          setTimeout(() => setSuccessToast(""), 4000);
+                        } else {
+                          setErrorToast(`❌ Save error: ${res.error}`);
+                          setTimeout(() => setErrorToast(""), 4000);
+                        }
+                      }}
+                      disabled={isSaving}
+                      className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Save Card Stack Studio</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Master Click Redirection Control Card */}
+              <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-base text-white">Master Hero Cards Click Redirection</span>
+                      <span className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${heroCardsConfig.enableCardRedirect !== false ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
+                        {heroCardsConfig.enableCardRedirect !== false ? "REDIRECT ENABLED" : "REDIRECT DISABLED (VISUAL ONLY)"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      When turned ON, clicking any hero card on the homepage opens its service URL page. When turned OFF, cards operate purely as visual interactive 3D display cards.
+                    </p>
+                  </div>
+
+                  <input
+                    type="checkbox"
+                    checked={heroCardsConfig.enableCardRedirect !== false}
+                    onChange={(e) =>
+                      setHeroCardsConfig({ ...heroCardsConfig, enableCardRedirect: e.target.checked })
+                    }
+                    className="w-6 h-6 accent-[#D4AF37] cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Individual Card Alignment Sliders Studio */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column: Sliders for each of the 5 cards */}
+                <div className="space-y-4">
+                  {[
+                    { key: "mugs", title: "1. Live Mug Printing", badge: "Sublimation", icon: Coffee, href: "/services/mug-printing" },
+                    { key: "keychains", title: "2. Bespoke Keychains", badge: "Keepsake", icon: Key, href: "/services/keychain-station" },
+                    { key: "magnets", title: "3. Custom Fridge Magnets", badge: "Bespoke", icon: Layers, href: "/services/magnet-station" },
+                    { key: "totes", title: "4. Tote Bag & T-Shirt Station", badge: "Canvas Press", icon: ShoppingBag, href: "/services/tote-tshirt-station" },
+                    { key: "photo-booth", title: "5. Instant Photo Booth", badge: "Flagship", icon: Camera, href: "/photo-booth" },
+                  ].map((cardDef) => {
+                    const item: HeroCardItemConfig = heroCardsConfig.cards[cardDef.key] || {
+                      id: cardDef.key,
+                      topPx: 0,
+                      rotateDeg: 0,
+                      horizontalOffsetPx: 0,
+                      scale: 1,
+                      redirectOnClick: true,
+                    };
+
+                    const Icon = cardDef.icon;
+
+                    const updateItem = (field: keyof HeroCardItemConfig, val: any) => {
+                      const updatedCards = {
+                        ...heroCardsConfig.cards,
+                        [cardDef.key]: {
+                          ...item,
+                          [field]: val,
+                        },
+                      };
+                      setHeroCardsConfig({ ...heroCardsConfig, cards: updatedCards });
+                    };
+
+                    return (
+                      <div key={cardDef.key} className="glass-card rounded-2xl p-5 border border-white/10 space-y-3.5 bg-black/40">
+                        <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                          <div className="flex items-center space-x-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37]">
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className="font-bold text-sm text-white block">{cardDef.title}</span>
+                              <span className="text-[10px] text-emerald-200/60 font-mono block">Link: {cardDef.href}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const defaultCard = DEFAULT_HERO_CARD_STACK_CONFIG.cards[cardDef.key] || {
+                                  id: cardDef.key,
+                                  topPx: 0,
+                                  rotateDeg: 0,
+                                  horizontalOffsetPx: 0,
+                                  scale: 1,
+                                  redirectOnClick: true,
+                                };
+                                setHeroCardsConfig({
+                                  ...heroCardsConfig,
+                                  cards: {
+                                    ...heroCardsConfig.cards,
+                                    [cardDef.key]: { ...defaultCard },
+                                  },
+                                });
+                              }}
+                              title="Reset this card back to default alignment"
+                              className="px-2.5 py-1 rounded-lg border border-white/20 bg-white/5 text-[11px] font-bold text-emerald-200 hover:bg-white/15 hover:text-white transition cursor-pointer flex items-center space-x-1"
+                            >
+                              <RefreshCw className="w-3 h-3 text-[#D4AF37]" />
+                              <span>Reset Card</span>
+                            </button>
+
+                            <div className="flex items-center space-x-1.5 border-l border-white/15 pl-2.5">
+                              <span className="text-[10px] text-white/70 font-semibold">Clickable:</span>
+                              <input
+                                type="checkbox"
+                                checked={item.redirectOnClick !== false}
+                                onChange={(e) => updateItem("redirectOnClick", e.target.checked)}
+                                className="w-4 h-4 accent-[#D4AF37] cursor-pointer"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 text-xs">
+                          {/* Top Offset Slider */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center text-emerald-100/80 font-mono text-[11px]">
+                              <span>Top Offset:</span>
+                              <div className="flex items-center space-x-1">
+                                <input
+                                  type="number"
+                                  min="-20"
+                                  max="350"
+                                  value={item.topPx}
+                                  onChange={(e) => updateItem("topPx", Number(e.target.value))}
+                                  className="w-14 bg-black/60 border border-[#D4AF37]/50 rounded px-1.5 py-0.5 text-right text-[#D4AF37] font-bold text-xs"
+                                />
+                                <span className="text-[#D4AF37] font-bold">px</span>
+                              </div>
+                            </div>
+                            <input
+                              type="range"
+                              min="-20"
+                              max="350"
+                              value={item.topPx}
+                              onChange={(e) => updateItem("topPx", Number(e.target.value))}
+                              className="w-full accent-[#D4AF37] cursor-pointer"
+                            />
+                          </div>
+
+                          {/* Horizontal Nudge Slider */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-emerald-100/80 font-mono text-[11px]">
+                              <span>Left/Right Offset:</span>
+                              <span className="text-[#D4AF37] font-bold">{item.horizontalOffsetPx}px</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="-80"
+                              max="80"
+                              value={item.horizontalOffsetPx}
+                              onChange={(e) => updateItem("horizontalOffsetPx", Number(e.target.value))}
+                              className="w-full accent-[#D4AF37] cursor-pointer"
+                            />
+                          </div>
+
+                          {/* Rotation Angle Slider */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-emerald-100/80 font-mono text-[11px]">
+                              <span>Rotation Tilt:</span>
+                              <span className="text-[#D4AF37] font-bold">{item.rotateDeg}°</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="-30"
+                              max="30"
+                              value={item.rotateDeg}
+                              onChange={(e) => updateItem("rotateDeg", Number(e.target.value))}
+                              className="w-full accent-[#D4AF37] cursor-pointer"
+                            />
+                          </div>
+
+                          {/* Scale Slider */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-emerald-100/80 font-mono text-[11px]">
+                              <span>Scale Ratio:</span>
+                              <span className="text-[#D4AF37] font-bold">{item.scale}x</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0.7"
+                              max="1.3"
+                              step="0.05"
+                              value={item.scale}
+                              onChange={(e) => updateItem("scale", Number(e.target.value))}
+                              className="w-full accent-[#D4AF37] cursor-pointer"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Text Content Editor */}
+                        <div className="pt-3 border-t border-white/10 space-y-2.5">
+                          <div className="flex items-center space-x-1.5 text-xs text-[#D4AF37] font-bold">
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>Card Text &amp; Description CMS</span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-emerald-100/70 block">Card Title</label>
+                              <input
+                                type="text"
+                                value={item.customTitle !== undefined ? item.customTitle : cardDef.title}
+                                onChange={(e) => updateItem("customTitle", e.target.value)}
+                                placeholder={cardDef.title}
+                                className="w-full bg-black/60 border border-white/20 rounded-lg px-2.5 py-1.5 text-white font-bold text-xs focus:border-[#D4AF37] outline-none"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-emerald-100/70 block">Badge Tag</label>
+                              <input
+                                type="text"
+                                value={item.customBadge !== undefined ? item.customBadge : cardDef.badge}
+                                onChange={(e) => updateItem("customBadge", e.target.value)}
+                                placeholder={cardDef.badge}
+                                className="w-full bg-black/60 border border-white/20 rounded-lg px-2.5 py-1.5 text-[#D4AF37] font-bold text-xs focus:border-[#D4AF37] outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-emerald-100/70 block">Card Description</label>
+                            <textarea
+                              rows={2}
+                              value={item.customDesc !== undefined ? item.customDesc : ""}
+                              onChange={(e) => updateItem("customDesc", e.target.value)}
+                              placeholder="Enter custom card description text..."
+                              className="w-full bg-black/60 border border-white/20 rounded-lg p-2 text-white text-xs leading-relaxed focus:border-[#D4AF37] outline-none"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-emerald-100/70 block">Footer Tag (Optional)</label>
+                            <input
+                              type="text"
+                              value={item.customFooter !== undefined ? item.customFooter : ""}
+                              onChange={(e) => updateItem("customFooter", e.target.value)}
+                              placeholder="e.g. Full-Frame Optics • Instant QR Gallery"
+                              className="w-full bg-[#011F15] border border-white/20 rounded-lg px-2.5 py-1.5 text-emerald-200 text-xs focus:border-[#D4AF37] outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Right Column: Live Interactive Card Canvas Preview Box */}
+                <div className="glass-card rounded-3xl p-6 border border-[#D4AF37]/30 space-y-4 flex flex-col">
+                  <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                    <h3 className="font-bold text-sm text-white flex items-center space-x-2">
+                      <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                      <span>Live 3D Card Stack Preview Canvas</span>
+                    </h3>
+                    <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-400/30">
+                      Interactive Live Studio
+                    </span>
+                  </div>
+
+                  {/* Canvas Container */}
+                  <div className="relative w-full h-[520px] bg-[#011F15] rounded-2xl border border-white/15 overflow-hidden flex items-center justify-center p-4">
+                    {[
+                      { key: "mugs", title: "Live Mug Printing", badge: "Sublimation", icon: Coffee, isFlag: false },
+                      { key: "keychains", title: "Bespoke Keychains", badge: "Keepsake", icon: Key, isFlag: false },
+                      { key: "magnets", title: "Custom Fridge Magnets", badge: "Bespoke", icon: Layers, isFlag: false },
+                      { key: "totes", title: "Tote Bag & T-Shirt Station", badge: "Canvas Press", icon: ShoppingBag, isFlag: false },
+                      { key: "photo-booth", title: "Instant Photo Booth", badge: "Flagship", icon: Camera, isFlag: true },
+                    ].map((cardDef, idx) => {
+                      const item = heroCardsConfig.cards[cardDef.key] || {
+                        id: cardDef.key,
+                        topPx: idx * 14,
+                        rotateDeg: idx % 2 === 0 ? -4 : 4,
+                        horizontalOffsetPx: 0,
+                        scale: 1,
+                        redirectOnClick: true,
+                      };
+                      const Icon = cardDef.icon;
+                      const zIndex = (idx + 1) * 10;
+                      const isClickable = heroCardsConfig.enableCardRedirect !== false && item.redirectOnClick !== false;
+
+                      const displayTitle = item.customTitle || cardDef.title;
+                      const displayBadge = item.customBadge || cardDef.badge;
+
+                      return (
+                        <div
+                          key={cardDef.key}
+                          style={{
+                            top: `${item.topPx + 10}px`,
+                            transform: `translateX(${item.horizontalOffsetPx}px) rotate(${item.rotateDeg}deg) scale(${item.scale})`,
+                            zIndex,
+                          }}
+                          className={`absolute w-72 p-4 rounded-xl border backdrop-blur-md shadow-lg transition-transform duration-300 ${
+                            cardDef.isFlag
+                              ? "border-[#D4AF37]/60 bg-[#022419]"
+                              : "border-white/20 bg-[#01281c]"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${cardDef.isFlag ? "bg-gold-gradient text-[#011F15]" : "bg-black/50 text-[#D4AF37]"}`}>
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <span className="text-[9px] font-mono text-[#D4AF37] bg-[#D4AF37]/15 px-2 py-0.5 rounded border border-[#D4AF37]/30">
+                              {displayBadge}
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-sm text-white line-clamp-1">{displayTitle}</h4>
+                          <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/10 text-[9px] font-mono text-emerald-200/70">
+                            <span>Top: {item.topPx}px</span>
+                            <span>Rot: {item.rotateDeg}°</span>
+                            <span className={isClickable ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                              {isClickable ? "Link ON" : "Link OFF"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <p className="text-[11px] text-emerald-100/60 leading-relaxed text-center italic">
+                    💡 Tip: Move the sliders on the left to see live real-time position updates on this canvas. Click &quot;Save Card Stack Studio&quot; to apply directly to the website homepage!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 12: AI EVENT CONCIERGE SYSTEM PROMPTS & PRESETS CMS */}
+          {activeTab === "aiConciergeCMS" && (
+            <div className="space-y-6">
+              {/* Header Card */}
+              <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-2xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-serif font-bold text-white">
+                        AI Event Concierge Prompts &amp; Presets CMS
+                      </h2>
+                    </div>
+                    <p className="text-xs text-emerald-100/70">
+                      Customize how Gemini 1.5 analyzes event requests, edit preset prompt chips, and update default fallback recommendations.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setAiConciergeConfig(DEFAULT_AI_CONCIERGE_CONFIG)}
+                      className="px-4 py-2.5 rounded-xl border border-white/20 text-white font-bold text-xs hover:bg-white/10 transition cursor-pointer flex items-center space-x-1.5"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>Reset Defaults</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setIsSaving(true);
+                        const res = await saveAIConciergeConfig(aiConciergeConfig);
+                        setIsSaving(false);
+                        if (res.success) {
+                          setSuccessToast("✅ AI Concierge settings permanently saved to Cloud Firestore!");
+                          setTimeout(() => setSuccessToast(""), 4000);
+                        } else {
+                          setErrorToast(`❌ Save error: ${res.error}`);
+                          setTimeout(() => setErrorToast(""), 4000);
+                        }
+                      }}
+                      disabled={isSaving}
+                      className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Save AI Concierge CMS</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Master Toggle */}
+              <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-base text-white">AI Event Concierge Banner Status</span>
+                      <span className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${aiConciergeConfig.enabled !== false ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
+                        {aiConciergeConfig.enabled !== false ? "WIDGET ENABLED" : "WIDGET DISABLED"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Toggle whether the AI Event Concierge widget is visible on the homepage hero and booking engine.
+                    </p>
+                  </div>
+
+                  <input
+                    type="checkbox"
+                    checked={aiConciergeConfig.enabled !== false}
+                    onChange={(e) =>
+                      setAiConciergeConfig({ ...aiConciergeConfig, enabled: e.target.checked })
+                    }
+                    className="w-6 h-6 accent-[#D4AF37] cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* System Prompt Editor */}
+              <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-3">
+                <label className="font-bold text-sm text-white block">
+                  Gemini AI Concierge System Prompt Instructions
+                </label>
+                <p className="text-xs text-emerald-100/70 leading-relaxed">
+                  These instructions tell Gemini AI how to analyze event requests, calculate hourly souvenir capacities, and recommend station setups.
+                </p>
+                <textarea
+                  rows={8}
+                  value={aiConciergeConfig.systemPrompt}
+                  onChange={(e) =>
+                    setAiConciergeConfig({ ...aiConciergeConfig, systemPrompt: e.target.value })
+                  }
+                  className="w-full bg-black/60 border border-white/20 rounded-2xl p-4 text-xs font-mono text-white leading-relaxed focus:border-[#D4AF37] outline-none"
+                />
+              </div>
+
+              {/* Preset Chips Editor */}
+              <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-4">
+                <h3 className="font-bold text-sm text-white">Preset Prompt Chips Editor</h3>
+                <p className="text-xs text-emerald-100/70">
+                  Manage the quick preset buttons displayed inside the AI Concierge drawer for users.
+                </p>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newPresetChip}
+                    onChange={(e) => setNewPresetChip(e.target.value)}
+                    placeholder="Enter new preset prompt chip..."
+                    className="flex-1 bg-black/60 border border-white/20 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-[#D4AF37]"
+                  />
+                  <button
+                    onClick={() => {
+                      if (!newPresetChip.trim()) return;
+                      setAiConciergeConfig({
+                        ...aiConciergeConfig,
+                        presetChips: [...(aiConciergeConfig.presetChips || []), newPresetChip.trim()],
+                      });
+                      setNewPresetChip("");
+                    }}
+                    className="px-4 py-2 rounded-xl bg-[#D4AF37] text-[#011F15] font-extrabold text-xs uppercase cursor-pointer"
+                  >
+                    Add Chip +
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {(aiConciergeConfig.presetChips || []).map((chip, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 text-xs">
+                      <span className="text-white font-mono">✨ {chip}</span>
+                      <button
+                        onClick={() => {
+                          const updated = aiConciergeConfig.presetChips.filter((_, i) => i !== idx);
+                          setAiConciergeConfig({ ...aiConciergeConfig, presetChips: updated });
+                        }}
+                        className="text-rose-400 hover:text-rose-300 font-bold px-2 py-1 cursor-pointer"
+                      >
+                        Remove ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Fallback Settings Editor */}
+              <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-4">
+                <h3 className="font-bold text-sm text-white">Default Fallback Recommendation (Offline Backup)</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-emerald-100/70 block">Fallback Title</label>
+                    <input
+                      type="text"
+                      value={aiConciergeConfig.fallbackTitle}
+                      onChange={(e) => setAiConciergeConfig({ ...aiConciergeConfig, fallbackTitle: e.target.value })}
+                      className="w-full bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-white font-bold text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-emerald-100/70 block">Fallback Tagline</label>
+                    <input
+                      type="text"
+                      value={aiConciergeConfig.fallbackTagline}
+                      onChange={(e) => setAiConciergeConfig({ ...aiConciergeConfig, fallbackTagline: e.target.value })}
+                      className="w-full bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-[#D4AF37] text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-xs">
+                  <label className="text-[11px] text-emerald-100/70 block">Fallback Reasoning Text</label>
+                  <textarea
+                    rows={2}
+                    value={aiConciergeConfig.fallbackReasoning}
+                    onChange={(e) => setAiConciergeConfig({ ...aiConciergeConfig, fallbackReasoning: e.target.value })}
+                    className="w-full bg-black/60 border border-white/20 rounded-xl p-3 text-white text-xs leading-relaxed"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 13: AI WHATSAPP ASSISTANT SYSTEM PROMPTS & TEMPLATES CMS */}
+          {activeTab === "aiWhatsAppCMS" && (
+            <div className="space-y-6">
+              {/* Header Card */}
+              <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-2xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                        <MessageCircle className="w-5 h-5" />
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-serif font-bold text-white">
+                        AI WhatsApp Assistant Prompts &amp; Templates CMS
+                      </h2>
+                    </div>
+                    <p className="text-xs text-emerald-100/70">
+                      Configure Gemini AI WhatsApp messaging instructions, VIP quote templates, confirmation checklists, and follow-up incentives.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setAiWhatsAppConfig(DEFAULT_AI_WHATSAPP_CONFIG)}
+                      className="px-4 py-2.5 rounded-xl border border-white/20 text-white font-bold text-xs hover:bg-white/10 transition cursor-pointer flex items-center space-x-1.5"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>Reset Defaults</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setIsSaving(true);
+                        const res = await saveAIWhatsAppConfig(aiWhatsAppConfig);
+                        setIsSaving(false);
+                        if (res.success) {
+                          setSuccessToast("✅ AI WhatsApp settings permanently saved to Cloud Firestore!");
+                          setTimeout(() => setSuccessToast(""), 4000);
+                        } else {
+                          setErrorToast(`❌ Save error: ${res.error}`);
+                          setTimeout(() => setErrorToast(""), 4000);
+                        }
+                      }}
+                      disabled={isSaving}
+                      className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Save AI WhatsApp CMS</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Master Toggle */}
+              <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-base text-white">AI WhatsApp Assistant Status</span>
+                      <span className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${aiWhatsAppConfig.enabled !== false ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
+                        {aiWhatsAppConfig.enabled !== false ? "ASSISTANT ACTIVE" : "ASSISTANT DISABLED"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Toggle whether the AI WhatsApp Draft button is active inside /operator and /admin CRM.
+                    </p>
+                  </div>
+
+                  <input
+                    type="checkbox"
+                    checked={aiWhatsAppConfig.enabled !== false}
+                    onChange={(e) =>
+                      setAiWhatsAppConfig({ ...aiWhatsAppConfig, enabled: e.target.checked })
+                    }
+                    className="w-6 h-6 accent-[#D4AF37] cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* System Prompt Editor */}
+              <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-3">
+                <label className="font-bold text-sm text-white block">
+                  Gemini AI WhatsApp System Prompt Instructions
+                </label>
+                <p className="text-xs text-emerald-100/70 leading-relaxed">
+                  Instructions for Gemini AI on tone, emoji usage, and custom WhatsApp bolding for client drafts.
+                </p>
+                <textarea
+                  rows={5}
+                  value={aiWhatsAppConfig.systemPrompt}
+                  onChange={(e) =>
+                    setAiWhatsAppConfig({ ...aiWhatsAppConfig, systemPrompt: e.target.value })
+                  }
+                  className="w-full bg-black/60 border border-white/20 rounded-2xl p-4 text-xs font-mono text-white leading-relaxed focus:border-[#D4AF37] outline-none"
+                />
+              </div>
+
+              {/* Fallback WhatsApp Template Editors */}
+              <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-5">
+                <h3 className="font-bold text-sm text-white">Default WhatsApp Message Templates (Fallback)</h3>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-[#D4AF37] block">1. VIP Quote Pitch Template</label>
+                  <textarea
+                    rows={6}
+                    value={aiWhatsAppConfig.defaultVipQuote}
+                    onChange={(e) =>
+                      setAiWhatsAppConfig({ ...aiWhatsAppConfig, defaultVipQuote: e.target.value })
+                    }
+                    className="w-full bg-black/60 border border-white/20 rounded-2xl p-3 text-xs font-sans text-white leading-relaxed"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-emerald-300 block">2. Booking Confirmation &amp; Setup Template</label>
+                  <textarea
+                    rows={6}
+                    value={aiWhatsAppConfig.defaultConfirmation}
+                    onChange={(e) =>
+                      setAiWhatsAppConfig({ ...aiWhatsAppConfig, defaultConfirmation: e.target.value })
+                    }
+                    className="w-full bg-black/60 border border-white/20 rounded-2xl p-3 text-xs font-sans text-white leading-relaxed"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-amber-300 block">3. Follow-Up &amp; Exclusive Offer Template</label>
+                  <textarea
+                    rows={6}
+                    value={aiWhatsAppConfig.defaultFollowUp}
+                    onChange={(e) =>
+                      setAiWhatsAppConfig({ ...aiWhatsAppConfig, defaultFollowUp: e.target.value })
+                    }
+                    className="w-full bg-black/60 border border-white/20 rounded-2xl p-3 text-xs font-sans text-white leading-relaxed"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════
+              OPTION 14: REAL IMPACT & EVENT TRACK RECORD CMS
+          ══════════════════════════════════════════════════════════════ */}
+          {activeTab === "impactStatsCMS" && (
+            <div className="space-y-6">
+              {/* Header Card */}
+              <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-2xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                        <TrendingUp className="w-5 h-5" />
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-serif font-bold text-white">
+                        Real Impact &amp; Event Track Record CMS
+                      </h2>
+                    </div>
+                    <p className="text-xs text-emerald-100/70">
+                      Update your real completed event numbers, souvenir prints, guests served, and company partners live. Saves permanently to Cloud Firestore.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setImpactStats(DEFAULT_LIVE_IMPACT_STATS)}
+                      className="px-4 py-2.5 rounded-xl border border-white/20 text-white font-bold text-xs hover:bg-white/10 transition cursor-pointer flex items-center space-x-1.5"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>Reset to 0 (Clean Slate)</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setIsSaving(true);
+                        const res = await saveLiveImpactStats(impactStats);
+                        setIsSaving(false);
+                        if (res.success) {
+                          setSuccessToast("✅ Real Impact Track Record permanently saved to Cloud Firestore!");
+                          setTimeout(() => setSuccessToast(""), 4000);
+                        } else {
+                          setErrorToast(`❌ Save error: ${res.error}`);
+                          setTimeout(() => setErrorToast(""), 4000);
+                        }
+                      }}
+                      disabled={isSaving}
+                      className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Save Impact CMS</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Banner */}
+              <div className="glass-card rounded-3xl p-5 border border-emerald-500/30 bg-emerald-950/30 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  <div>
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                      Honest Track Record System Active
+                    </h4>
+                    <p className="text-[11px] text-emerald-100/70">
+                      No fake numbers are hardcoded on the site. When values are 0, the site displays your studio capabilities &amp; guarantees. Update these numbers as you execute events!
+                    </p>
+                  </div>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold uppercase border border-emerald-400/40">
+                  REAL TIME SYNC
+                </span>
+              </div>
+
+              {/* 4 Metric Counters Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 1. Events Executed */}
+                <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-extrabold uppercase tracking-wider text-[#D4AF37] block">
+                      1. Total Events Executed
+                    </label>
+                    <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-500/30">
+                      {impactStats.eventsExecuted} Events
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    value={impactStats.eventsExecuted}
+                    onChange={(e) =>
+                      setImpactStats({
+                        ...impactStats,
+                        eventsExecuted: Math.max(0, parseInt(e.target.value) || 0),
+                      })
+                    }
+                    className="w-full bg-black/60 border border-white/20 rounded-2xl px-4 py-3 text-lg font-mono text-white focus:border-[#D4AF37] outline-none"
+                  />
+                  <p className="text-[11px] text-emerald-100/60 leading-relaxed">
+                    Total real completed events executed by Visriva across Bengaluru &amp; Pune.
+                  </p>
+                </div>
+
+                {/* 2. Souvenirs Printed */}
+                <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-extrabold uppercase tracking-wider text-[#D4AF37] block">
+                      2. Total Keepsakes &amp; Souvenirs Delivered
+                    </label>
+                    <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-500/30">
+                      {impactStats.souvenirsDelivered.toLocaleString("en-IN")} Prints
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    value={impactStats.souvenirsDelivered}
+                    onChange={(e) =>
+                      setImpactStats({
+                        ...impactStats,
+                        souvenirsDelivered: Math.max(0, parseInt(e.target.value) || 0),
+                      })
+                    }
+                    className="w-full bg-black/60 border border-white/20 rounded-2xl px-4 py-3 text-lg font-mono text-white focus:border-[#D4AF37] outline-none"
+                  />
+                  <p className="text-[11px] text-emerald-100/60 leading-relaxed">
+                    Total photos, magnets, keychains, mugs &amp; apparel printed live on-site.
+                  </p>
+                </div>
+
+                {/* 3. Guests Served */}
+                <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-extrabold uppercase tracking-wider text-[#D4AF37] block">
+                      3. Total Guests Served
+                    </label>
+                    <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-500/30">
+                      {impactStats.guestsServed.toLocaleString("en-IN")} Guests
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    value={impactStats.guestsServed}
+                    onChange={(e) =>
+                      setImpactStats({
+                        ...impactStats,
+                        guestsServed: Math.max(0, parseInt(e.target.value) || 0),
+                      })
+                    }
+                    className="w-full bg-black/60 border border-white/20 rounded-2xl px-4 py-3 text-lg font-mono text-white focus:border-[#D4AF37] outline-none"
+                  />
+                  <p className="text-[11px] text-emerald-100/60 leading-relaxed">
+                    Estimated total guests entertained across all completed celebrations.
+                  </p>
+                </div>
+
+                {/* 4. Corporate Clients Count */}
+                <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-extrabold uppercase tracking-wider text-[#D4AF37] block">
+                      4. Total Corporate Clients / Agencies
+                    </label>
+                    <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-500/30">
+                      {impactStats.corporateClientsCount} Clients
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    value={impactStats.corporateClientsCount}
+                    onChange={(e) =>
+                      setImpactStats({
+                        ...impactStats,
+                        corporateClientsCount: Math.max(0, parseInt(e.target.value) || 0),
+                      })
+                    }
+                    className="w-full bg-black/60 border border-white/20 rounded-2xl px-4 py-3 text-lg font-mono text-white focus:border-[#D4AF37] outline-none"
+                  />
+                  <p className="text-[11px] text-emerald-100/60 leading-relaxed">
+                    Number of corporate brands &amp; luxury event agencies served.
+                  </p>
+                </div>
+              </div>
+
+              {/* Company Brands / Clients Worked With List */}
+              <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-4">
+                <div className="space-y-1">
+                  <h3 className="font-bold text-sm text-white flex items-center space-x-2">
+                    <Briefcase className="w-4 h-4 text-[#D4AF37]" />
+                    <span>Companies &amp; Partner Brands Worked With</span>
+                  </h3>
+                  <p className="text-xs text-emerald-100/60">
+                    Add company names or event agencies you have executed live printing for.
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newClientBrandInput}
+                    onChange={(e) => setNewClientBrandInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newClientBrandInput.trim()) {
+                        e.preventDefault();
+                        const trimmed = newClientBrandInput.trim();
+                        if (!impactStats.clientBrands?.includes(trimmed)) {
+                          setImpactStats({
+                            ...impactStats,
+                            clientBrands: [...(impactStats.clientBrands || []), trimmed],
+                            corporateClientsCount: (impactStats.clientBrands || []).length + 1,
+                          });
+                        }
+                        setNewClientBrandInput("");
+                      }
+                    }}
+                    placeholder="e.g. Infosys, Wipro, Taj Hotels, Luxury Weddings Co..."
+                    className="flex-1 bg-black/60 border border-white/20 rounded-xl px-4 py-2.5 text-white text-xs placeholder:text-emerald-100/40 focus:border-[#D4AF37] outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      const trimmed = newClientBrandInput.trim();
+                      if (trimmed && !impactStats.clientBrands?.includes(trimmed)) {
+                        setImpactStats({
+                          ...impactStats,
+                          clientBrands: [...(impactStats.clientBrands || []), trimmed],
+                          corporateClientsCount: (impactStats.clientBrands || []).length + 1,
+                        });
+                        setNewClientBrandInput("");
+                      }
+                    }}
+                    disabled={!newClientBrandInput.trim()}
+                    className="px-5 py-2.5 bg-gold-gradient text-[#011F15] rounded-xl font-extrabold text-xs uppercase tracking-wider hover:scale-105 transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer shadow-md"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Partner Brand</span>
+                  </button>
+                </div>
+
+                {/* Brands Chip List */}
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {(!impactStats.clientBrands || impactStats.clientBrands.length === 0) ? (
+                    <p className="text-xs text-emerald-100/40 italic">
+                      No partner companies added yet. Type a company name above and press Add!
+                    </p>
+                  ) : (
+                    impactStats.clientBrands.map((brand, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-semibold"
+                      >
+                        <span>{brand}</span>
+                        <button
+                          onClick={() => {
+                            const updated = impactStats.clientBrands.filter((_, i) => i !== idx);
+                            setImpactStats({
+                              ...impactStats,
+                              clientBrands: updated,
+                              corporateClientsCount: updated.length,
+                            });
+                          }}
+                          className="text-white/40 hover:text-rose-400 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════
+              OPTION 15: PLANNERS & B2B PARTNER PORTAL CMS
+          ══════════════════════════════════════════════════════════════ */}
+          {activeTab === "plannersCMS" && (
+            <div className="space-y-6">
+              {/* Header Card */}
+              <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-2xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                        <Briefcase className="w-5 h-5" />
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-serif font-bold text-white">
+                        Planners &amp; B2B Partner Portal CMS
+                      </h2>
+                    </div>
+                    <p className="text-xs text-emerald-100/70">
+                      Customize every word, title, badge, advantage card, net rate description, and FAQ on the /planners partner portal.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setPlannersConfig(DEFAULT_PLANNERS_CONFIG)}
+                      className="px-4 py-2.5 rounded-xl border border-white/20 text-white font-bold text-xs hover:bg-white/10 transition cursor-pointer flex items-center space-x-1.5"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>Reset Defaults</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setIsSaving(true);
+                        const res = await savePlannersConfig(plannersConfig);
+                        setIsSaving(false);
+                        if (res.success) {
+                          setSuccessToast("✅ Planners B2B CMS settings permanently saved to Cloud Firestore!");
+                          setTimeout(() => setSuccessToast(""), 4000);
+                        } else {
+                          setErrorToast(`❌ Save error: ${res.error}`);
+                          setTimeout(() => setErrorToast(""), 4000);
+                        }
+                      }}
+                      disabled={isSaving}
+                      className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Save Planners CMS</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. Hero Section Copy Editor */}
+              <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-4">
+                <h3 className="font-bold text-sm text-[#D4AF37] uppercase tracking-wider">
+                  1. Hero Section Headlines &amp; Badge
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-white block">Eyebrow Badge Text</label>
+                    <input
+                      type="text"
+                      value={plannersConfig.heroBadge}
+                      onChange={(e) => setPlannersConfig({ ...plannersConfig, heroBadge: e.target.value })}
+                      className="w-full bg-black/60 border border-white/20 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-white block">Hero Title Prefix</label>
+                    <input
+                      type="text"
+                      value={plannersConfig.heroTitlePrefix}
+                      onChange={(e) => setPlannersConfig({ ...plannersConfig, heroTitlePrefix: e.target.value })}
+                      className="w-full bg-black/60 border border-white/20 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-[#D4AF37] block">Hero Title Highlight Word (Gold)</label>
+                    <input
+                      type="text"
+                      value={plannersConfig.heroTitleHighlight}
+                      onChange={(e) => setPlannersConfig({ ...plannersConfig, heroTitleHighlight: e.target.value })}
+                      className="w-full bg-black/60 border border-white/20 rounded-xl px-4 py-2.5 text-xs text-[#D4AF37] font-bold outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-white block">Hero Subtitle Paragraph</label>
+                  <textarea
+                    rows={3}
+                    value={plannersConfig.heroSubtitle}
+                    onChange={(e) => setPlannersConfig({ ...plannersConfig, heroSubtitle: e.target.value })}
+                    className="w-full bg-black/60 border border-white/20 rounded-xl p-3 text-xs text-white outline-none focus:border-[#D4AF37] leading-relaxed"
+                  />
+                </div>
+              </div>
+
+              {/* 2. Why Partner Advantage Cards */}
+              <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-sm text-[#D4AF37] uppercase tracking-wider">
+                    2. Why Partner Advantage Cards (Grid)
+                  </h3>
+                  <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-500/30">
+                    {(plannersConfig.whyPartnerCards || []).length} Cards
+                  </span>
+                </div>
+
+                {/* Grid of existing cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(plannersConfig.whyPartnerCards || []).map((card, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-2 relative group">
+                      <div className="flex items-center justify-between">
+                        <input
+                          type="text"
+                          value={card.title}
+                          onChange={(e) => {
+                            const updated = [...(plannersConfig.whyPartnerCards || [])];
+                            updated[idx] = { ...updated[idx], title: e.target.value };
+                            setPlannersConfig({ ...plannersConfig, whyPartnerCards: updated });
+                          }}
+                          className="font-bold text-xs text-white bg-transparent outline-none border-b border-transparent focus:border-[#D4AF37] w-full mr-2"
+                        />
+                        <button
+                          onClick={() => {
+                            const updated = (plannersConfig.whyPartnerCards || []).filter((_, i) => i !== idx);
+                            setPlannersConfig({ ...plannersConfig, whyPartnerCards: updated });
+                          }}
+                          className="text-white/40 hover:text-rose-400 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <textarea
+                        rows={2}
+                        value={card.desc}
+                        onChange={(e) => {
+                          const updated = [...(plannersConfig.whyPartnerCards || [])];
+                          updated[idx] = { ...updated[idx], desc: e.target.value };
+                          setPlannersConfig({ ...plannersConfig, whyPartnerCards: updated });
+                        }}
+                        className="w-full bg-transparent text-[11px] text-emerald-100/70 outline-none border border-white/5 rounded-lg p-2 leading-relaxed focus:border-[#D4AF37]"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add new advantage card */}
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                  <h4 className="text-xs font-bold text-white">Add New Advantage Card</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Card Title (e.g. Priority Date Hold)"
+                      value={newWhyCardTitle}
+                      onChange={(e) => setNewWhyCardTitle(e.target.value)}
+                      className="bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Description text..."
+                      value={newWhyCardDesc}
+                      onChange={(e) => setNewWhyCardDesc(e.target.value)}
+                      className="bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (newWhyCardTitle.trim()) {
+                        setPlannersConfig({
+                          ...plannersConfig,
+                          whyPartnerCards: [
+                            ...(plannersConfig.whyPartnerCards || []),
+                            { title: newWhyCardTitle.trim(), desc: newWhyCardDesc.trim() },
+                          ],
+                        });
+                        setNewWhyCardTitle("");
+                        setNewWhyCardDesc("");
+                      }
+                    }}
+                    disabled={!newWhyCardTitle.trim()}
+                    className="px-4 py-2 bg-gold-gradient text-[#011F15] rounded-xl font-extrabold text-xs uppercase tracking-wider hover:scale-105 transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer shadow-md"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Card</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Net Vendor Rates Pitch Copy */}
+              <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-4">
+                <h3 className="font-bold text-sm text-[#D4AF37] uppercase tracking-wider">
+                  3. Net Vendor Rates Privacy Pitch
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-white block">Section Eyebrow Tag</label>
+                    <input
+                      type="text"
+                      value={plannersConfig.netRatesTitle}
+                      onChange={(e) => setPlannersConfig({ ...plannersConfig, netRatesTitle: e.target.value })}
+                      className="w-full bg-black/60 border border-white/20 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-white block">Main Heading</label>
+                    <input
+                      type="text"
+                      value={plannersConfig.netRatesSubtitle}
+                      onChange={(e) => setPlannersConfig({ ...plannersConfig, netRatesSubtitle: e.target.value })}
+                      className="w-full bg-black/60 border border-white/20 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-white block">Pitch Description</label>
+                  <textarea
+                    rows={3}
+                    value={plannersConfig.netRatesDescription}
+                    onChange={(e) => setPlannersConfig({ ...plannersConfig, netRatesDescription: e.target.value })}
+                    className="w-full bg-black/60 border border-white/20 rounded-xl p-3 text-xs text-white outline-none focus:border-[#D4AF37] leading-relaxed"
+                  />
+                </div>
+              </div>
+
+              {/* 4. Partner FAQs */}
+              <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-sm text-[#D4AF37] uppercase tracking-wider">
+                    4. Partner FAQs
+                  </h3>
+                  <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-500/30">
+                    {(plannersConfig.faqs || []).length} FAQs
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {(plannersConfig.faqs || []).map((faq, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <input
+                          type="text"
+                          value={faq.question}
+                          onChange={(e) => {
+                            const updated = [...(plannersConfig.faqs || [])];
+                            updated[idx] = { ...updated[idx], question: e.target.value };
+                            setPlannersConfig({ ...plannersConfig, faqs: updated });
+                          }}
+                          className="font-bold text-xs text-white bg-transparent outline-none border-b border-transparent focus:border-[#D4AF37] w-full mr-2"
+                        />
+                        <button
+                          onClick={() => {
+                            const updated = (plannersConfig.faqs || []).filter((_, i) => i !== idx);
+                            setPlannersConfig({ ...plannersConfig, faqs: updated });
+                          }}
+                          className="text-white/40 hover:text-rose-400 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <textarea
+                        rows={2}
+                        value={faq.answer}
+                        onChange={(e) => {
+                          const updated = [...(plannersConfig.faqs || [])];
+                          updated[idx] = { ...updated[idx], answer: e.target.value };
+                          setPlannersConfig({ ...plannersConfig, faqs: updated });
+                        }}
+                        className="w-full bg-transparent text-[11px] text-emerald-100/70 outline-none border border-white/5 rounded-lg p-2 leading-relaxed focus:border-[#D4AF37]"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add new FAQ */}
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                  <h4 className="text-xs font-bold text-white">Add New Partner FAQ</h4>
+                  <input
+                    type="text"
+                    placeholder="Question (e.g. Can we co-brand print frames?)"
+                    value={newFaqQ}
+                    onChange={(e) => setNewFaqQ(e.target.value)}
+                    className="w-full bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                  />
+                  <textarea
+                    rows={2}
+                    placeholder="Answer details..."
+                    value={newFaqA}
+                    onChange={(e) => setNewFaqA(e.target.value)}
+                    className="w-full bg-black/60 border border-white/20 rounded-xl p-3 text-xs text-white outline-none leading-relaxed"
+                  />
+                  <button
+                    onClick={() => {
+                      if (newFaqQ.trim()) {
+                        setPlannersConfig({
+                          ...plannersConfig,
+                          faqs: [...(plannersConfig.faqs || []), { question: newFaqQ.trim(), answer: newFaqA.trim() }],
+                        });
+                        setNewFaqQ("");
+                        setNewFaqA("");
+                      }
+                    }}
+                    disabled={!newFaqQ.trim()}
+                    className="px-4 py-2 bg-gold-gradient text-[#011F15] rounded-xl font-extrabold text-xs uppercase tracking-wider hover:scale-105 transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer shadow-md"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add FAQ Item</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </main>
       </div>
 
       <Footer />
+
+      {/* AI WHATSAPP ASSISTANT MODAL FOR ADMIN LEADS */}
+      <AIWhatsAppAssistantModal
+        isOpen={adminAiModalOpen}
+        onClose={() => setAdminAiModalOpen(false)}
+        leadData={adminSelectedLeadForAI || {}}
+      />
 
       {/* ── CROP MODAL ──────────────────────────────────────────────────── */}
       {cropModalOpen && (

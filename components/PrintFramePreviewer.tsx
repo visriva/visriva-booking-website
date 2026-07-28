@@ -351,6 +351,15 @@ export default function PrintFramePreviewer() {
             <p className="text-[11px] text-emerald-100/60 font-mono mt-3">
               *Printed live on-site in 8 seconds using dye-sublimation heat transfer engines.
             </p>
+
+            <div className="pt-4">
+              <a
+                href="/frame-customizer"
+                className="inline-flex items-center space-x-2 px-6 py-3 rounded-full bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-widest shadow-gold-sm hover:shadow-gold-md hover:scale-105 transition-all"
+              >
+                <span>🎨 Launch Full Design Studio &amp; Export PNG</span>
+              </a>
+            </div>
           </div>
 
         </div>

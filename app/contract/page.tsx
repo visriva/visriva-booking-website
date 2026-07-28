@@ -180,7 +180,7 @@ function ContractContent() {
                 Experiential Event Tech &amp; Instant Live Keepsake Stations
               </p>
               <p className="text-[11px] text-emerald-100/60 font-mono print:text-gray-500">
-                Indiranagar, Bengaluru, Karnataka 560038 • +91 8884484828 • contact@visriva.com
+                Bengaluru &amp; Pune, India • +91 88844 84828 • visriva.work@gmail.com
               </p>
             </div>
 

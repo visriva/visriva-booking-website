@@ -214,6 +214,120 @@ export const DEFAULT_PRINT_PREVIEWER_CONFIG: PrintPreviewerConfig = {
   customNotes: "8-Sec Dye-Sublimation Heat Transfer",
 };
 
+export interface OperatorConfig {
+  enabled: boolean;
+  pin: string;
+  allowAdminPass: boolean;
+  googleSheetUrl: string;
+  hiddenFields: string[];
+  customQuestions: string[];
+}
+
+export const DEFAULT_OPERATOR_CONFIG: OperatorConfig = {
+  enabled: true,
+  pin: "visriva2026",
+  allowAdminPass: true,
+  googleSheetUrl: "",
+  hiddenFields: [],
+  customQuestions: ["Guest Name", "WhatsApp Phone", "Item Choice", "Token Number", "Special Notes"],
+};
+
+export interface FeatureTogglesConfig {
+  enableOperatorPortal: boolean;
+  enableGuestGallery: boolean;
+  enableFrameCustomizer: boolean;
+  enablePhotoBoothService?: boolean;
+  enableMagnetService?: boolean;
+  enableKeychainService?: boolean;
+  enableMugService?: boolean;
+  enableToteTshirtService?: boolean;
+  showOperatorInNavbar?: boolean;
+}
+
+export const DEFAULT_FEATURE_TOGGLES: FeatureTogglesConfig = {
+  enableOperatorPortal: true,
+  enableGuestGallery: true,
+  enableFrameCustomizer: true,
+  enablePhotoBoothService: true,
+  enableMagnetService: true,
+  enableKeychainService: true,
+  enableMugService: true,
+  enableToteTshirtService: true,
+  showOperatorInNavbar: true,
+};
+
+export interface BentoGridCard {
+  id: string;
+  badgeText: string;
+  title: string;
+  description: string;
+  bullets?: string[];
+  ctaText: string;
+  ctaUrl: string;
+  enabled: boolean;
+}
+
+export interface BentoGridConfig {
+  badgeText: string;
+  headingTitle: string;
+  subheadingText: string;
+  cards: BentoGridCard[];
+}
+
+export const DEFAULT_BENTO_GRID_CONFIG: BentoGridConfig = {
+  badgeText: "Asymmetrical Live Services",
+  headingTitle: "Our Signature Live Stations",
+  subheadingText: "Choose from an elite portfolio of live experiential setups, engineered for immediate high-density guest engagement.",
+  cards: [
+    {
+      id: "photo-booth",
+      badgeText: "Flagship Experience",
+      title: "Instant Photo Booth",
+      description: "Full-frame studio cameras paired with studio strobe illumination and instant dye-sublimation print engines. Guests receive high-gloss 4×6 photo prints within 8 seconds alongside instant QR digital album access.",
+      bullets: ["8-Second Dye-Sub Prints", "Custom Event Frame Overlay", "Instant QR Code Sharing", "White-Glove Tech Operator"],
+      ctaText: "View Full Photo Booth Details",
+      ctaUrl: "/photo-booth",
+      enabled: true,
+    },
+    {
+      id: "magnets",
+      badgeText: "Bespoke Keepsakes",
+      title: "Custom Fridge Magnets",
+      description: "Glossy acrylic magnetic frames crafted live on-site. Guests take home functional, high-density magnetic memories that stay on display for years.",
+      ctaText: "Explore Station",
+      ctaUrl: "/services/magnet-station",
+      enabled: true,
+    },
+    {
+      id: "keychains",
+      badgeText: "Personalized Accessories",
+      title: "Bespoke Keychains",
+      description: "Dual-sided photo keychains assembled live during the event. Compact, durable, and customized with your event branding.",
+      ctaText: "Explore Station",
+      ctaUrl: "/services/keychain-station",
+      enabled: true,
+    },
+    {
+      id: "mugs",
+      badgeText: "VIP Return Gift",
+      title: "Live Mug Printing",
+      description: "High-temperature ceramic sublimation press station printing full-color ceramic mugs live for your VIP guests.",
+      ctaText: "Explore Station",
+      ctaUrl: "/services/mug-printing",
+      enabled: true,
+    },
+    {
+      id: "totes",
+      badgeText: "Canvas Sublimation",
+      title: "Live Tote Bag & T-Shirt Press",
+      description: "High-heat transfer press station printing custom canvas tote bags and premium cotton t-shirts live on-site.",
+      ctaText: "Explore Station",
+      ctaUrl: "/services/tote-tshirt-station",
+      enabled: true,
+    },
+  ],
+};
+
 export interface GlobalSettingsConfig {
   contactEmail: string;
   phoneNumber: string;
@@ -225,7 +339,7 @@ export interface GlobalSettingsConfig {
 }
 
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettingsConfig = {
-  contactEmail: "jeevanbm48@gmail.com",
+  contactEmail: "visriva.work@gmail.com",
   phoneNumber: "+91 88844 84828",
   physicalAddress: "Bengaluru, Karnataka, India",
   linkedinUrl: "https://linkedin.com/company/visriva",
@@ -241,9 +355,16 @@ export interface WebsiteTextConfig {
   aboutText: string;
   footerDescription: string;
   whatsIncludedBadge?: string;
+  whatsIncludedHeading?: string;
   whatsIncludedTitle?: string;
   whatsIncludedSubtitle?: string;
   whatsIncludedImageUrl?: string;
+  whatsIncludedItems?: string[];
+  whyChooseBadge?: string;
+  whyChooseTitle?: string;
+  whyChooseDescription?: string;
+  whyChooseBullets?: string[];
+  whyChooseHighlights?: { val: string; label: string }[];
 }
 
 export const DEFAULT_WEBSITE_TEXT: WebsiteTextConfig = {
@@ -252,10 +373,34 @@ export const DEFAULT_WEBSITE_TEXT: WebsiteTextConfig = {
   heroTagline: "Bengaluru's Premier Live Event Station",
   aboutText: "Visriva Live Station brings luxury event technology to Bengaluru. Transform weddings, corporate galas, and VIP activations with studio-grade photo booths, custom magnets, keychains, and live mug printing.",
   footerDescription: "Elevating luxury celebrations, weddings, and corporate galas across Bengaluru with high-speed dye-sublimation print engines and live interactive stations.",
-  whatsIncludedBadge: "Signature Station",
+  whatsIncludedBadge: "The Visriva Guarantee",
+  whatsIncludedHeading: "What's Included in Every Standard Photo Booth Package:",
   whatsIncludedTitle: "Vintage Wooden Booth Setup",
   whatsIncludedSubtitle: "Studio Strobe Lighting • 8-Sec Thermal Dye-Sublimation",
   whatsIncludedImageUrl: "https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=1200&q=80",
+  whatsIncludedItems: [
+    "A high-quality studio camera for sharp, professional-grade images.",
+    "Professional studio lighting that guarantees you and your guests look flawless.",
+    "Super-fast, lab-quality prints (ready in just 8 seconds!) so the fun never stops.",
+    "Custom-designed print templates tailored to match your event's unique theme.",
+    "A curated selection of premium, fun props to keep your guests entertained.",
+    "A friendly, dedicated booth attendant to assist your guests and keep things running smoothly.",
+  ],
+  whyChooseBadge: "The Visriva Standard",
+  whyChooseTitle: "Why Choose Visriva?",
+  whyChooseDescription: "We blend cutting-edge photography tech with luxurious event design to create unforgettable, on-site experiences. Our studio-grade photo booth setup, instant printing, and premium branding ensure every guest walks away with a museum-quality memory.",
+  whyChooseBullets: [
+    "8-second ultra-fast prints on high-gloss dye-sublimation paper",
+    "Bespoke event overlays, custom frames & corporate branding",
+    "Full studio camera rig & professional lighting setup",
+    "Dedicated white-glove on-site technical team",
+  ],
+  whyChooseHighlights: [
+    { val: "8 Sec", label: "Print Speed" },
+    { val: "4K", label: "Studio Optics" },
+    { val: "Custom", label: "Branding Overlays" },
+    { val: "100%", label: "On-Site Support" },
+  ],
 };
 
 export interface GlobalPricingMatrix {
@@ -263,6 +408,7 @@ export interface GlobalPricingMatrix {
   magnets: ServicePricingMatrix;
   mugs: ServicePricingMatrix;
   keychains: ServicePricingMatrix;
+  toteTshirt: ServicePricingMatrix;
   heroTitle: string;
   heroSubtitle: string;
   heroDescription: string;
@@ -547,6 +693,50 @@ export const DEFAULT_PRICING_MATRIX: GlobalPricingMatrix = {
       },
     ],
   },
+  toteTshirt: {
+    idleHourlyRate: 1500,
+    packages: [
+      {
+        id: "tt_100",
+        name: "Silver Tote & T-Shirt Tier",
+        price: 18999,
+        duration: "3 Hours",
+        subtitle: "3 Hours · 100 Canvas Totes / T-Shirts",
+        features: [
+          "100 Custom Canvas Totes or T-Shirts",
+          "Single High-Temp Sublimation Press",
+          "Full Color HD Heat Transfers",
+          "2 On-Site Technical Operators",
+        ],
+      },
+      {
+        id: "tt_200",
+        name: "Gold Tote & T-Shirt Tier",
+        price: 28999,
+        duration: "4 Hours",
+        subtitle: "4 Hours · 200 Canvas Totes / T-Shirts",
+        features: [
+          "200 Custom Canvas Totes or T-Shirts",
+          "Dual Sublimation Heat Press Station",
+          "Custom Monogram & Event Branding",
+          "3 On-Site Technical Operators",
+        ],
+      },
+      {
+        id: "tt_350",
+        name: "Platinum VIP Tote & T-Shirt Tier",
+        price: 42999,
+        duration: "5 Hours",
+        subtitle: "5 Hours · 350 Canvas Totes & VIP T-Shirts",
+        features: [
+          "350 Custom Canvas Totes & VIP T-Shirts",
+          "High-Density Sublimation Station",
+          "VIP Custom Gift Box Packaging",
+          "4 On-Site Technical Operators",
+        ],
+      },
+    ],
+  },
   portfolioEnabled: true,
   portfolioImages: [
     {
@@ -599,7 +789,7 @@ export async function saveBookingLead(
   try {
     const isConfigured = Boolean(
       process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
-        process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+      process.env.NEXT_PUBLIC_FIREBASE_API_KEY
     );
 
     if (!isConfigured) {
@@ -662,7 +852,7 @@ export function subscribeBookingLeads(
       (err) => console.warn("Leads snapshot warning:", err.message)
     );
   } catch (e) {
-    return () => {};
+    return () => { };
   }
 }
 
@@ -944,7 +1134,7 @@ export function subscribeServiceDoc(
         try {
           callback(JSON.parse(localSvc));
           return;
-        } catch (e) {}
+        } catch (e) { }
       }
       const localMatrix = localStorage.getItem("visriva_pricing_matrix");
       if (localMatrix) {
@@ -952,7 +1142,7 @@ export function subscribeServiceDoc(
           const parsed = JSON.parse(localMatrix);
           if (serviceKey in parsed) callback(parsed[serviceKey]);
           else if (serviceKey === "photoBooth") callback(parsed.photoBooth);
-        } catch (e) {}
+        } catch (e) { }
       }
     }
   };
@@ -1020,7 +1210,7 @@ export function subscribeGalleryVisibility(
         try {
           callback({ ...DEFAULT_VISIBILITY_CONFIG, ...JSON.parse(local) });
           return;
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     callback(DEFAULT_VISIBILITY_CONFIG);
@@ -1109,7 +1299,7 @@ export function subscribePrintPreviewerConfig(
         try {
           callback({ ...DEFAULT_PRINT_PREVIEWER_CONFIG, ...JSON.parse(local) });
           return;
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     callback(DEFAULT_PRINT_PREVIEWER_CONFIG);
@@ -1190,6 +1380,645 @@ export async function savePrintPreviewerConfig(
 }
 
 /**
+ * OPERATOR CMS CONFIG (config/operator & localStorage)
+ */
+export function subscribeOperatorConfig(
+  callback: (config: OperatorConfig) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem("visriva_operator_config");
+      if (local) {
+        try {
+          callback({ ...DEFAULT_OPERATOR_CONFIG, ...JSON.parse(local) });
+          return;
+        } catch (e) { }
+      }
+    }
+    callback(DEFAULT_OPERATOR_CONFIG);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("operator_config_updated", handleUpdate);
+  }
+
+  if (isDummyKey) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("operator_config_updated", handleUpdate);
+      }
+    };
+  }
+
+  try {
+    const docRef = doc(db, "config", "operator");
+    const unsub = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as OperatorConfig;
+          const merged = { ...DEFAULT_OPERATOR_CONFIG, ...data };
+          callback(merged);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("visriva_operator_config", JSON.stringify(merged));
+          }
+        }
+      },
+      (err) => console.warn("Operator config snapshot warning:", err.message)
+    );
+
+    return () => {
+      unsub();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("operator_config_updated", handleUpdate);
+      }
+    };
+  } catch (e) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("operator_config_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveOperatorConfig(
+  config: OperatorConfig
+): Promise<{ success: boolean; firestoreSynced?: boolean; error?: string }> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("visriva_operator_config", JSON.stringify(config));
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("operator_config_updated"));
+  }
+
+  if (isDummyKey) {
+    return { success: true, firestoreSynced: false };
+  }
+
+  try {
+    const docRef = doc(db, "config", "operator");
+    await setDoc(docRef, config, { merge: true });
+    return { success: true, firestoreSynced: true };
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : "Failed to save operator config";
+    return { success: true, firestoreSynced: false, error: errMessage };
+  }
+}
+
+/**
+ * FEATURE TOGGLES CMS CONFIG (config/feature_toggles & localStorage)
+ */
+export function subscribeFeatureToggles(
+  callback: (config: FeatureTogglesConfig) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem("visriva_feature_toggles");
+      if (local) {
+        try {
+          callback({ ...DEFAULT_FEATURE_TOGGLES, ...JSON.parse(local) });
+          return;
+        } catch (e) { }
+      }
+    }
+    callback(DEFAULT_FEATURE_TOGGLES);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("feature_toggles_updated", handleUpdate);
+  }
+
+  if (isDummyKey) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("feature_toggles_updated", handleUpdate);
+      }
+    };
+  }
+
+  try {
+    const docRef = doc(db, "config", "feature_toggles");
+    const unsub = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as FeatureTogglesConfig;
+          const merged = { ...DEFAULT_FEATURE_TOGGLES, ...data };
+          callback(merged);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("visriva_feature_toggles", JSON.stringify(merged));
+          }
+        }
+      },
+      (err) => console.warn("Feature toggles snapshot warning:", err.message)
+    );
+
+    return () => {
+      unsub();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("feature_toggles_updated", handleUpdate);
+      }
+    };
+  } catch (e) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("feature_toggles_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveFeatureToggles(
+  config: FeatureTogglesConfig
+): Promise<{ success: boolean; firestoreSynced?: boolean; error?: string }> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("visriva_feature_toggles", JSON.stringify(config));
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("feature_toggles_updated"));
+  }
+
+  if (isDummyKey) {
+    return { success: true, firestoreSynced: false };
+  }
+
+  try {
+    const docRef = doc(db, "config", "feature_toggles");
+    await setDoc(docRef, config, { merge: true });
+    return { success: true, firestoreSynced: true };
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : "Failed to save feature toggles";
+    return { success: true, firestoreSynced: false, error: errMessage };
+  }
+}
+
+/**
+ * HERO 3D CARD STACK CUSTOM ALIGNMENT & REDIRECT CONFIG (config/hero_cards & localStorage)
+ */
+export interface HeroCardItemConfig {
+  id: string; // 'mugs' | 'keychains' | 'magnets' | 'totes' | 'photo-booth'
+  topPx: number;
+  rotateDeg: number;
+  horizontalOffsetPx: number;
+  scale: number;
+  redirectOnClick: boolean;
+  customTitle?: string;
+  customBadge?: string;
+  customDesc?: string;
+  customFooter?: string;
+}
+
+export interface HeroCardStackConfig {
+  enableCardRedirect: boolean;
+  cards: Record<string, HeroCardItemConfig>;
+}
+
+export const DEFAULT_HERO_CARD_STACK_CONFIG: HeroCardStackConfig = {
+  enableCardRedirect: true,
+  cards: {
+    mugs: { id: "mugs", topPx: 0, rotateDeg: -6, horizontalOffsetPx: 0, scale: 1, redirectOnClick: true },
+    keychains: { id: "keychains", topPx: 12, rotateDeg: -3, horizontalOffsetPx: 16, scale: 1, redirectOnClick: true },
+    magnets: { id: "magnets", topPx: 24, rotateDeg: 3, horizontalOffsetPx: 0, scale: 1, redirectOnClick: true },
+    totes: { id: "totes", topPx: 36, rotateDeg: -2, horizontalOffsetPx: 10, scale: 1, redirectOnClick: true },
+    "photo-booth": { id: "photo-booth", topPx: 230, rotateDeg: 6, horizontalOffsetPx: 8, scale: 1, redirectOnClick: true },
+  },
+};
+
+export function subscribeHeroCardStackConfig(
+  callback: (config: HeroCardStackConfig) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem("visriva_hero_cards_config");
+      if (local) {
+        try {
+          const parsed = JSON.parse(local);
+          callback({
+            enableCardRedirect: parsed.enableCardRedirect ?? DEFAULT_HERO_CARD_STACK_CONFIG.enableCardRedirect,
+            cards: { ...DEFAULT_HERO_CARD_STACK_CONFIG.cards, ...(parsed.cards || {}) },
+          });
+          return;
+        } catch (e) {}
+      }
+    }
+    callback(DEFAULT_HERO_CARD_STACK_CONFIG);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("hero_cards_config_updated", handleUpdate);
+  }
+
+  if (isDummyKey) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("hero_cards_config_updated", handleUpdate);
+      }
+    };
+  }
+
+  try {
+    const docRef = doc(db, "config", "hero_cards");
+    const unsub = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as HeroCardStackConfig;
+          const merged: HeroCardStackConfig = {
+            enableCardRedirect: data.enableCardRedirect ?? DEFAULT_HERO_CARD_STACK_CONFIG.enableCardRedirect,
+            cards: { ...DEFAULT_HERO_CARD_STACK_CONFIG.cards, ...(data.cards || {}) },
+          };
+          callback(merged);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("visriva_hero_cards_config", JSON.stringify(merged));
+          }
+        }
+      },
+      (err) => console.warn("Hero cards config snapshot warning:", err.message)
+    );
+
+    return () => {
+      unsub();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("hero_cards_config_updated", handleUpdate);
+      }
+    };
+  } catch (e) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("hero_cards_config_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveHeroCardStackConfig(
+  config: HeroCardStackConfig
+): Promise<{ success: boolean; firestoreSynced?: boolean; error?: string }> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("visriva_hero_cards_config", JSON.stringify(config));
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("hero_cards_config_updated"));
+  }
+
+  if (isDummyKey) {
+    return { success: true, firestoreSynced: false };
+  }
+
+  try {
+    const docRef = doc(db, "config", "hero_cards");
+    await setDoc(docRef, config, { merge: true });
+    return { success: true, firestoreSynced: true };
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : "Failed to save hero cards config";
+    return { success: true, firestoreSynced: false, error: errMessage };
+  }
+}
+
+/**
+ * AI EVENT CONCIERGE CONFIG (config/ai_concierge & localStorage)
+ */
+export interface AIConciergeConfig {
+  enabled: boolean;
+  systemPrompt: string;
+  presetChips: string[];
+  fallbackTitle: string;
+  fallbackTagline: string;
+  fallbackReasoning: string;
+  capacityEstimateText: string;
+}
+
+export const DEFAULT_AI_CONCIERGE_CONFIG: AIConciergeConfig = {
+  enabled: true,
+  systemPrompt: `You are the AI Event Concierge for Visriva Live Station (visriva.com), India's premier luxury live event printing station provider operating in Bengaluru & Pune (Phone/WhatsApp: +91 88844 84828, Email: visriva.work@gmail.com).
+
+Visriva offers 5 Flagship On-Site Live Stations:
+1. "photo-booth": Instant Photo Booth (Full-Frame DSLR optics, dye-sublimation 10s prints, instant QR digital gallery, customized magnetic frames).
+2. "mugs": Live Mug Printing Station (High-heat sublimation transfer live on ceramic mugs).
+3. "keychains": Bespoke Acrylic Keychains Station (Double-sided crystal acrylic & metallic keychains with guest portraits).
+4. "magnets": Custom Fridge Magnets Station (Glossy acrylic magnetic keepsakes customized live).
+5. "totes": Tote Bag & T-Shirt Station (Live heat-press canvas tote bags and custom apparel printing).`,
+  presetChips: [
+    "250-guest wedding reception with custom keepsakes in Pune",
+    "Corporate tech product launch in Bengaluru for 400 guests",
+    "150-guest Haldi & Sangeet ceremony with live magnet printing",
+    "Luxury VIP brand activation with instant apparel press",
+  ],
+  fallbackTitle: "Flagship Luxury Live Station Suite",
+  fallbackTagline: "Instant Photo Booth & Custom Magnet Station",
+  fallbackReasoning: "Perfect high-throughput combination for interactive guest entertainment and physical branded souvenirs.",
+  capacityEstimateText: "~180 prints & magnets / hr",
+};
+
+export function subscribeAIConciergeConfig(
+  callback: (config: AIConciergeConfig) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem("visriva_ai_concierge_config");
+      if (local) {
+        try {
+          callback({ ...DEFAULT_AI_CONCIERGE_CONFIG, ...JSON.parse(local) });
+          return;
+        } catch (e) {}
+      }
+    }
+    callback(DEFAULT_AI_CONCIERGE_CONFIG);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("ai_concierge_config_updated", handleUpdate);
+  }
+
+  if (isDummyKey) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("ai_concierge_config_updated", handleUpdate);
+      }
+    };
+  }
+
+  try {
+    const docRef = doc(db, "config", "ai_concierge");
+    const unsubscribe = onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data() as AIConciergeConfig;
+        const merged = { ...DEFAULT_AI_CONCIERGE_CONFIG, ...data };
+        if (typeof window !== "undefined") {
+          localStorage.setItem("visriva_ai_concierge_config", JSON.stringify(merged));
+        }
+        callback(merged);
+      } else {
+        loadLocal();
+      }
+    }, () => loadLocal());
+
+    return () => {
+      unsubscribe();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("ai_concierge_config_updated", handleUpdate);
+      }
+    };
+  } catch (e) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("ai_concierge_config_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveAIConciergeConfig(
+  config: AIConciergeConfig
+): Promise<{ success: boolean; firestoreSynced?: boolean; error?: string }> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("visriva_ai_concierge_config", JSON.stringify(config));
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("ai_concierge_config_updated"));
+  }
+
+  if (isDummyKey) {
+    return { success: true, firestoreSynced: false };
+  }
+
+  try {
+    const docRef = doc(db, "config", "ai_concierge");
+    await setDoc(docRef, config, { merge: true });
+    return { success: true, firestoreSynced: true };
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : "Failed to save AI Concierge config";
+    return { success: true, firestoreSynced: false, error: errMessage };
+  }
+}
+
+/**
+ * AI WHATSAPP ASSISTANT CONFIG (config/ai_whatsapp & localStorage)
+ */
+export interface AIWhatsAppConfig {
+  enabled: boolean;
+  systemPrompt: string;
+  defaultVipQuote: string;
+  defaultConfirmation: string;
+  defaultFollowUp: string;
+}
+
+export const DEFAULT_AI_WHATSAPP_CONFIG: AIWhatsAppConfig = {
+  enabled: true,
+  systemPrompt: `You are the AI On-Site Crew Manager for Visriva Live Station (visriva.com, Phone/WhatsApp: +91 88844 84828).
+Generate 3 professional, high-converting, luxury WhatsApp response options formatted with WhatsApp bold (*text*) and emojis.`,
+  defaultVipQuote: `*Hi {{clientName}}!* 👋\n\nThank you for reaching out to *Visriva Live Station*! 📸✨\n\nWe would love to bring our flagship *{{services}}* to your upcoming *{{eventType}}* on *{{eventDate}}* in *{{location}}*.\n\nOur setups include studio-grade DSLR optics, instant 10s dye-sublimation prints, QR digital galleries, and live magnetic branding.\n\nWould you like us to lock in your date or send over our detailed pricing matrix?\n\nWarm regards,\n*Visriva Team* (+91 88844 84828)`,
+  defaultConfirmation: `*Booking Confirmation & Setup Details - Visriva Live Station* 🎯\n\nDear *{{clientName}}*,\n\nWe are excited to confirm your live station setup for *{{eventDate}}*!\n\n*Setup Details:*\n- Services: {{services}}\n- Expected Guests: {{guestCount}}\n- Venue Location: {{location}}\n\nOur on-site technical crew will arrive 60 minutes prior to setup. Please ensure a dedicated 5A power outlet.\n\nBest regards,\n*Visriva Crew Command*`,
+  defaultFollowUp: `*Hi {{clientName}}!* 🌟\n\nQuick follow-up from *Visriva Live Station* regarding your *{{eventType}}*.\n\nWe have a special offer for your date: book this week and receive *Complimentary Custom Frame Branding & Glossy Magnetic Upgrade* for all guest souvenirs!\n\nLet us know if you would like us to reserve the team for you!\n\n*Visriva Team* (+91 88844 84828)`,
+};
+
+export function subscribeAIWhatsAppConfig(
+  callback: (config: AIWhatsAppConfig) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem("visriva_ai_whatsapp_config");
+      if (local) {
+        try {
+          callback({ ...DEFAULT_AI_WHATSAPP_CONFIG, ...JSON.parse(local) });
+          return;
+        } catch (e) {}
+      }
+    }
+    callback(DEFAULT_AI_WHATSAPP_CONFIG);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("ai_whatsapp_config_updated", handleUpdate);
+  }
+
+  if (isDummyKey) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("ai_whatsapp_config_updated", handleUpdate);
+      }
+    };
+  }
+
+  try {
+    const docRef = doc(db, "config", "ai_whatsapp");
+    const unsubscribe = onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data() as AIWhatsAppConfig;
+        const merged = { ...DEFAULT_AI_WHATSAPP_CONFIG, ...data };
+        if (typeof window !== "undefined") {
+          localStorage.setItem("visriva_ai_whatsapp_config", JSON.stringify(merged));
+        }
+        callback(merged);
+      } else {
+        loadLocal();
+      }
+    }, () => loadLocal());
+
+    return () => {
+      unsubscribe();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("ai_whatsapp_config_updated", handleUpdate);
+      }
+    };
+  } catch (e) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("ai_whatsapp_config_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveAIWhatsAppConfig(
+  config: AIWhatsAppConfig
+): Promise<{ success: boolean; firestoreSynced?: boolean; error?: string }> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("visriva_ai_whatsapp_config", JSON.stringify(config));
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("ai_whatsapp_config_updated"));
+  }
+
+  if (isDummyKey) {
+    return { success: true, firestoreSynced: false };
+  }
+
+  try {
+    const docRef = doc(db, "config", "ai_whatsapp");
+    await setDoc(docRef, config, { merge: true });
+    return { success: true, firestoreSynced: true };
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : "Failed to save AI WhatsApp config";
+    return { success: true, firestoreSynced: false, error: errMessage };
+  }
+}
+
+/**
+ * BENTO GRID CMS CONFIG (config/bento_grid & localStorage)
+ */
+export function subscribeBentoGridConfig(
+  callback: (config: BentoGridConfig) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem("visriva_bento_grid_config");
+      if (local) {
+        try {
+          callback({ ...DEFAULT_BENTO_GRID_CONFIG, ...JSON.parse(local) });
+          return;
+        } catch (e) { }
+      }
+    }
+    callback(DEFAULT_BENTO_GRID_CONFIG);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("bento_grid_updated", handleUpdate);
+  }
+
+  if (isDummyKey) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("bento_grid_updated", handleUpdate);
+      }
+    };
+  }
+
+  try {
+    const docRef = doc(db, "config", "bento_grid");
+    const unsub = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as BentoGridConfig;
+          const merged = { ...DEFAULT_BENTO_GRID_CONFIG, ...data };
+          callback(merged);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("visriva_bento_grid_config", JSON.stringify(merged));
+          }
+        }
+      },
+      (err) => console.warn("Bento grid snapshot warning:", err.message)
+    );
+
+    return () => {
+      unsub();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("bento_grid_updated", handleUpdate);
+      }
+    };
+  } catch (e) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("bento_grid_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveBentoGridConfig(
+  config: BentoGridConfig
+): Promise<{ success: boolean; firestoreSynced?: boolean; error?: string }> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("visriva_bento_grid_config", JSON.stringify(config));
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("bento_grid_updated"));
+  }
+
+  if (isDummyKey) {
+    return { success: true, firestoreSynced: false };
+  }
+
+  try {
+    const docRef = doc(db, "config", "bento_grid");
+    await setDoc(docRef, config, { merge: true });
+    return { success: true, firestoreSynced: true };
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : "Failed to save Bento Grid config";
+    return { success: true, firestoreSynced: false, error: errMessage };
+  }
+}
+
+/**
  * BLOCKED & HIGH DEMAND DATES MANAGER (config/blocked_dates & localStorage)
  */
 export interface BlockedDatesConfig {
@@ -1212,7 +2041,7 @@ export function subscribeBlockedDates(
         try {
           callback({ ...DEFAULT_BLOCKED_DATES, ...JSON.parse(local) });
           return;
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     callback(DEFAULT_BLOCKED_DATES);
@@ -1260,7 +2089,7 @@ export function subscribeBlockedDates(
       }
     };
   } catch (e) {
-    return () => {};
+    return () => { };
   }
 }
 
@@ -1365,7 +2194,7 @@ export function subscribeGoldenWheelConfig(
         try {
           callback({ ...DEFAULT_GOLDEN_WHEEL_CONFIG, ...JSON.parse(local) });
           return;
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     callback(DEFAULT_GOLDEN_WHEEL_CONFIG);
@@ -1413,7 +2242,7 @@ export function subscribeGoldenWheelConfig(
       }
     };
   } catch (e) {
-    return () => {};
+    return () => { };
   }
 }
 
@@ -1453,7 +2282,7 @@ export function subscribeGlobalContactSettings(
         try {
           callback(JSON.parse(local));
           return;
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     callback(DEFAULT_GLOBAL_SETTINGS);
@@ -1533,7 +2362,7 @@ export function subscribeWebsiteText(
         try {
           callback(JSON.parse(local));
           return;
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     callback(DEFAULT_WEBSITE_TEXT);
@@ -1646,7 +2475,7 @@ export function subscribeGalleries(
         try {
           callback(JSON.parse(local));
           return;
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     callback(DEFAULT_INITIAL_GALLERY);
@@ -1778,3 +2607,255 @@ export async function deleteGalleryItem(
     return { success: false, error: err?.message || "Failed to delete photo" };
   }
 }
+
+// ─── LIVE IMPACT & EVENT TRACK RECORD CMS ────────────────────────────────────
+export interface LiveImpactStatsConfig {
+  eventsExecuted: number;
+  souvenirsDelivered: number;
+  guestsServed: number;
+  corporateClientsCount: number;
+  clientBrands: string[];
+  showTruthMode?: boolean;
+}
+
+export const DEFAULT_LIVE_IMPACT_STATS: LiveImpactStatsConfig = {
+  eventsExecuted: 0,
+  souvenirsDelivered: 0,
+  guestsServed: 0,
+  corporateClientsCount: 0,
+  clientBrands: [],
+  showTruthMode: true,
+};
+
+export function subscribeLiveImpactStats(
+  callback: (config: LiveImpactStatsConfig) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem("visriva_live_impact_stats");
+      if (local) {
+        try {
+          callback({ ...DEFAULT_LIVE_IMPACT_STATS, ...JSON.parse(local) });
+          return;
+        } catch (e) {}
+      }
+    }
+    callback(DEFAULT_LIVE_IMPACT_STATS);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("live_impact_stats_updated", handleUpdate);
+  }
+
+  try {
+    const docRef = doc(db, "config", "impact_stats");
+    const unsubscribe = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as LiveImpactStatsConfig;
+          const merged = { ...DEFAULT_LIVE_IMPACT_STATS, ...data };
+          if (typeof window !== "undefined") {
+            localStorage.setItem("visriva_live_impact_stats", JSON.stringify(merged));
+          }
+          callback(merged);
+        } else {
+          loadLocal();
+        }
+      },
+      () => loadLocal()
+    );
+
+    return () => {
+      unsubscribe();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("live_impact_stats_updated", handleUpdate);
+      }
+    };
+  } catch (e) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("live_impact_stats_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveLiveImpactStats(
+  config: LiveImpactStatsConfig
+): Promise<{ success: boolean; firestoreSynced?: boolean; error?: string }> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("visriva_live_impact_stats", JSON.stringify(config));
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("live_impact_stats_updated"));
+  }
+
+  try {
+    const docRef = doc(db, "config", "impact_stats");
+    await setDoc(docRef, config, { merge: true });
+    return { success: true, firestoreSynced: true };
+  } catch (e: any) {
+    console.warn("saveLiveImpactStats Firestore fallback note:", e?.message);
+    return { success: true, firestoreSynced: false, error: e?.message };
+  }
+}
+
+// ─── PLANNERS & B2B PARTNER PORTAL CMS ───────────────────────────────────────
+export interface PlannersPageConfig {
+  heroBadge: string;
+  heroTitlePrefix: string;
+  heroTitleHighlight: string;
+  heroSubtitle: string;
+  whyPartnerTitle: string;
+  whyPartnerSubtitle: string;
+  whyPartnerCards: { title: string; desc: string }[];
+  netRatesTitle: string;
+  netRatesSubtitle: string;
+  netRatesDescription: string;
+  faqs: { question: string; answer: string }[];
+}
+
+export const DEFAULT_PLANNERS_CONFIG: PlannersPageConfig = {
+  heroBadge: "Exclusive Partner Program — For Planners & Decorators Only",
+  heroTitlePrefix: "Your Clients Deserve ",
+  heroTitleHighlight: "Visriva",
+  heroSubtitle:
+    "Partner with Bengaluru's most sought-after live event printing stations. Exclusive net vendor rates, co-branding on every print, and a dedicated crew that makes you look brilliant.",
+  whyPartnerTitle: "Why Partner With Us",
+  whyPartnerSubtitle: "The Visriva Planner Advantage",
+  whyPartnerCards: [
+    {
+      title: "Exclusive Net Vendor Rates",
+      desc: "Registered planners and decorators receive private pricing not available to the public. Your margin, your business.",
+    },
+    {
+      title: "Co-Branded souvenir Frames",
+      desc: "Add your agency logo alongside the host's branding on every physical keepsake printed at the venue.",
+    },
+    {
+      title: "Priority Date Locking",
+      desc: "Hold event dates up to 6 months in advance with a zero-friction hold policy for your VIP clients.",
+    },
+    {
+      title: "Dedicated On-Site Manager",
+      desc: "A single point of contact coordinates crew arrival, dress code, power setup, and guest flow seamlessly.",
+    },
+    {
+      title: "Same-Day Custom Proposals",
+      desc: "Receive beautifully designed, client-ready pitch deck PDFs within 2 hours of your inquiry.",
+    },
+    {
+      title: "Volume & Loyalty Bonuses",
+      desc: "Execute 3+ events per quarter and unlock complimentary station upgrades and bonus print passes.",
+    },
+  ],
+  netRatesTitle: "Partner Pricing Privacy Policy",
+  netRatesSubtitle: "Confidential B2B Vendor Rates",
+  netRatesDescription:
+    "We protect event planners by keeping net vendor rates confidential. We never publish wholesale prices publicly. Contact our B2B team on WhatsApp to get instant partner pricing for your upcoming event.",
+  faqs: [
+    {
+      question: "How do Net Vendor Rates work for planners?",
+      answer: "We offer registered planners a flat wholesale rate per station. You can markup or bundle our service into your total event package freely.",
+    },
+    {
+      question: "Can we add our agency logo to the live prints?",
+      answer: "Yes! Every photo, magnet, keychain, or mug can feature your agency logo alongside the client's event branding.",
+    },
+    {
+      question: "What space and power requirements do your stations need?",
+      answer: "Our compact stations require a standard 6x6 ft footprint and a single standard 5A power outlet. Setup takes 30-45 minutes.",
+    },
+    {
+      question: "Do you travel for destination events outside Bengaluru & Pune?",
+      answer: "Yes, our mobile crews regularly travel across Karnataka, Maharashtra, Goa, and pan-India destination venues.",
+    },
+  ],
+};
+
+export function subscribePlannersConfig(
+  callback: (config: PlannersPageConfig) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem("visriva_planners_config");
+      if (local) {
+        try {
+          callback({ ...DEFAULT_PLANNERS_CONFIG, ...JSON.parse(local) });
+          return;
+        } catch (e) {}
+      }
+    }
+    callback(DEFAULT_PLANNERS_CONFIG);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("planners_config_updated", handleUpdate);
+  }
+
+  try {
+    const docRef = doc(db, "config", "planners");
+    const unsubscribe = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as PlannersPageConfig;
+          const merged = { ...DEFAULT_PLANNERS_CONFIG, ...data };
+          if (typeof window !== "undefined") {
+            localStorage.setItem("visriva_planners_config", JSON.stringify(merged));
+          }
+          callback(merged);
+        } else {
+          loadLocal();
+        }
+      },
+      () => loadLocal()
+    );
+
+    return () => {
+      unsubscribe();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("planners_config_updated", handleUpdate);
+      }
+    };
+  } catch (e) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("planners_config_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function savePlannersConfig(
+  config: PlannersPageConfig
+): Promise<{ success: boolean; firestoreSynced?: boolean; error?: string }> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("visriva_planners_config", JSON.stringify(config));
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("planners_config_updated"));
+  }
+
+  try {
+    const docRef = doc(db, "config", "planners");
+    await setDoc(docRef, config, { merge: true });
+    return { success: true, firestoreSynced: true };
+  } catch (e: any) {
+    console.warn("savePlannersConfig Firestore fallback note:", e?.message);
+    return { success: true, firestoreSynced: false, error: e?.message };
+  }
+}
+
+

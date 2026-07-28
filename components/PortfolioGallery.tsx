@@ -10,15 +10,18 @@ import {
   subscribeGalleryVisibility,
   DEFAULT_VISIBILITY_CONFIG,
   GalleryVisibilityConfig,
+  subscribeFeatureToggles,
+  DEFAULT_FEATURE_TOGGLES,
+  FeatureTogglesConfig,
 } from "@/lib/firebase";
 import TiltCard from "@/components/TiltCard";
 import GalleryModal from "@/components/GalleryModal";
 
 const CATEGORIES = [
-  { id: "photo-booth", label: "Photo Booth", icon: Camera, category: "photo-booth" as const },
-  { id: "magnet-station", label: "Custom Magnets", icon: Magnet, category: "magnet-station" as const },
-  { id: "keychain-station", label: "Metal Keychains", icon: Key, category: "keychain-station" as const },
-  { id: "mug-printing", label: "Live Mugs", icon: Coffee, category: "mug-printing" as const },
+  { id: "photo-booth", label: "Photo Booth", icon: Camera, category: "photo-booth" as const, toggleKey: "enablePhotoBoothService" },
+  { id: "magnet-station", label: "Custom Magnets", icon: Magnet, category: "magnet-station" as const, toggleKey: "enableMagnetService" },
+  { id: "keychain-station", label: "Metal Keychains", icon: Key, category: "keychain-station" as const, toggleKey: "enableKeychainService" },
+  { id: "mug-printing", label: "Live Mugs", icon: Coffee, category: "mug-printing" as const, toggleKey: "enableMugService" },
 ] as const;
 
 const SERVICE_HIGHLIGHTS: Record<string, { title: string; subtitle: string; specs: string[] }> = {
@@ -49,17 +52,22 @@ export default function PortfolioGallery() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SITE_SETTINGS);
   const [visibility, setVisibility] = useState<GalleryVisibilityConfig>(DEFAULT_VISIBILITY_CONFIG);
+  const [toggles, setToggles] = useState<FeatureTogglesConfig>(DEFAULT_FEATURE_TOGGLES);
 
   useEffect(() => {
-    const unsubSettings = subscribeSiteSettings((data) => {
-      if (data) setSettings(data);
+    const unsub = subscribeSiteSettings((newSettings) => {
+      setSettings(newSettings);
     });
-    const unsubVis = subscribeGalleryVisibility((data) => {
-      if (data) setVisibility(data);
+    const unsubVis = subscribeGalleryVisibility((config) => {
+      if (config) setVisibility(config);
+    });
+    const unsubToggles = subscribeFeatureToggles((data) => {
+      if (data) setToggles(data);
     });
     return () => {
-      unsubSettings();
+      unsub();
       unsubVis();
+      unsubToggles();
     };
   }, []);
 
@@ -95,7 +103,10 @@ export default function PortfolioGallery() {
 
         {/* ─── PREMIUM SERVICE SELECTION CARDS ─── */}
         <div className="flex flex-wrap justify-center gap-4 md:gap-5 max-w-5xl mx-auto mb-14 px-2">
-          {CATEGORIES.map((cat) => {
+          {CATEGORIES.filter((cat) => {
+            const toggleVal = toggles[cat.toggleKey as keyof FeatureTogglesConfig];
+            return toggleVal !== false;
+          }).map((cat) => {
             const isActive = activeFilter === cat.id;
             const Icon = cat.icon;
             return (
