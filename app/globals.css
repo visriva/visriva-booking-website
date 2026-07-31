@@ -140,3 +140,37 @@
 .shadow-gold-lg {
   box-shadow: 0 8px 40px rgba(212, 175, 55, 0.45), 0 0 0 1px rgba(212, 175, 55, 0.2);
 }
+
+/* Luxury Background Mesh & Grid Patterns */
+.bg-luxury-grid {
+  background-image: radial-gradient(rgba(212, 175, 55, 0.07) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+.bg-vignette {
+  background: radial-gradient(circle at center, transparent 40%, rgba(1, 15, 10, 0.85) 100%);
+}
+
+@keyframes ambientFloat {
+  0% {
+    transform: translateY(0px) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-25px) scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0px) scale(1);
+    opacity: 0.7;
+  }
+}
+
+.animate-ambient-float {
+  animation: ambientFloat 14s infinite ease-in-out;
+}
+
+.animate-ambient-float-slow {
+  animation: ambientFloat 22s infinite ease-in-out reverse;
+}
+

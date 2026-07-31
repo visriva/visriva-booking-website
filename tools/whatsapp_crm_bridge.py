@@ -44,9 +44,12 @@ console = Console()
 # ─── CONFIG ──────────────────────────────────────────────────────────────────
 GEMINI_API_KEY       = os.getenv("GEMINI_API_KEY", "")
 FIREBASE_CREDS       = os.getenv("FIREBASE_CREDENTIALS_PATH", "serviceAccountKey.json")
+META_APP_ID          = os.getenv("META_APP_ID", "2252335525522630")
+META_APP_SECRET      = os.getenv("META_APP_SECRET", "32f187afec9f0f380904c8a8ac3c9891")
 
 # Your own WhatsApp number — leads will receive messages FROM this number
 YOUR_WHATSAPP_NUMBER = "918884484828"   # +91 88844 84828 (Visriva)
+
 
 
 # ─── LAZY IMPORTS ─────────────────────────────────────────────────────────────
