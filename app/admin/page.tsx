@@ -2470,6 +2470,70 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
+              {/* Card 3.5: On-Site Crew Resilience & Failsafe Settings */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-5">
+                <h4 className="font-serif text-lg font-bold text-[#D4AF37] flex items-center space-x-2">
+                  <ShieldCheck className="w-5 h-5 text-[#D4AF37]" />
+                  <span>On-Site Crew Resilience &amp; Failsafe Toggles</span>
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-white">Phone Typos Guard</span>
+                      <input
+                        type="checkbox"
+                        checked={operatorConfig.enablePhoneValidation !== false}
+                        onChange={(e) =>
+                          setOperatorConfig({ ...operatorConfig, enablePhoneValidation: e.target.checked })
+                        }
+                        className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Ensures on-site operators input exactly 10 digits and auto-formats the country code prefix (`91`).
+                    </p>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-white">Meta 24h QR Fallback</span>
+                      <input
+                        type="checkbox"
+                        checked={operatorConfig.enableQrFallback !== false}
+                        onChange={(e) =>
+                          setOperatorConfig({ ...operatorConfig, enableQrFallback: e.target.checked })
+                        }
+                        className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Pops up a Scan QR code modal on `/operator` if Meta rejects message delivery due to 24h restrictions.
+                    </p>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <label className="block font-bold text-sm text-white mb-1.5">Printer Delay Threshold</label>
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="number"
+                        min="1"
+                        max="60"
+                        value={operatorConfig.printerDelayMinutes ?? 3}
+                        onChange={(e) =>
+                          setOperatorConfig({ ...operatorConfig, printerDelayMinutes: parseInt(e.target.value) || 3 })
+                        }
+                        className="w-20 px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white font-mono font-bold text-center focus:border-[#D4AF37] focus:outline-none"
+                      />
+                      <span className="text-xs text-emerald-200">minutes in queue</span>
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Flags items left in "Processing" for longer than this duration with a blinking warning icon.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Card 4: Google Sheet Question Sync */}
               <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-6">
                 <div className="flex items-center space-x-3 border-b border-white/10 pb-4">

@@ -226,6 +226,9 @@ export interface OperatorConfig {
   magnetBlanks?: number;
   toteBlanks?: number;
   mugStock?: number;
+  printerDelayMinutes?: number;
+  enablePhoneValidation?: boolean;
+  enableQrFallback?: boolean;
 }
 
 export const DEFAULT_OPERATOR_CONFIG: OperatorConfig = {
@@ -240,6 +243,9 @@ export const DEFAULT_OPERATOR_CONFIG: OperatorConfig = {
   magnetBlanks: 0,
   toteBlanks: 0,
   mugStock: 0,
+  printerDelayMinutes: 3,
+  enablePhoneValidation: true,
+  enableQrFallback: true,
 };
 
 export interface FeatureTogglesConfig {

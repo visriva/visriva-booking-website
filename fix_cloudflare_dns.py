@@ -58,23 +58,23 @@ for record in records_data['result']:
         print(f"🗑️ Deleting old record: {record['name']} ({record['type']} -> {record['content']})")
         request("DELETE", f"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records/{record['id']}")
 
-print(f"➕ Adding new A record for {DOMAIN} -> {VERCEL_A_RECORD} (DNS Only)...")
+print(f"➕ Adding new A record for {DOMAIN} -> {VERCEL_A_RECORD} (Proxied)...")
 request("POST", f"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records", {
     "type": "A",
     "name": DOMAIN,
     "content": VERCEL_A_RECORD,
-    "proxied": False,
-    "ttl": 60
+    "proxied": True,
+    "ttl": 1
 })
 
-print(f"➕ Adding new CNAME record for www.{DOMAIN} -> {VERCEL_CNAME_RECORD} (DNS Only)...")
+print(f"➕ Adding new CNAME record for www.{DOMAIN} -> {VERCEL_CNAME_RECORD} (Proxied)...")
 request("POST", f"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records", {
     "type": "CNAME",
     "name": f"www.{DOMAIN}",
     "content": VERCEL_CNAME_RECORD,
-    "proxied": False,
-    "ttl": 60
+    "proxied": True,
+    "ttl": 1
 })
 
-print("🎉 Successfully updated Cloudflare DNS to point directly to Vercel!")
-print("Visriva.com will now load instantly and securely.")
+print("🎉 Successfully updated Cloudflare DNS to proxy directly to Vercel!")
+print("Visriva.com will now load instantly and bypass Jio ISP DNS blocking.")

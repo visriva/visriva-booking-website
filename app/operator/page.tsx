@@ -218,7 +218,7 @@ export default function OperatorCommandCenterPage() {
     if (!guestName.trim()) return;
 
     let formattedPhone = guestPhone.trim();
-    if (formattedPhone) {
+    if (formattedPhone && opConfig.enablePhoneValidation !== false) {
       const clean = formattedPhone.replace(/\D/g, "");
       if (clean.length === 10) {
         formattedPhone = "91" + clean;
@@ -227,6 +227,12 @@ export default function OperatorCommandCenterPage() {
       } else {
         alert("Please enter a valid 10-digit mobile number.");
         return;
+      }
+    } else if (formattedPhone) {
+      // Non-blocking auto-formatter fallback
+      const clean = formattedPhone.replace(/\D/g, "");
+      if (clean.length === 10) {
+        formattedPhone = "91" + clean;
       }
     }
 
@@ -252,6 +258,11 @@ export default function OperatorCommandCenterPage() {
   const handlePhoneInputChange = (val: string) => {
     const clean = val.replace(/\D/g, "");
     setGuestPhone(clean);
+
+    if (opConfig.enablePhoneValidation === false) {
+      setPhoneError("");
+      return;
+    }
 
     if (clean === "") {
       setPhoneError("");
@@ -305,7 +316,7 @@ export default function OperatorCommandCenterPage() {
         if (data.fallbackWaUrl && typeof window !== "undefined") {
           window.open(data.fallbackWaUrl, "_blank");
         }
-      } else if (data.isWindowExpired) {
+      } else if (data.isWindowExpired && opConfig.enableQrFallback !== false) {
         // Meta 24-hr customer service window policy restriction
         setQrModalData({
           guestName: token.guestName,
@@ -713,10 +724,10 @@ export default function OperatorCommandCenterPage() {
                               <span className="text-[10px] font-mono text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded border border-[#D4AF37]/30">
                                 {token.itemType}
                               </span>
-                              {token.status === "Processing" && token.createdTimestamp && (timeTick - token.createdTimestamp) > 180000 && (
+                              {token.status === "Processing" && token.createdTimestamp && (timeTick - token.createdTimestamp) > ((opConfig.printerDelayMinutes ?? 3) * 60000) && (
                                 <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[9px] font-bold font-mono bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse uppercase tracking-wider">
                                   <AlertCircle className="w-3 h-3 text-rose-400" />
-                                  <span>Delay Alert (&gt;3m)</span>
+                                  <span>Delay Alert (&gt;{opConfig.printerDelayMinutes ?? 3}m)</span>
                                 </span>
                               )}
                             </div>
