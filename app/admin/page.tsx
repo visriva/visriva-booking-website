@@ -133,6 +133,10 @@ export default function AdminDashboardPage() {
     "globalSettings" | "websiteText" | "printPreviewer" | "goldenWheel" | "pricingServices" | "galleryManager" | "bookingCRM" | "operatorTab" | "featureToggles" | "bentoGrid" | "serviceToggles" | "heroCardStudio" | "aiConciergeCMS" | "aiWhatsAppCMS" | "impactStatsCMS" | "plannersCMS"
   >("globalSettings");
 
+  const [activeCategory, setActiveCategory] = useState<
+    "dashboard" | "branding" | "services" | "operator" | "ai" | "crm"
+  >("dashboard");
+
   // Subtabs inside Pricing & Services
   const [pricingSubTab, setPricingSubTab] = useState<"photoBooth" | "magnets" | "keychains" | "mugs" | "toteTshirt">("photoBooth");
   const [pbHardwareSubTab, setPbHardwareSubTab] = useState<"dslr" | "ipad">("dslr");
@@ -734,195 +738,92 @@ export default function AdminDashboardPage() {
 
             <nav className="space-y-1.5">
               <button
-                onClick={() => setActiveTab("globalSettings")}
+                onClick={() => {
+                  setActiveCategory("dashboard");
+                }}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "globalSettings"
-                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Settings className="w-4 h-4" />
-                <span>1. Global Contact &amp; Socials</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("websiteText")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "websiteText"
-                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <FileText className="w-4 h-4" />
-                <span>2. Website Copy &amp; Text</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("printPreviewer")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "printPreviewer"
-                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Palette className="w-4 h-4" />
-                <span>3. 🎨 Custom Print Frame CMS</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("goldenWheel")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "goldenWheel"
-                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>4. 🎰 Golden Wheel of Perks CMS</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("pricingServices")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "pricingServices"
-                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <DollarSign className="w-4 h-4" />
-                <span>5. 💰 Pricing &amp; Package Matrix</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("galleryManager")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "galleryManager"
-                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <ImageIcon className="w-4 h-4" />
-                <span>6. 🖼️ Gallery Manager</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("bookingCRM")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "bookingCRM"
-                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Briefcase className="w-4 h-4" />
-                <span>7. 💼 Booking CRM Pipeline</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("operatorTab")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "operatorTab"
-                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <ShieldCheck className="w-4 h-4 text-[#D4AF37]" />
-                <span>8. 🎪 Operator Panel &amp; Stock Inventory</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("featureToggles")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "featureToggles"
-                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Lock className="w-4 h-4" />
-                <span>9. ⚙️ Feature Toggles &amp; Master Switches</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("bentoGrid")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "bentoGrid"
+                  activeCategory === "dashboard"
                     ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <Layers className="w-4 h-4" />
-                <span>9. 🍱 Homepage Sections 1, 2 &amp; 3 CMS</span>
+                <span>🏠 Dashboard Home</span>
               </button>
 
               <button
-                onClick={() => setActiveTab("serviceToggles")}
+                onClick={() => {
+                  setActiveCategory("branding");
+                  setActiveTab("websiteText");
+                }}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "serviceToggles"
+                  activeCategory === "branding"
                     ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                <Lock className="w-4 h-4" />
-                <span>10. 🔌 Services &amp; Navbar Menu Toggles</span>
+                <FileText className="w-4 h-4" />
+                <span>🌐 Website Branding</span>
               </button>
 
               <button
-                onClick={() => setActiveTab("heroCardStudio")}
+                onClick={() => {
+                  setActiveCategory("services");
+                  setActiveTab("pricingServices");
+                }}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "heroCardStudio"
+                  activeCategory === "services"
                     ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                <Palette className="w-4 h-4" />
-                <span>11. 🎨 Hero 3D Cards Alignment Studio</span>
+                <DollarSign className="w-4 h-4" />
+                <span>⚙️ Services &amp; Pricing</span>
               </button>
 
               <button
-                onClick={() => setActiveTab("aiConciergeCMS")}
+                onClick={() => {
+                  setActiveCategory("operator");
+                  setActiveTab("operatorTab");
+                }}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "aiConciergeCMS"
+                  activeCategory === "operator"
                     ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                <Sparkles className="w-4 h-4 text-[#011F15]" />
-                <span>12. 🤖 AI Event Concierge CMS</span>
+                <ShieldCheck className="w-4 h-4" />
+                <span>🎪 Crew &amp; On-Site</span>
               </button>
 
               <button
-                onClick={() => setActiveTab("aiWhatsAppCMS")}
+                onClick={() => {
+                  setActiveCategory("ai");
+                  setActiveTab("aiConciergeCMS");
+                }}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "aiWhatsAppCMS"
+                  activeCategory === "ai"
                     ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                <MessageCircle className="w-4 h-4" />
-                <span>13. 💬 AI WhatsApp Assistant CMS</span>
+                <Sparkles className="w-4 h-4" />
+                <span>🤖 AI Prompt Studio</span>
               </button>
 
               <button
-                onClick={() => setActiveTab("impactStatsCMS")}
+                onClick={() => {
+                  setActiveCategory("crm");
+                  setActiveTab("bookingCRM");
+                }}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "impactStatsCMS"
-                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <TrendingUp className="w-4 h-4" />
-                <span>14. 📊 Real Impact &amp; Event Tracker CMS</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("plannersCMS")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === "plannersCMS"
+                  activeCategory === "crm"
                     ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <Briefcase className="w-4 h-4" />
-                <span>15. 🤝 Planners &amp; B2B Portal CMS</span>
+                <span>📂 CRM &amp; Galleries</span>
               </button>
             </nav>
           </div>
@@ -939,8 +840,309 @@ export default function AdminDashboardPage() {
         {/* RIGHT MAIN CONTENT AREA */}
         <main className="flex-1 space-y-6">
           
+          {/* DASHBOARD HOME OVERVIEW */}
+          {activeCategory === "dashboard" && (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              {/* Welcome Card */}
+              <div className="bg-black/40 border border-[#D4AF37]/30 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-3">
+                <h2 className="font-serif text-3xl font-bold text-white">
+                  Welcome to <span className="text-gold-gradient">Visriva Master Control Panel</span>
+                </h2>
+                <p className="text-sm text-emerald-100/70 leading-relaxed max-w-3xl">
+                  This command center allows you to easily manage homepage copywriting, pricing matrix tables, active blanks stock inventory, on-site failsafes, and B2B wedding planners data. Select a category below or from the sidebar to begin.
+                </p>
+              </div>
+
+              {/* Grid of Categories */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                
+                {/* Category 1: Website Branding */}
+                <button
+                  onClick={() => {
+                    setActiveCategory("branding");
+                    setActiveTab("websiteText");
+                  }}
+                  className="text-left bg-black/35 hover:bg-black/60 border border-white/10 hover:border-[#D4AF37]/50 rounded-3xl p-6 transition-all duration-300 flex items-start space-x-4 cursor-pointer group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 group-hover:bg-[#D4AF37]/10 text-white group-hover:text-[#D4AF37] flex items-center justify-center shrink-0 transition-colors">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-serif font-bold text-base text-white group-hover:text-[#D4AF37] transition-colors">🌐 Website Branding &amp; Copy</h4>
+                    <p className="text-xs text-emerald-100/60 leading-relaxed">
+                      Modify hero taglines, FAQ answers, homepage Bento layout elements, and actual event stats displayed online.
+                    </p>
+                  </div>
+                </button>
+
+                {/* Category 2: Services & Pricing */}
+                <button
+                  onClick={() => {
+                    setActiveCategory("services");
+                    setActiveTab("pricingServices");
+                  }}
+                  className="text-left bg-black/35 hover:bg-black/60 border border-white/10 hover:border-[#D4AF37]/50 rounded-3xl p-6 transition-all duration-300 flex items-start space-x-4 cursor-pointer group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 group-hover:bg-[#D4AF37]/10 text-white group-hover:text-[#D4AF37] flex items-center justify-center shrink-0 transition-colors">
+                    <DollarSign className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-serif font-bold text-base text-white group-hover:text-[#D4AF37] transition-colors">⚙️ Services &amp; Pricing Matrix</h4>
+                    <p className="text-xs text-emerald-100/60 leading-relaxed">
+                      Update basic packages pricing, customize dynamic print size overlays, and enable/disable services on navigation bars.
+                    </p>
+                  </div>
+                </button>
+
+                {/* Category 3: On-Site Operator */}
+                <button
+                  onClick={() => {
+                    setActiveCategory("operator");
+                    setActiveTab("operatorTab");
+                  }}
+                  className="text-left bg-black/35 hover:bg-black/60 border border-white/10 hover:border-[#D4AF37]/50 rounded-3xl p-6 transition-all duration-300 flex items-start space-x-4 cursor-pointer group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 group-hover:bg-[#D4AF37]/10 text-white group-hover:text-[#D4AF37] flex items-center justify-center shrink-0 transition-colors">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-serif font-bold text-base text-white group-hover:text-[#D4AF37] transition-colors">🎪 Crew &amp; On-Site Failsafes</h4>
+                    <p className="text-xs text-emerald-100/60 leading-relaxed">
+                      Update technician security access PINs, configure on-site warning delay times, and set backup Evolution servers.
+                    </p>
+                  </div>
+                </button>
+
+                {/* Category 4: AI Prompts */}
+                <button
+                  onClick={() => {
+                    setActiveCategory("ai");
+                    setActiveTab("aiConciergeCMS");
+                  }}
+                  className="text-left bg-black/35 hover:bg-black/60 border border-white/10 hover:border-[#D4AF37]/50 rounded-3xl p-6 transition-all duration-300 flex items-start space-x-4 cursor-pointer group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 group-hover:bg-[#D4AF37]/10 text-white group-hover:text-[#D4AF37] flex items-center justify-center shrink-0 transition-colors">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-serif font-bold text-base text-white group-hover:text-[#D4AF37] transition-colors">🤖 AI Assistant Studio</h4>
+                    <p className="text-xs text-emerald-100/60 leading-relaxed">
+                      Instruct the client-facing event planner assistant guidelines and modify pre-filled templates for WhatsApp.
+                    </p>
+                  </div>
+                </button>
+
+                {/* Category 5: CRM Leads */}
+                <button
+                  onClick={() => {
+                    setActiveCategory("crm");
+                    setActiveTab("bookingCRM");
+                  }}
+                  className="text-left bg-black/35 hover:bg-black/60 border border-white/10 hover:border-[#D4AF37]/50 rounded-3xl p-6 transition-all duration-300 flex items-start space-x-4 cursor-pointer group md:col-span-2"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 group-hover:bg-[#D4AF37]/10 text-white group-hover:text-[#D4AF37] flex items-center justify-center shrink-0 transition-colors">
+                    <Briefcase className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-serif font-bold text-base text-white group-hover:text-[#D4AF37] transition-colors">📂 CRM Pipeline &amp; Image Galleries</h4>
+                    <p className="text-xs text-[#D4AF37] leading-relaxed">
+                      Review wedding booking dates, manage the public media gallery grids, and update global business contact details.
+                    </p>
+                  </div>
+                </button>
+
+              </div>
+            </div>
+          )}
+
+          {/* CATEGORY SUB-TABS ROW */}
+          {activeCategory === "branding" && (
+            <div className="flex flex-wrap gap-2 pb-3 border-b border-white/10 mb-4">
+              <button
+                onClick={() => setActiveTab("websiteText")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "websiteText"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                📝 Website Copy
+              </button>
+              <button
+                onClick={() => setActiveTab("heroCardStudio")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "heroCardStudio"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                🃏 3D Cards Stack
+              </button>
+              <button
+                onClick={() => setActiveTab("bentoGrid")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "bentoGrid"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                🍱 Bento Grid
+              </button>
+              <button
+                onClick={() => setActiveTab("impactStatsCMS")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "impactStatsCMS"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                📊 Impact Stats
+              </button>
+            </div>
+          )}
+
+          {activeCategory === "services" && (
+            <div className="flex flex-wrap gap-2 pb-3 border-b border-white/10 mb-4">
+              <button
+                onClick={() => setActiveTab("pricingServices")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "pricingServices"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                💰 Package Matrix
+              </button>
+              <button
+                onClick={() => setActiveTab("printPreviewer")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "printPreviewer"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                🎨 Custom Frame Overlays
+              </button>
+              <button
+                onClick={() => setActiveTab("goldenWheel")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "goldenWheel"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                🎰 Perks Wheel
+              </button>
+              <button
+                onClick={() => setActiveTab("serviceToggles")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "serviceToggles"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                🔌 Services Menu Toggles
+              </button>
+              <button
+                onClick={() => setActiveTab("featureToggles")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "featureToggles"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                ⚙️ Master Switches
+              </button>
+            </div>
+          )}
+
+          {activeCategory === "operator" && (
+            <div className="flex flex-wrap gap-2 pb-3 border-b border-white/10 mb-4">
+              <button
+                onClick={() => setActiveTab("operatorTab")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "operatorTab"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                🎪 Live Station Crew Controls
+              </button>
+            </div>
+          )}
+
+          {activeCategory === "ai" && (
+            <div className="flex flex-wrap gap-2 pb-3 border-b border-white/10 mb-4">
+              <button
+                onClick={() => setActiveTab("aiConciergeCMS")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "aiConciergeCMS"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                🤖 Event Concierge Chat
+              </button>
+              <button
+                onClick={() => setActiveTab("aiWhatsAppCMS")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "aiWhatsAppCMS"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                💬 WhatsApp Templates
+              </button>
+            </div>
+          )}
+
+          {activeCategory === "crm" && (
+            <div className="flex flex-wrap gap-2 pb-3 border-b border-white/10 mb-4">
+              <button
+                onClick={() => setActiveTab("bookingCRM")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "bookingCRM"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                💼 Booking Pipeline
+              </button>
+              <button
+                onClick={() => setActiveTab("galleryManager")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "galleryManager"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                🖼️ Gallery Manager
+              </button>
+              <button
+                onClick={() => setActiveTab("plannersCMS")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "plannersCMS"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                🤝 Planners Portal
+              </button>
+              <button
+                onClick={() => setActiveTab("globalSettings")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "globalSettings"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                📞 Global Socials &amp; Socials
+              </button>
+            </div>
+          )}
+
           {/* TAB 1: GLOBAL SETTINGS (CONTACT INFO & SOCIALS) */}
-          {activeTab === "globalSettings" && (
+          {activeTab === "globalSettings" && activeCategory === "crm" && (
             <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div>
@@ -1049,7 +1251,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* TAB 2: WEBSITE TEXT CONTROL */}
-          {activeTab === "websiteText" && (
+          {activeTab === "websiteText" && activeCategory === "branding" && (
             <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div>
@@ -1120,7 +1322,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* TAB 3: INTERACTIVE CUSTOM PRINT FRAME PREVIEWER CMS */}
-          {activeTab === "printPreviewer" && (
+          {activeTab === "printPreviewer" && activeCategory === "services" && (
             <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
                 <div>
@@ -1217,7 +1419,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* TAB 4: GOLDEN WHEEL OF PERKS CMS */}
-          {activeTab === "goldenWheel" && (
+          {activeTab === "goldenWheel" && activeCategory === "services" && (
             <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
                 <div>
@@ -1378,7 +1580,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* TAB 3: PRICING & SERVICES MATRIX */}
-          {activeTab === "pricingServices" && (
+          {activeTab === "pricingServices" && activeCategory === "services" && (
             <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
                 <div>
@@ -1643,7 +1845,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* TAB 4: GALLERY MANAGER & MASTER VISIBILITY */}
-          {activeTab === "galleryManager" && (
+          {activeTab === "galleryManager" && activeCategory === "crm" && (
             <div className="space-y-8">
               
               {/* SECTION 0: RECOMMENDED IMAGE DIMENSIONS & FORMAT GUIDE */}
@@ -2059,7 +2261,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* TAB 5: BOOKING CRM PIPELINE (KANBAN BOARD) */}
-          {activeTab === "bookingCRM" && (
+          {activeTab === "bookingCRM" && activeCategory === "crm" && (
             <div className="space-y-6">
               {/* Header Banner */}
               <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -2303,7 +2505,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* TAB 8: DEDICATED OPERATOR PANEL & STOCK INVENTORY CMS */}
-          {activeTab === "operatorTab" && (
+          {activeTab === "operatorTab" && activeCategory === "operator" && (
             <div className="space-y-8 animate-in fade-in duration-300">
               
               {/* Header Banner */}
@@ -2532,6 +2734,52 @@ export default function AdminDashboardPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Backup Evolution VPS Input fields */}
+                <div className="border-t border-white/10 pt-5 space-y-4">
+                  <h5 className="font-semibold text-sm text-[#D4AF37] flex items-center space-x-2">
+                    <Settings className="w-4 h-4" />
+                    <span>Backup WhatsApp Server VPS configuration (Auto-Failover)</span>
+                  </h5>
+                  <p className="text-xs text-emerald-100/60 leading-relaxed">
+                    If your primary WhatsApp server fails or is offline, the backend automatically reroutes alerts to this backup server to prevent outages.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-mono text-emerald-200 mb-1.5">Backup VPS API URL</label>
+                      <input
+                        type="url"
+                        value={operatorConfig.backupEvoApiUrl || ""}
+                        onChange={(e) => setOperatorConfig({ ...operatorConfig, backupEvoApiUrl: e.target.value })}
+                        placeholder="https://backup-api.visriva.com"
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white font-sans text-xs focus:border-[#D4AF37] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-mono text-emerald-200 mb-1.5">Backup VPS API Key</label>
+                      <input
+                        type="password"
+                        value={operatorConfig.backupEvoApiKey || ""}
+                        onChange={(e) => setOperatorConfig({ ...operatorConfig, backupEvoApiKey: e.target.value })}
+                        placeholder="Enter API Key"
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white font-mono text-xs focus:border-[#D4AF37] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-mono text-[#D4AF37] mb-1.5">Backup Instance Name</label>
+                      <input
+                        type="text"
+                        value={operatorConfig.backupInstanceName || ""}
+                        onChange={(e) => setOperatorConfig({ ...operatorConfig, backupInstanceName: e.target.value })}
+                        placeholder="e.g. visriva-backup"
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white font-sans text-xs focus:border-[#D4AF37] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Card 4: Google Sheet Question Sync */}
@@ -2617,7 +2865,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* TAB 9: FEATURE TOGGLES & MASTER SWITCHES */}
-          {activeTab === "featureToggles" && (
+          {activeTab === "featureToggles" && activeCategory === "services" && (
             <div className="space-y-8 animate-in fade-in duration-300">
               
               {/* Card 1: Master Feature Enable/Disable Switches */}
@@ -2712,7 +2960,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* TAB 9: HOMEPAGE SECTIONS 1, 2 & 3 CMS */}
-          {activeTab === "bentoGrid" && (
+          {activeTab === "bentoGrid" && activeCategory === "branding" && (
             <div className="space-y-8 animate-in fade-in duration-300">
               
               {/* Card 1: Section 1 CMS - Our Signature Live Stations (Bento Grid) */}
@@ -3111,7 +3359,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* TAB 10: INDIVIDUAL SERVICES & NAVBAR MASTER TOGGLES */}
-          {activeTab === "serviceToggles" && (
+          {activeTab === "serviceToggles" && activeCategory === "services" && (
             <div className="space-y-8 animate-in fade-in duration-300">
               
               {/* Card 1: Individual Service Pages Switches */}
@@ -3293,7 +3541,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* TAB 11: HERO 3D CARDS ALIGNMENT & CLICK REDIRECT STUDIO */}
-          {activeTab === "heroCardStudio" && (
+          {activeTab === "heroCardStudio" && activeCategory === "branding" && (
             <div className="space-y-6">
               {/* Header Card */}
               <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-4">
@@ -3669,7 +3917,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* TAB 12: AI EVENT CONCIERGE SYSTEM PROMPTS & PRESETS CMS */}
-          {activeTab === "aiConciergeCMS" && (
+          {activeTab === "aiConciergeCMS" && activeCategory === "ai" && (
             <div className="space-y-6">
               {/* Header Card */}
               <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-4">
@@ -3849,7 +4097,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* TAB 13: AI WHATSAPP ASSISTANT SYSTEM PROMPTS & TEMPLATES CMS */}
-          {activeTab === "aiWhatsAppCMS" && (
+          {activeTab === "aiWhatsAppCMS" && activeCategory === "ai" && (
             <div className="space-y-6">
               {/* Header Card */}
               <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-4">
@@ -3989,7 +4237,7 @@ export default function AdminDashboardPage() {
           {/* ══════════════════════════════════════════════════════════════
               OPTION 14: REAL IMPACT & EVENT TRACK RECORD CMS
           ══════════════════════════════════════════════════════════════ */}
-          {activeTab === "impactStatsCMS" && (
+          {activeTab === "impactStatsCMS" && activeCategory === "branding" && (
             <div className="space-y-6">
               {/* Header Card */}
               <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-4">
@@ -4259,7 +4507,7 @@ export default function AdminDashboardPage() {
           {/* ══════════════════════════════════════════════════════════════
               OPTION 15: PLANNERS & B2B PARTNER PORTAL CMS
           ══════════════════════════════════════════════════════════════ */}
-          {activeTab === "plannersCMS" && (
+          {activeTab === "plannersCMS" && activeCategory === "crm" && (
             <div className="space-y-6">
               {/* Header Card */}
               <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-4">

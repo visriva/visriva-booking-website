@@ -229,6 +229,9 @@ export interface OperatorConfig {
   printerDelayMinutes?: number;
   enablePhoneValidation?: boolean;
   enableQrFallback?: boolean;
+  backupEvoApiUrl?: string;
+  backupEvoApiKey?: string;
+  backupInstanceName?: string;
 }
 
 export const DEFAULT_OPERATOR_CONFIG: OperatorConfig = {
@@ -246,6 +249,9 @@ export const DEFAULT_OPERATOR_CONFIG: OperatorConfig = {
   printerDelayMinutes: 3,
   enablePhoneValidation: true,
   enableQrFallback: true,
+  backupEvoApiUrl: "",
+  backupEvoApiKey: "",
+  backupInstanceName: "",
 };
 
 export interface FeatureTogglesConfig {
@@ -1486,6 +1492,20 @@ export async function saveOperatorConfig(
     const errMessage = error instanceof Error ? error.message : "Failed to save operator config";
     return { success: true, firestoreSynced: false, error: errMessage };
   }
+}
+
+export async function getOperatorConfigServer(): Promise<OperatorConfig> {
+  if (isDummyKey) return DEFAULT_OPERATOR_CONFIG;
+  try {
+    const docRef = doc(db, "config", "operator");
+    const snapshot = await getDoc(docRef);
+    if (snapshot.exists()) {
+      return { ...DEFAULT_OPERATOR_CONFIG, ...(snapshot.data() as OperatorConfig) };
+    }
+  } catch (e) {
+    console.error("Error reading operator config:", e);
+  }
+  return DEFAULT_OPERATOR_CONFIG;
 }
 
 export interface OperatorTokenItem {

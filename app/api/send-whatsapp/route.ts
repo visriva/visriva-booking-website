@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { getOperatorConfigServer } from "@/lib/firebase";
 
 export async function POST(req: Request) {
   try {
     const { name, phone, token, galleryUrl, templateName, templateLanguage, isMarketing, ttlSeconds } = await req.json();
+    const opConfig = await getOperatorConfigServer();
 
     if (!phone) {
       return NextResponse.json(
@@ -153,9 +155,9 @@ export async function POST(req: Request) {
     }
 
     // ─── 2.5. BACKUP EVOLUTION VPS FAILOVER DISPATCH ─────────────────────────
-    const BACKUP_EVOLUTION_API_URL = process.env.BACKUP_EVOLUTION_API_URL;
-    const BACKUP_EVOLUTION_API_KEY = process.env.BACKUP_EVOLUTION_API_KEY;
-    const BACKUP_INSTANCE_NAME = process.env.BACKUP_EVOLUTION_INSTANCE_NAME || INSTANCE_NAME;
+    const BACKUP_EVOLUTION_API_URL = opConfig.backupEvoApiUrl || process.env.BACKUP_EVOLUTION_API_URL;
+    const BACKUP_EVOLUTION_API_KEY = opConfig.backupEvoApiKey || process.env.BACKUP_EVOLUTION_API_KEY;
+    const BACKUP_INSTANCE_NAME = opConfig.backupInstanceName || process.env.BACKUP_EVOLUTION_INSTANCE_NAME || INSTANCE_NAME;
 
     if (!evolutionSuccess && BACKUP_EVOLUTION_API_URL && BACKUP_EVOLUTION_API_KEY) {
       try {
