@@ -91,6 +91,23 @@ export default function OperatorCommandCenterPage() {
     return 1;
   });
   const [alertSuccessId, setAlertSuccessId] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(typeof window !== "undefined" ? window.navigator.onLine : true);
+  const [pendingSync, setPendingSync] = useState(false);
+  const [timeTick, setTimeTick] = useState(Date.now());
+  const [phoneError, setPhoneError] = useState("");
+
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrModalData, setQrModalData] = useState<{ guestName: string; phone: string; tokenNum: number; fallbackWaUrl: string } | null>(null);
+
+  const syncPendingTokens = async (currentTokens: TokenItem[]) => {
+    if (typeof window !== "undefined" && window.navigator.onLine) {
+      setPendingSync(true);
+      try {
+        await saveOperatorTokens(currentTokens);
+      } catch (e) {}
+      setPendingSync(false);
+    }
+  };
 
   // 1. Restore Auth & Subscribe to Admin & Tokens Configs
   useEffect(() => {
@@ -112,10 +129,44 @@ export default function OperatorCommandCenterPage() {
       }
     });
 
+    const handleOnline = () => {
+      setIsOnline(true);
+      // Fetch latest from local storage and sync to Firestore
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("visriva_operator_tokens");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              syncPendingTokens(parsed);
+            }
+          } catch (e) {}
+        }
+      }
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+    }
+
+    // Periodic tick for print delay warnings
+    const tickInterval = setInterval(() => {
+      setTimeTick(Date.now());
+    }, 10000);
+
     return () => {
       unsubOp();
       unsubToggles();
       unsubTokens();
+      clearInterval(tickInterval);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+      }
     };
   }, []);
 
@@ -161,19 +212,33 @@ export default function OperatorCommandCenterPage() {
     }
   };
 
-  // Add New Token
+  // Add New Token with Phone Formatting and Timestamping
   const handleAddToken = (e: React.FormEvent) => {
     e.preventDefault();
     if (!guestName.trim()) return;
+
+    let formattedPhone = guestPhone.trim();
+    if (formattedPhone) {
+      const clean = formattedPhone.replace(/\D/g, "");
+      if (clean.length === 10) {
+        formattedPhone = "91" + clean;
+      } else if (clean.length === 12 && clean.startsWith("91")) {
+        formattedPhone = clean;
+      } else {
+        alert("Please enter a valid 10-digit mobile number.");
+        return;
+      }
+    }
 
     const newToken: TokenItem = {
       id: Date.now().toString(),
       tokenNum: nextTokenNum,
       guestName: guestName.trim(),
-      guestPhone: guestPhone.trim(),
+      guestPhone: formattedPhone,
       itemType,
       status: "Processing",
       createdAt: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+      createdTimestamp: Date.now(),
     };
 
     const updated = [newToken, ...tokens];
@@ -181,6 +246,22 @@ export default function OperatorCommandCenterPage() {
     setNextTokenNum(nextTokenNum + 1);
     setGuestName("");
     setGuestPhone("");
+    setPhoneError("");
+  };
+
+  const handlePhoneInputChange = (val: string) => {
+    const clean = val.replace(/\D/g, "");
+    setGuestPhone(clean);
+
+    if (clean === "") {
+      setPhoneError("");
+    } else if (clean.length !== 10 && clean.length !== 12) {
+      setPhoneError("⚠️ Indian phone number must be exactly 10 digits (excluding +91 country code).");
+    } else if (clean.length === 12 && !clean.startsWith("91")) {
+      setPhoneError("⚠️ 12-digit numbers must start with 91 (India country code).");
+    } else {
+      setPhoneError("");
+    }
   };
 
   // Send WhatsApp Pickup Alert
@@ -224,6 +305,18 @@ export default function OperatorCommandCenterPage() {
         if (data.fallbackWaUrl && typeof window !== "undefined") {
           window.open(data.fallbackWaUrl, "_blank");
         }
+      } else if (data.isWindowExpired) {
+        // Meta 24-hr customer service window policy restriction
+        setQrModalData({
+          guestName: token.guestName,
+          phone: token.guestPhone,
+          tokenNum: token.tokenNum,
+          fallbackWaUrl: data.fallbackWaUrl,
+        });
+        setQrModalOpen(true);
+
+        const updated = tokens.map((t) => (t.id === token.id ? { ...t, status: "Ready for Pickup" as const } : t));
+        updateTokensState(updated);
       } else {
         alert(data.error || "Could not dispatch message.");
       }
@@ -288,6 +381,25 @@ export default function OperatorCommandCenterPage() {
           <p className="font-sans text-emerald-100/70 text-xs sm:text-sm font-light">
             Monitor real-time print counters, manage inventory stock, and trigger instant WhatsApp collection alerts for guest tokens.
           </p>
+
+          {/* Online/Offline Status Indicator */}
+          <div className="flex items-center justify-center space-x-2.5 pt-1">
+            <span className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase font-bold tracking-wider border transition-all ${
+              isOnline 
+                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                : "bg-rose-500/20 text-rose-300 border-rose-500/30 animate-pulse"
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-ping" : "bg-rose-400"}`}></span>
+              <span>{isOnline ? "Venue Network Online" : "Venue Offline (Queue Caching)"}</span>
+            </span>
+
+            {pendingSync && (
+              <span className="inline-flex items-center space-x-1 px-3 py-1 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/20 animate-pulse">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                <span>Syncing Cloud...</span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* PIN SECURITY AUTHENTICATION SCREEN */}
@@ -500,10 +612,17 @@ export default function OperatorCommandCenterPage() {
                     <input
                       type="text"
                       value={guestPhone}
-                      onChange={(e) => setGuestPhone(e.target.value)}
+                      onChange={(e) => handlePhoneInputChange(e.target.value)}
                       placeholder="e.g. 918884484828"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm font-mono focus:border-[#D4AF37] focus:outline-none"
+                      className={`w-full px-3.5 py-2.5 rounded-xl bg-white/5 border text-sm font-mono focus:outline-none transition ${
+                        phoneError ? "border-amber-400 focus:border-amber-400" : "border-white/15 focus:border-[#D4AF37]"
+                      }`}
                     />
+                    {phoneError && (
+                      <p className="text-[10px] text-amber-300 font-sans mt-1 leading-tight">
+                        {phoneError}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -589,11 +708,17 @@ export default function OperatorCommandCenterPage() {
                             #{token.tokenNum}
                           </div>
                           <div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 flex-wrap gap-y-1.5">
                               <h4 className="font-bold text-sm text-white">{token.guestName}</h4>
                               <span className="text-[10px] font-mono text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded border border-[#D4AF37]/30">
                                 {token.itemType}
                               </span>
+                              {token.status === "Processing" && token.createdTimestamp && (timeTick - token.createdTimestamp) > 180000 && (
+                                <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[9px] font-bold font-mono bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse uppercase tracking-wider">
+                                  <AlertCircle className="w-3 h-3 text-rose-400" />
+                                  <span>Delay Alert (&gt;3m)</span>
+                                </span>
+                              )}
                             </div>
                             <p className="text-xs text-white/60 font-mono flex items-center gap-2 mt-0.5">
                               <span>Phone: {token.guestPhone || "Not Provided"}</span>
@@ -680,6 +805,72 @@ export default function OperatorCommandCenterPage() {
         onClose={() => setAiModalOpen(false)}
         leadData={selectedLeadForAI || {}}
       />
+
+      {/* META 24-HOUR RESTRICTION QR FALLBACK MODAL */}
+      {qrModalOpen && qrModalData && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#011F15] border border-[#D4AF37]/40 rounded-3xl p-6 sm:p-8 max-w-sm w-full relative space-y-5 shadow-2xl text-center">
+            
+            <button
+              onClick={() => {
+                setQrModalOpen(false);
+                setQrModalData(null);
+              }}
+              className="absolute top-4 right-4 text-white/60 hover:text-white transition text-lg cursor-pointer"
+            >
+              ✕
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
+              <Lock className="w-6 h-6 animate-pulse" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-serif text-lg font-bold text-white">Meta 24-Hour Lock Bypass</h3>
+              <p className="text-[11px] text-emerald-100/70 leading-relaxed">
+                Meta rules require this guest (<strong>{qrModalData.guestName}</strong>) to text us first to initiate chat delivery.
+              </p>
+            </div>
+
+            {/* QR Code Container */}
+            <div className="p-3 bg-white rounded-2xl max-w-[220px] mx-auto shadow-md">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrModalData.fallbackWaUrl)}`}
+                alt="Scan to unlock WhatsApp"
+                className="w-full h-auto"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[11px] text-amber-200 font-medium">
+                👉 Point guest camera here &amp; send the pre-filled text!
+              </p>
+              
+              <div className="pt-2 border-t border-white/10 flex flex-col gap-2">
+                <a
+                  href={qrModalData.fallbackWaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider hover:scale-[1.02] transition block text-center"
+                >
+                  Open WhatsApp Web Manual Link
+                </a>
+                
+                <button
+                  onClick={() => {
+                    setQrModalOpen(false);
+                    setQrModalData(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-white/5 border border-white/15 text-white/70 hover:text-white text-xs uppercase tracking-wider transition cursor-pointer"
+                >
+                  Done / Close
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
     </main>
   );
 }

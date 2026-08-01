@@ -96,6 +96,16 @@ export async function POST(req: Request) {
         } else {
           const errText = await metaRes.text();
           console.warn(`Meta API rejected message (${metaRes.status}): ${errText}. Falling back to secondary engine.`);
+          const isWindowExpired = errText.includes("131047") || errText.toLowerCase().includes("window") || errText.toLowerCase().includes("24 hours");
+          if (isWindowExpired) {
+            return NextResponse.json({
+              success: false,
+              isWindowExpired: true,
+              fallbackWaUrl,
+              error: "Meta 24-hour customer service window expired.",
+              details: errText
+            }, { status: 200 });
+          }
         }
       } catch (metaErr: any) {
         console.warn("Meta API network connection issue. Falling back to secondary engine:", metaErr.message);

@@ -1491,6 +1491,7 @@ export interface OperatorTokenItem {
   status: "Processing" | "Ready for Pickup" | "Collected";
   createdAt: string;
   notes?: string;
+  createdTimestamp?: number;
   customFields?: Record<string, string>;
 }
 
