@@ -2518,6 +2518,82 @@ export default function AdminDashboardPage() {
                           Allow Master Admin Passwords to unlock /operator (jeevan, drupitha, punith, arpitha, 4848, 0315)
                         </label>
                       </div>
+                  {/* Live Inventory & Production Stock Controls Card */}
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                    <h4 className="font-serif text-base font-bold text-[#D4AF37] flex items-center space-x-2">
+                      <Layers className="w-4 h-4 text-[#D4AF37]" />
+                      <span>Live Production & Stock Inventory Controls (/operator)</span>
+                    </h4>
+                    <p className="text-xs text-emerald-100/70">
+                      Configure live inventory counters shown to operators on-site. All values default to 0 and update in real time.
+                    </p>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
+                      <div>
+                        <label className="block text-[11px] font-mono text-emerald-200 mb-1">Prints Done</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={operatorConfig.printsCompleted ?? 0}
+                          onChange={(e) =>
+                            setOperatorConfig({ ...operatorConfig, printsCompleted: parseInt(e.target.value) || 0 })
+                          }
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/20 text-white font-mono font-bold text-center focus:border-[#D4AF37] focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-mono text-emerald-200 mb-1">Paper Roll %</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={operatorConfig.paperRollPercent ?? 0}
+                          onChange={(e) =>
+                            setOperatorConfig({ ...operatorConfig, paperRollPercent: parseInt(e.target.value) || 0 })
+                          }
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/20 text-white font-mono font-bold text-center focus:border-[#D4AF37] focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-mono text-emerald-200 mb-1">Magnet Stock</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={operatorConfig.magnetBlanks ?? 0}
+                          onChange={(e) =>
+                            setOperatorConfig({ ...operatorConfig, magnetBlanks: parseInt(e.target.value) || 0 })
+                          }
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/20 text-white font-mono font-bold text-center focus:border-[#D4AF37] focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-mono text-emerald-200 mb-1">Tote Stock</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={operatorConfig.toteBlanks ?? 0}
+                          onChange={(e) =>
+                            setOperatorConfig({ ...operatorConfig, toteBlanks: parseInt(e.target.value) || 0 })
+                          }
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/20 text-white font-mono font-bold text-center focus:border-[#D4AF37] focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-mono text-emerald-200 mb-1">Mug Stock</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={operatorConfig.mugStock ?? 0}
+                          onChange={(e) =>
+                            setOperatorConfig({ ...operatorConfig, mugStock: parseInt(e.target.value) || 0 })
+                          }
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/20 text-white font-mono font-bold text-center focus:border-[#D4AF37] focus:outline-none"
+                        />
+                      </div>
                     </div>
                   </div>
 

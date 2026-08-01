@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       cleanPhone = "91" + cleanPhone; // Default to India country code
     }
 
-    const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || "2176925779756822";
+    const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || "1203212472878765";
     const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN;
 
     // ─── 1. META OFFICIAL CLOUD & MARKETING MESSAGES API DISPATCH (v20.0 / v25.0) ──
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
             },
           };
 
-      const metaRes = await fetch(metaUrl, {
+      let metaRes = await fetch(metaUrl, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${ACCESS_TOKEN}`,
@@ -56,6 +56,28 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify(payload),
       });
+
+      // If free-form text message fails (e.g., 24-hr window restriction), retry using default Meta 'hello_world' template
+      if (!metaRes.ok && !templateName) {
+        console.warn("Meta text message rejected (24-hr window). Retrying with 'hello_world' template...");
+        const fallbackPayload = {
+          messaging_product: "whatsapp",
+          to: cleanPhone,
+          type: "template",
+          template: {
+            name: "hello_world",
+            language: { code: "en_US" },
+          },
+        };
+        metaRes = await fetch(metaUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${ACCESS_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(fallbackPayload),
+        });
+      }
 
       if (!metaRes.ok) {
         const errText = await metaRes.text();

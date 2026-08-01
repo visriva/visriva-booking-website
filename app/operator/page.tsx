@@ -25,6 +25,7 @@ import Footer from "@/components/Footer";
 import { buildTokenPickupAlertMessage, formatWhatsAppUrl } from "@/lib/whatsappWorkflow";
 import {
   subscribeOperatorConfig,
+  saveOperatorConfig,
   DEFAULT_OPERATOR_CONFIG,
   OperatorConfig,
   subscribeFeatureToggles,
@@ -47,26 +48,7 @@ interface TokenItem {
 
 const AUTHORIZED_ADMIN_PASSWORDS = ["jeevan", "drupitha", "punith", "arpitha", "4848", "0315"];
 
-const DEFAULT_TOKENS: TokenItem[] = [
-  {
-    id: "101",
-    tokenNum: 101,
-    guestName: "Ananya Sharma",
-    guestPhone: "918884484828",
-    itemType: "Live Mug",
-    status: "Ready for Pickup",
-    createdAt: "21:40",
-  },
-  {
-    id: "102",
-    tokenNum: 102,
-    guestName: "Rohan Kapoor",
-    guestPhone: "918884484828",
-    itemType: "Tote Bag",
-    status: "Processing",
-    createdAt: "21:45",
-  },
-];
+const DEFAULT_TOKENS: TokenItem[] = [];
 
 export default function OperatorCommandCenterPage() {
   const [pin, setPin] = useState("");
@@ -90,12 +72,12 @@ export default function OperatorCommandCenterPage() {
     };
   }, []);
 
-  // Live Stats State
-  const [printsCompleted, setPrintsCompleted] = useState(148);
-  const [paperRollPercent, setPaperRollPercent] = useState(65);
-  const [magnetBlanks, setMagnetBlanks] = useState(85);
-  const [toteBlanks, setToteBlanks] = useState(42);
-  const [mugStock, setMugStock] = useState(28);
+  // Synchronized Live Inventory & Production Stats from Admin Config (default 0)
+  const printsCompleted = opConfig.printsCompleted ?? 0;
+  const paperRollPercent = opConfig.paperRollPercent ?? 0;
+  const magnetBlanks = opConfig.magnetBlanks ?? 0;
+  const toteBlanks = opConfig.toteBlanks ?? 0;
+  const mugStock = opConfig.mugStock ?? 0;
 
   // Token Management State
   const [tokens, setTokens] = useState<TokenItem[]>(DEFAULT_TOKENS);
@@ -103,7 +85,7 @@ export default function OperatorCommandCenterPage() {
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [itemType, setItemType] = useState<"Tote Bag" | "Live Mug" | "Fridge Magnet" | "Keychain" | "Photo Frame">("Tote Bag");
-  const [nextTokenNum, setNextTokenNum] = useState(103);
+  const [nextTokenNum, setNextTokenNum] = useState(101);
   const [alertSuccessId, setAlertSuccessId] = useState<string | null>(null);
 
   // AI WhatsApp Assistant State
@@ -229,6 +211,14 @@ export default function OperatorCommandCenterPage() {
     );
   }
 
+  const updateStock = (field: keyof OperatorConfig, delta: number) => {
+    const currentValue = (opConfig[field] as number) || 0;
+    const newValue = Math.max(0, currentValue + delta);
+    const updated = { ...opConfig, [field]: newValue };
+    setOpConfig(updated);
+    saveOperatorConfig(updated);
+  };
+
   return (
     <main className="min-h-screen bg-[#011F15] text-white selection:bg-[#D4AF37] selection:text-[#011F15]">
       <Navbar />
@@ -296,48 +286,128 @@ export default function OperatorCommandCenterPage() {
             
             {/* 1. REAL-TIME EVENT INVENTORY & PRINT STATS CARDS */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-              <div className="p-4 rounded-2xl bg-black/40 border border-[#D4AF37]/30 backdrop-blur-md space-y-1">
+              <div className="p-4 rounded-2xl bg-black/40 border border-[#D4AF37]/30 backdrop-blur-md space-y-2">
                 <div className="flex items-center justify-between text-xs text-emerald-200">
                   <span>Prints Done</span>
                   <Printer className="w-4 h-4 text-[#D4AF37]" />
                 </div>
-                <div className="text-2xl font-bold font-serif text-[#D4AF37]">{printsCompleted}</div>
-                <div className="text-[10px] text-white/50 font-mono">+12 in last 30m</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold font-serif text-[#D4AF37]">{printsCompleted}</div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => updateStock("printsCompleted", -1)}
+                      className="w-6 h-6 rounded-lg bg-white/10 text-white hover:bg-white/20 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                    >
+                      -
+                    </button>
+                    <button
+                      onClick={() => updateStock("printsCompleted", 1)}
+                      className="w-6 h-6 rounded-lg bg-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/30 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div className="text-[10px] text-white/50 font-mono">Real-time counter</div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-black/40 border border-emerald-400/30 backdrop-blur-md space-y-1">
+              <div className="p-4 rounded-2xl bg-black/40 border border-emerald-400/30 backdrop-blur-md space-y-2">
                 <div className="flex items-center justify-between text-xs text-emerald-200">
                   <span>Paper Roll</span>
                   <RefreshCw className="w-4 h-4 text-emerald-400" />
                 </div>
-                <div className="text-2xl font-bold font-serif text-emerald-300">{paperRollPercent}%</div>
-                <div className="text-[10px] text-white/50 font-mono">Roll #2 Active</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold font-serif text-emerald-300">{paperRollPercent}%</div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => updateStock("paperRollPercent", -5)}
+                      className="w-6 h-6 rounded-lg bg-white/10 text-white hover:bg-white/20 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                    >
+                      -
+                    </button>
+                    <button
+                      onClick={() => updateStock("paperRollPercent", 5)}
+                      className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div className="text-[10px] text-white/50 font-mono">Roll Capacity</div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-black/40 border border-cyan-400/30 backdrop-blur-md space-y-1">
+              <div className="p-4 rounded-2xl bg-black/40 border border-cyan-400/30 backdrop-blur-md space-y-2">
                 <div className="flex items-center justify-between text-xs text-emerald-200">
                   <span>Magnet Blanks</span>
                   <Layers className="w-4 h-4 text-cyan-400" />
                 </div>
-                <div className="text-2xl font-bold font-serif text-cyan-200">{magnetBlanks}</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold font-serif text-cyan-200">{magnetBlanks}</div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => updateStock("magnetBlanks", -1)}
+                      className="w-6 h-6 rounded-lg bg-white/10 text-white hover:bg-white/20 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                    >
+                      -
+                    </button>
+                    <button
+                      onClick={() => updateStock("magnetBlanks", 1)}
+                      className="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
                 <div className="text-[10px] text-white/50 font-mono">In Stock</div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-black/40 border border-amber-400/30 backdrop-blur-md space-y-1">
+              <div className="p-4 rounded-2xl bg-black/40 border border-amber-400/30 backdrop-blur-md space-y-2">
                 <div className="flex items-center justify-between text-xs text-emerald-200">
                   <span>Tote Blanks</span>
                   <ShoppingBag className="w-4 h-4 text-amber-400" />
                 </div>
-                <div className="text-2xl font-bold font-serif text-amber-300">{toteBlanks}</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold font-serif text-amber-300">{toteBlanks}</div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => updateStock("toteBlanks", -1)}
+                      className="w-6 h-6 rounded-lg bg-white/10 text-white hover:bg-white/20 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                    >
+                      -
+                    </button>
+                    <button
+                      onClick={() => updateStock("toteBlanks", 1)}
+                      className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
                 <div className="text-[10px] text-white/50 font-mono">Canvas Stock</div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-black/40 border border-rose-400/30 backdrop-blur-md space-y-1 col-span-2 sm:col-span-1">
+              <div className="p-4 rounded-2xl bg-black/40 border border-rose-400/30 backdrop-blur-md space-y-2 col-span-2 sm:col-span-1">
                 <div className="flex items-center justify-between text-xs text-emerald-200">
                   <span>Mug Stock</span>
                   <Coffee className="w-4 h-4 text-rose-400" />
                 </div>
-                <div className="text-2xl font-bold font-serif text-rose-300">{mugStock}</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold font-serif text-rose-300">{mugStock}</div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => updateStock("mugStock", -1)}
+                      className="w-6 h-6 rounded-lg bg-white/10 text-white hover:bg-white/20 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                    >
+                      -
+                    </button>
+                    <button
+                      onClick={() => updateStock("mugStock", 1)}
+                      className="w-6 h-6 rounded-lg bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
                 <div className="text-[10px] text-white/50 font-mono">Ceramic Stock</div>
               </div>
             </div>

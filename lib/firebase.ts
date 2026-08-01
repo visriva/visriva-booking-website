@@ -221,6 +221,11 @@ export interface OperatorConfig {
   googleSheetUrl: string;
   hiddenFields: string[];
   customQuestions: string[];
+  printsCompleted?: number;
+  paperRollPercent?: number;
+  magnetBlanks?: number;
+  toteBlanks?: number;
+  mugStock?: number;
 }
 
 export const DEFAULT_OPERATOR_CONFIG: OperatorConfig = {
@@ -230,6 +235,11 @@ export const DEFAULT_OPERATOR_CONFIG: OperatorConfig = {
   googleSheetUrl: "",
   hiddenFields: [],
   customQuestions: ["Guest Name", "WhatsApp Phone", "Item Choice", "Token Number", "Special Notes"],
+  printsCompleted: 0,
+  paperRollPercent: 0,
+  magnetBlanks: 0,
+  toteBlanks: 0,
+  mugStock: 0,
 };
 
 export interface FeatureTogglesConfig {
