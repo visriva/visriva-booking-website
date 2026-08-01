@@ -818,6 +818,18 @@ export default function AdminDashboardPage() {
               </button>
 
               <button
+                onClick={() => setActiveTab("operatorTab")}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  activeTab === "operatorTab"
+                    ? "bg-[#D4AF37] text-[#011F15] shadow-gold-sm font-extrabold"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4 text-[#D4AF37]" />
+                <span>8. 🎪 Operator Panel &amp; Stock Inventory</span>
+              </button>
+
+              <button
                 onClick={() => setActiveTab("featureToggles")}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                   activeTab === "featureToggles"
@@ -825,8 +837,8 @@ export default function AdminDashboardPage() {
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                <ShieldCheck className="w-4 h-4" />
-                <span>8. ⚙️ Feature Toggles &amp; Crew Config</span>
+                <Lock className="w-4 h-4" />
+                <span>9. ⚙️ Feature Toggles &amp; Master Switches</span>
               </button>
 
               <button
@@ -2290,7 +2302,257 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* TAB 8: FEATURE TOGGLES & CREW COMMAND CONFIG */}
+          {/* TAB 8: DEDICATED OPERATOR PANEL & STOCK INVENTORY CMS */}
+          {activeTab === "operatorTab" && (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              
+              {/* Header Banner */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 rounded-2xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold shadow-lg">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-2xl font-bold text-white">Operator Panel &amp; Stock Inventory Control Center</h3>
+                    <p className="text-xs text-emerald-100/70">
+                      Manage live inventory stock, on-site crew security PIN, and Google Sheet field questions for <span className="text-[#D4AF37] font-mono font-bold">/operator</span>.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSaveOperatorConfig}
+                  disabled={isSaving}
+                  className="px-6 py-3 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-2"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Operator Settings</span>
+                </button>
+              </div>
+
+              {/* Card 1: Master Operator Portal Enable Switch */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-serif text-lg font-bold text-white">Operator Portal Status (/operator)</h4>
+                    <p className="text-xs text-emerald-100/70">Turn ON/OFF public access to the live on-site operator dashboard.</p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const updated = { ...featureToggles, enableOperatorPortal: !featureToggles.enableOperatorPortal };
+                      setFeatureToggles(updated);
+                      await saveFeatureToggles(updated);
+                      showToast(updated.enableOperatorPortal ? "Operator Portal is now ONLINE ✅" : "Operator Portal is now DISABLED 🚫");
+                    }}
+                    className={`px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition cursor-pointer ${
+                      featureToggles.enableOperatorPortal
+                        ? "bg-emerald-500 text-white shadow-lg"
+                        : "bg-red-500/20 text-red-400 border border-red-500/40"
+                    }`}
+                  >
+                    {featureToggles.enableOperatorPortal ? "ONLINE / ACTIVE ✅" : "DISABLED BY ADMIN 🚫"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 2: Live Stock Inventory & Production Counters */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-5">
+                <h4 className="font-serif text-lg font-bold text-[#D4AF37] flex items-center space-x-2">
+                  <Layers className="w-5 h-5 text-[#D4AF37]" />
+                  <span>Live Production &amp; Stock Inventory Counters</span>
+                </h4>
+                <p className="text-xs text-emerald-100/70">
+                  Update inventory counts displayed on the /operator dashboard. Values default to 0 and sync in real time.
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 pt-2">
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                    <label className="block text-xs font-mono text-emerald-200">Prints Done</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={operatorConfig.printsCompleted ?? 0}
+                      onChange={(e) =>
+                        setOperatorConfig({ ...operatorConfig, printsCompleted: parseInt(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white font-mono font-bold text-lg text-center focus:border-[#D4AF37] focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                    <label className="block text-xs font-mono text-emerald-200">Paper Roll %</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={operatorConfig.paperRollPercent ?? 0}
+                      onChange={(e) =>
+                        setOperatorConfig({ ...operatorConfig, paperRollPercent: parseInt(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-emerald-300 font-mono font-bold text-lg text-center focus:border-emerald-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                    <label className="block text-xs font-mono text-emerald-200">Magnet Stock</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={operatorConfig.magnetBlanks ?? 0}
+                      onChange={(e) =>
+                        setOperatorConfig({ ...operatorConfig, magnetBlanks: parseInt(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-cyan-200 font-mono font-bold text-lg text-center focus:border-cyan-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                    <label className="block text-xs font-mono text-emerald-200">Tote Stock</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={operatorConfig.toteBlanks ?? 0}
+                      onChange={(e) =>
+                        setOperatorConfig({ ...operatorConfig, toteBlanks: parseInt(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-amber-300 font-mono font-bold text-lg text-center focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2 col-span-2 sm:col-span-1">
+                    <label className="block text-xs font-mono text-emerald-200">Mug Stock</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={operatorConfig.mugStock ?? 0}
+                      onChange={(e) =>
+                        setOperatorConfig({ ...operatorConfig, mugStock: parseInt(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-rose-300 font-mono font-bold text-lg text-center focus:border-rose-400 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Crew Security Credentials */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-5">
+                <h4 className="font-serif text-lg font-bold text-[#D4AF37] flex items-center space-x-2">
+                  <Lock className="w-5 h-5 text-[#D4AF37]" />
+                  <span>On-Site Crew Security PIN Credentials</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-mono text-emerald-200 mb-1.5">Dedicated Crew Security PIN</label>
+                    <input
+                      type="text"
+                      value={operatorConfig.pin || "visriva2026"}
+                      onChange={(e) => setOperatorConfig({ ...operatorConfig, pin: e.target.value })}
+                      placeholder="e.g. visriva2026"
+                      className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/20 text-white font-mono font-bold focus:border-[#D4AF37] focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-3 pt-6">
+                    <input
+                      type="checkbox"
+                      id="allowAdminPassTab"
+                      checked={operatorConfig.allowAdminPass !== false}
+                      onChange={(e) => setOperatorConfig({ ...operatorConfig, allowAdminPass: e.target.checked })}
+                      className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                    />
+                    <label htmlFor="allowAdminPassTab" className="text-xs font-semibold text-white cursor-pointer leading-tight">
+                      Allow Master Admin Passwords to unlock /operator (jeevan, drupitha, punith, arpitha, 4848, 0315)
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 4: Google Sheet Question Sync */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-6">
+                <div className="flex items-center space-x-3 border-b border-white/10 pb-4">
+                  <div className="w-10 h-10 rounded-xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-serif text-lg font-bold text-white">Google Sheet Question Column Sync</h4>
+                    <p className="text-xs text-emerald-100/70">
+                      Paste your event Google Sheet link. Row 1 header columns will automatically become active questions in /operator.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="text"
+                      value={operatorConfig.googleSheetUrl || ""}
+                      onChange={(e) => setOperatorConfig({ ...operatorConfig, googleSheetUrl: e.target.value })}
+                      placeholder="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit..."
+                      className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/20 text-white font-mono text-xs focus:border-[#D4AF37] focus:outline-none"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={handleSyncGoogleSheetHeaders}
+                      disabled={fetchingSheetHeaders}
+                      className="px-5 py-3 rounded-xl bg-white/10 border border-white/20 text-[#D4AF37] font-bold text-xs uppercase tracking-wider hover:bg-white/20 transition flex items-center justify-center space-x-2 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${fetchingSheetHeaders ? "animate-spin" : ""}`} />
+                      <span>{fetchingSheetHeaders ? "Syncing..." : "Sync Row 1 Columns"}</span>
+                    </button>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                    <h5 className="font-serif text-base font-bold text-[#D4AF37]">
+                      Active Question Columns ({operatorConfig.customQuestions?.length || 0})
+                    </h5>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {(operatorConfig.customQuestions || []).map((colName, idx) => {
+                        const isHidden = (operatorConfig.hiddenFields || []).includes(colName);
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-xl border flex items-center justify-between text-xs transition ${
+                              !isHidden
+                                ? "bg-emerald-950/40 border-emerald-400/40 text-emerald-200 font-semibold"
+                                : "bg-black/40 border-white/10 text-white/40 line-through"
+                            }`}
+                          >
+                            <span className="truncate pr-2 font-mono">
+                              {idx + 1}. {colName}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentHidden = operatorConfig.hiddenFields || [];
+                                const newHidden = isHidden
+                                  ? currentHidden.filter((f) => f !== colName)
+                                  : [...currentHidden, colName];
+                                setOperatorConfig({ ...operatorConfig, hiddenFields: newHidden });
+                              }}
+                              className={`px-2 py-1 rounded text-[10px] font-bold font-mono uppercase cursor-pointer ${
+                                !isHidden ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                              }`}
+                            >
+                              {!isHidden ? "Visible" : "Hidden"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB 9: FEATURE TOGGLES & MASTER SWITCHES */}
           {activeTab === "featureToggles" && (
             <div className="space-y-8 animate-in fade-in duration-300">
               
@@ -2382,224 +2644,6 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Card 2: Google Sheet Question Sync & Crew Settings */}
-              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-6">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-serif text-xl font-bold text-white">Google Sheet Row 1 Question Column Sync</h3>
-                      <p className="text-xs text-emerald-100/70">
-                        Paste your event Google Sheet link. Row 1 header columns will automatically become active questions in /operator.
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleSaveOperatorConfig}
-                    disabled={isSaving}
-                    className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span>Save Crew &amp; Sheet Settings</span>
-                  </button>
-                </div>
-
-                <div className="space-y-6">
-                  {/* Google Sheet URL Input */}
-                  <div>
-                    <label className="block text-xs font-mono text-emerald-200 mb-1.5">
-                      Google Sheet URL (Spreadsheet link, Published CSV, or Webhook)
-                    </label>
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <input
-                        type="text"
-                        value={operatorConfig.googleSheetUrl || ""}
-                        onChange={(e) =>
-                          setOperatorConfig({ ...operatorConfig, googleSheetUrl: e.target.value })
-                        }
-                        placeholder="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit..."
-                        className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/20 text-white font-mono text-xs focus:border-[#D4AF37] focus:outline-none"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={handleSyncGoogleSheetHeaders}
-                        disabled={fetchingSheetHeaders}
-                        className="px-5 py-3 rounded-xl bg-white/10 border border-white/20 text-[#D4AF37] font-bold text-xs uppercase tracking-wider hover:bg-white/20 transition flex items-center justify-center space-x-2 cursor-pointer"
-                      >
-                        <RefreshCw className={`w-4 h-4 ${fetchingSheetHeaders ? "animate-spin" : ""}`} />
-                        <span>{fetchingSheetHeaders ? "Syncing..." : "Sync Row 1 Columns"}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Question Columns & Hide/Show Toggles */}
-                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
-                    <h4 className="font-serif text-base font-bold text-[#D4AF37]">
-                      Active Question Columns ({operatorConfig.customQuestions?.length || 0})
-                    </h4>
-                    <p className="text-xs text-emerald-100/70">
-                      Check or uncheck fields to show or hide questions in the On-Site Crew Command token manager.
-                    </p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {(operatorConfig.customQuestions || []).map((colName, idx) => {
-                        const isHidden = (operatorConfig.hiddenFields || []).includes(colName);
-                        return (
-                          <div
-                            key={idx}
-                            className={`p-3 rounded-xl border flex items-center justify-between text-xs transition ${
-                              !isHidden
-                                ? "bg-emerald-950/40 border-emerald-400/40 text-emerald-200 font-semibold"
-                                : "bg-black/40 border-white/10 text-white/40 line-through"
-                            }`}
-                          >
-                            <span className="truncate pr-2 font-mono">
-                              {idx + 1}. {colName}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const currentHidden = operatorConfig.hiddenFields || [];
-                                const newHidden = isHidden
-                                  ? currentHidden.filter((f) => f !== colName)
-                                  : [...currentHidden, colName];
-                                setOperatorConfig({ ...operatorConfig, hiddenFields: newHidden });
-                              }}
-                              className={`px-2 py-1 rounded text-[10px] font-bold font-mono uppercase cursor-pointer ${
-                                !isHidden ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
-                              }`}
-                            >
-                              {!isHidden ? "Visible" : "Hidden"}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Crew PIN Credentials & Admin Sync Card */}
-                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
-                    <h4 className="font-serif text-base font-bold text-[#D4AF37] flex items-center space-x-2">
-                      <Lock className="w-4 h-4 text-[#D4AF37]" />
-                      <span>On-Site Crew Security PIN Credentials</span>
-                    </h4>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-mono text-emerald-200 mb-1">Dedicated Crew Security PIN</label>
-                        <input
-                          type="text"
-                          value={operatorConfig.pin || "visriva2026"}
-                          onChange={(e) =>
-                            setOperatorConfig({ ...operatorConfig, pin: e.target.value })
-                          }
-                          placeholder="e.g. visriva2026"
-                          className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white font-mono font-bold focus:border-[#D4AF37] focus:outline-none"
-                        />
-                      </div>
-
-                      <div className="flex items-center space-x-3 pt-6">
-                        <input
-                          type="checkbox"
-                          id="allowAdminPass"
-                          checked={operatorConfig.allowAdminPass !== false}
-                          onChange={(e) =>
-                            setOperatorConfig({ ...operatorConfig, allowAdminPass: e.target.checked })
-                          }
-                          className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
-                        />
-                        <label htmlFor="allowAdminPass" className="text-xs font-semibold text-white cursor-pointer leading-tight">
-                          Allow Master Admin Passwords to unlock /operator (jeevan, drupitha, punith, arpitha, 4848, 0315)
-                        </label>
-                      </div>
-                  {/* Live Inventory & Production Stock Controls Card */}
-                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
-                    <h4 className="font-serif text-base font-bold text-[#D4AF37] flex items-center space-x-2">
-                      <Layers className="w-4 h-4 text-[#D4AF37]" />
-                      <span>Live Production & Stock Inventory Controls (/operator)</span>
-                    </h4>
-                    <p className="text-xs text-emerald-100/70">
-                      Configure live inventory counters shown to operators on-site. All values default to 0 and update in real time.
-                    </p>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
-                      <div>
-                        <label className="block text-[11px] font-mono text-emerald-200 mb-1">Prints Done</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={operatorConfig.printsCompleted ?? 0}
-                          onChange={(e) =>
-                            setOperatorConfig({ ...operatorConfig, printsCompleted: parseInt(e.target.value) || 0 })
-                          }
-                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/20 text-white font-mono font-bold text-center focus:border-[#D4AF37] focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-mono text-emerald-200 mb-1">Paper Roll %</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={operatorConfig.paperRollPercent ?? 0}
-                          onChange={(e) =>
-                            setOperatorConfig({ ...operatorConfig, paperRollPercent: parseInt(e.target.value) || 0 })
-                          }
-                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/20 text-white font-mono font-bold text-center focus:border-[#D4AF37] focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-mono text-emerald-200 mb-1">Magnet Stock</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={operatorConfig.magnetBlanks ?? 0}
-                          onChange={(e) =>
-                            setOperatorConfig({ ...operatorConfig, magnetBlanks: parseInt(e.target.value) || 0 })
-                          }
-                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/20 text-white font-mono font-bold text-center focus:border-[#D4AF37] focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-mono text-emerald-200 mb-1">Tote Stock</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={operatorConfig.toteBlanks ?? 0}
-                          onChange={(e) =>
-                            setOperatorConfig({ ...operatorConfig, toteBlanks: parseInt(e.target.value) || 0 })
-                          }
-                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/20 text-white font-mono font-bold text-center focus:border-[#D4AF37] focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-mono text-emerald-200 mb-1">Mug Stock</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={operatorConfig.mugStock ?? 0}
-                          onChange={(e) =>
-                            setOperatorConfig({ ...operatorConfig, mugStock: parseInt(e.target.value) || 0 })
-                          }
-                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/20 text-white font-mono font-bold text-center focus:border-[#D4AF37] focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-
             </div>
           )}
 
