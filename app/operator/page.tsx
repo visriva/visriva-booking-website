@@ -98,6 +98,7 @@ export default function OperatorCommandCenterPage() {
 
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrModalData, setQrModalData] = useState<{ guestName: string; phone: string; tokenNum: number; fallbackWaUrl: string } | null>(null);
+  const [oledTheme, setOledTheme] = useState(false);
 
   const syncPendingTokens = async (currentTokens: TokenItem[]) => {
     if (typeof window !== "undefined" && window.navigator.onLine) {
@@ -108,6 +109,42 @@ export default function OperatorCommandCenterPage() {
       setPendingSync(false);
     }
   };
+
+  // Screen Wake Lock API to prevent device from dimming or sleeping
+  useEffect(() => {
+    if (!authenticated) return;
+    let wakeLock: any = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if ("wakeLock" in navigator) {
+          wakeLock = await (navigator as any).wakeLock.request("screen");
+          console.log("Screen Wake Lock is active ✅");
+        }
+      } catch (err: any) {
+        console.warn("Wake Lock request blocked:", err.message);
+      }
+    };
+
+    requestWakeLock();
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === "visible") {
+        await requestWakeLock();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (wakeLock !== null) {
+        wakeLock.release().then(() => {
+          wakeLock = null;
+        }).catch(() => {});
+      }
+    };
+  }, [authenticated]);
 
   // 1. Restore Auth & Subscribe to Admin & Tokens Configs
   useEffect(() => {
@@ -277,6 +314,11 @@ export default function OperatorCommandCenterPage() {
 
   // Send WhatsApp Pickup Alert
   const handleSendPickupAlert = (token: TokenItem) => {
+    if (token.status !== "Processing") {
+      const confirmSend = window.confirm(`⚠️ Duplicate Print Warning: Token #${token.tokenNum} (${token.guestName}) has already been notified/printed once. Send duplicate alert?`);
+      if (!confirmSend) return;
+    }
+
     const waMsg = buildTokenPickupAlertMessage(token.guestName, token.tokenNum, token.itemType);
     const targetPhone = token.guestPhone || "918884484828";
     const waUrl = formatWhatsAppUrl(targetPhone, waMsg);
@@ -296,6 +338,12 @@ export default function OperatorCommandCenterPage() {
       alert("No guest phone number provided for Token #" + token.tokenNum);
       return;
     }
+
+    if (token.status !== "Processing") {
+      const confirmSend = window.confirm(`⚠️ Duplicate Print Warning: Token #${token.tokenNum} (${token.guestName}) has already been dispatched/printed once. Send duplicate alert?`);
+      if (!confirmSend) return;
+    }
+
     try {
       const res = await fetch("/api/send-whatsapp", {
         method: "POST",
@@ -352,7 +400,9 @@ export default function OperatorCommandCenterPage() {
   // Check Master Admin Enable/Disable Toggle
   if (featureToggles.enableOperatorPortal === false && opConfig.enabled === false) {
     return (
-      <main className="min-h-screen bg-[#011F15] text-white selection:bg-[#D4AF37] selection:text-[#011F15]">
+      <main className={`min-h-screen text-white selection:bg-[#D4AF37] selection:text-[#011F15] transition-colors duration-300 ${
+        oledTheme ? "bg-black" : "bg-[#011F15]"
+      }`}>
         <Navbar />
         <div className="pt-44 pb-28 px-4 text-center max-w-md mx-auto space-y-4">
           <Lock className="w-12 h-12 text-[#D4AF37] mx-auto opacity-70" />
@@ -375,7 +425,9 @@ export default function OperatorCommandCenterPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#011F15] text-white selection:bg-[#D4AF37] selection:text-[#011F15]">
+    <main className={`min-h-screen text-white selection:bg-[#D4AF37] selection:text-[#011F15] transition-colors duration-300 ${
+      oledTheme ? "bg-black" : "bg-[#011F15]"
+    }`}>
       <Navbar />
 
       <div className="pt-36 sm:pt-40 pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
@@ -394,7 +446,7 @@ export default function OperatorCommandCenterPage() {
           </p>
 
           {/* Online/Offline Status Indicator */}
-          <div className="flex items-center justify-center space-x-2.5 pt-1">
+          <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
             <span className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase font-bold tracking-wider border transition-all ${
               isOnline 
                 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
@@ -410,6 +462,18 @@ export default function OperatorCommandCenterPage() {
                 <span>Syncing Cloud...</span>
               </span>
             )}
+
+            <button
+              type="button"
+              onClick={() => setOledTheme(!oledTheme)}
+              className={`px-3 py-1 rounded-full text-[10px] font-mono uppercase font-bold tracking-wider border transition-all cursor-pointer flex items-center space-x-1 ${
+                oledTheme 
+                  ? "bg-amber-500 text-black border-amber-500 shadow-md font-extrabold" 
+                  : "bg-white/5 text-white/70 border-white/20 hover:bg-white/10"
+              }`}
+            >
+              <span>🔋 {oledTheme ? "OLED Mode Active" : "OLED Battery Saver"}</span>
+            </button>
           </div>
         </div>
 

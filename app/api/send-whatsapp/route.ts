@@ -117,6 +117,9 @@ export async function POST(req: Request) {
     const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey";
     const INSTANCE_NAME = process.env.EVOLUTION_INSTANCE_NAME || "visriva-live";
 
+    let evolutionSuccess = false;
+    let evoData = null;
+
     try {
       const response = await fetch(
         `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`,
@@ -140,11 +143,62 @@ export async function POST(req: Request) {
       );
 
       if (response.ok) {
-        const data = await response.json();
-        return NextResponse.json({ success: true, provider: "evolution_api", data });
+        evoData = await response.json();
+        evolutionSuccess = true;
+      } else {
+        console.warn(`Primary Evolution API responded with code ${response.status}. Attempting backup VPS failover...`);
       }
     } catch (evoErr: any) {
-      console.warn("Evolution API unavailable:", evoErr.message);
+      console.warn("Primary Evolution API unavailable:", evoErr.message);
+    }
+
+    // ─── 2.5. BACKUP EVOLUTION VPS FAILOVER DISPATCH ─────────────────────────
+    const BACKUP_EVOLUTION_API_URL = process.env.BACKUP_EVOLUTION_API_URL;
+    const BACKUP_EVOLUTION_API_KEY = process.env.BACKUP_EVOLUTION_API_KEY;
+    const BACKUP_INSTANCE_NAME = process.env.BACKUP_EVOLUTION_INSTANCE_NAME || INSTANCE_NAME;
+
+    if (!evolutionSuccess && BACKUP_EVOLUTION_API_URL && BACKUP_EVOLUTION_API_KEY) {
+      try {
+        console.log(`🔌 Failover triggered: Routing traffic to backup Evolution VPS at ${BACKUP_EVOLUTION_API_URL}`);
+        const backupResponse = await fetch(
+          `${BACKUP_EVOLUTION_API_URL}/message/sendText/${BACKUP_INSTANCE_NAME}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: BACKUP_EVOLUTION_API_KEY,
+            },
+            body: JSON.stringify({
+              number: cleanPhone,
+              options: {
+                delay: 1000,
+                presence: "composing",
+              },
+              textMessage: {
+                text: defaultMsgText,
+              },
+            }),
+          }
+        );
+
+        if (backupResponse.ok) {
+          evoData = await backupResponse.json();
+          evolutionSuccess = true;
+          return NextResponse.json({ 
+            success: true, 
+            provider: "evolution_api_failover", 
+            data: evoData 
+          });
+        } else {
+          console.warn(`Backup Evolution API failover rejected message with code ${backupResponse.status}`);
+        }
+      } catch (backupErr: any) {
+        console.error("Backup Evolution API failover failed:", backupErr.message);
+      }
+    }
+
+    if (evolutionSuccess) {
+      return NextResponse.json({ success: true, provider: "evolution_api", data: evoData });
     }
 
     // ─── 3. FAILSAFE DIRECT WHATSAPP LINK FALLBACK ───────────────────────────
