@@ -19,6 +19,7 @@ import {
   AlertCircle,
   RefreshCw,
   Zap,
+  Trash2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -31,20 +32,11 @@ import {
   subscribeFeatureToggles,
   DEFAULT_FEATURE_TOGGLES,
   FeatureTogglesConfig,
+  subscribeOperatorTokens,
+  saveOperatorTokens,
+  OperatorTokenItem as TokenItem,
 } from "@/lib/firebase";
 import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
-
-interface TokenItem {
-  id: string;
-  tokenNum: number;
-  guestName: string;
-  guestPhone: string;
-  itemType: "Tote Bag" | "Live Mug" | "Fridge Magnet" | "Keychain" | "Photo Frame";
-  status: "Processing" | "Ready for Pickup" | "Collected";
-  createdAt: string;
-  notes?: string;
-  customFields?: Record<string, string>;
-}
 
 const AUTHORIZED_ADMIN_PASSWORDS = ["jeevan", "drupitha", "punith", "arpitha", "4848", "0315"];
 
@@ -52,13 +44,55 @@ const DEFAULT_TOKENS: TokenItem[] = [];
 
 export default function OperatorCommandCenterPage() {
   const [pin, setPin] = useState("");
-  const [authenticated, setAuthenticated] = useState(false);
+  const [authenticated, setAuthenticated] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return (
+        sessionStorage.getItem("visriva_operator_auth") === "true" ||
+        localStorage.getItem("visriva_operator_auth") === "true"
+      );
+    }
+    return false;
+  });
   const [authError, setAuthError] = useState("");
 
   const [opConfig, setOpConfig] = useState<OperatorConfig>(DEFAULT_OPERATOR_CONFIG);
   const [featureToggles, setFeatureToggles] = useState<FeatureTogglesConfig>(DEFAULT_FEATURE_TOGGLES);
 
-  // Subscribe to Admin Firestore Configs
+  // Token Management State with Firestore & Local Persistence
+  const [tokens, setTokens] = useState<TokenItem[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("visriva_operator_tokens");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {}
+      }
+    }
+    return [];
+  });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [itemType, setItemType] = useState<"Tote Bag" | "Live Mug" | "Fridge Magnet" | "Keychain" | "Photo Frame">("Tote Bag");
+  const [nextTokenNum, setNextTokenNum] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("visriva_operator_tokens");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const maxToken = Math.max(...parsed.map((t: TokenItem) => t.tokenNum || 0));
+            return maxToken >= 1 ? maxToken + 1 : 1;
+          }
+        } catch (e) {}
+      }
+    }
+    return 1;
+  });
+  const [alertSuccessId, setAlertSuccessId] = useState<string | null>(null);
+
+  // 1. Restore Auth & Subscribe to Admin & Tokens Configs
   useEffect(() => {
     const unsubOp = subscribeOperatorConfig((data) => {
       if (data) setOpConfig(data);
@@ -66,27 +100,36 @@ export default function OperatorCommandCenterPage() {
     const unsubToggles = subscribeFeatureToggles((data) => {
       if (data) setFeatureToggles(data);
     });
+    const unsubTokens = subscribeOperatorTokens((data) => {
+      if (Array.isArray(data)) {
+        setTokens(data);
+        if (data.length > 0) {
+          const maxToken = Math.max(...data.map((t) => t.tokenNum || 0));
+          setNextTokenNum(maxToken >= 1 ? maxToken + 1 : 1);
+        } else {
+          setNextTokenNum(1);
+        }
+      }
+    });
+
     return () => {
       unsubOp();
       unsubToggles();
+      unsubTokens();
     };
   }, []);
 
-  // Synchronized Live Inventory & Production Stats from Admin Config (default 0)
-  const printsCompleted = opConfig.printsCompleted ?? 0;
-  const paperRollPercent = opConfig.paperRollPercent ?? 0;
-  const magnetBlanks = opConfig.magnetBlanks ?? 0;
-  const toteBlanks = opConfig.toteBlanks ?? 0;
-  const mugStock = opConfig.mugStock ?? 0;
+  const updateTokensState = (newTokens: TokenItem[]) => {
+    setTokens(newTokens);
+    saveOperatorTokens(newTokens);
+  };
 
-  // Token Management State
-  const [tokens, setTokens] = useState<TokenItem[]>(DEFAULT_TOKENS);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [guestName, setGuestName] = useState("");
-  const [guestPhone, setGuestPhone] = useState("");
-  const [itemType, setItemType] = useState<"Tote Bag" | "Live Mug" | "Fridge Magnet" | "Keychain" | "Photo Frame">("Tote Bag");
-  const [nextTokenNum, setNextTokenNum] = useState(101);
-  const [alertSuccessId, setAlertSuccessId] = useState<string | null>(null);
+  const handleResetQueue = () => {
+    if (window.confirm("Are you sure you want to reset the active token queue? Token count will reset to #1.")) {
+      updateTokensState([]);
+      setNextTokenNum(1);
+    }
+  };
 
   // AI WhatsApp Assistant State
   const [aiModalOpen, setAiModalOpen] = useState(false);
@@ -109,6 +152,10 @@ export default function OperatorCommandCenterPage() {
     if (isMatch) {
       setAuthenticated(true);
       setAuthError("");
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("visriva_operator_auth", "true");
+        localStorage.setItem("visriva_operator_auth", "true");
+      }
     } else {
       setAuthError("Invalid Crew Security PIN or Admin Password.");
     }
@@ -129,7 +176,8 @@ export default function OperatorCommandCenterPage() {
       createdAt: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
     };
 
-    setTokens([newToken, ...tokens]);
+    const updated = [newToken, ...tokens];
+    updateTokensState(updated);
     setNextTokenNum(nextTokenNum + 1);
     setGuestName("");
     setGuestPhone("");
@@ -144,9 +192,8 @@ export default function OperatorCommandCenterPage() {
     window.open(waUrl, "_blank");
 
     // Update status to Ready for Pickup
-    setTokens(
-      tokens.map((t) => (t.id === token.id ? { ...t, status: "Ready for Pickup" } : t))
-    );
+    const updated = tokens.map((t) => (t.id === token.id ? { ...t, status: "Ready for Pickup" as const } : t));
+    updateTokensState(updated);
     setAlertSuccessId(token.id);
     setTimeout(() => setAlertSuccessId(null), 4000);
   };
@@ -169,13 +216,16 @@ export default function OperatorCommandCenterPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setTokens(
-          tokens.map((t) => (t.id === token.id ? { ...t, status: "Ready for Pickup" } : t))
-        );
+        const updated = tokens.map((t) => (t.id === token.id ? { ...t, status: "Ready for Pickup" as const } : t));
+        updateTokensState(updated);
         setAlertSuccessId(token.id);
         setTimeout(() => setAlertSuccessId(null), 4000);
+
+        if (data.fallbackWaUrl && typeof window !== "undefined") {
+          window.open(data.fallbackWaUrl, "_blank");
+        }
       } else {
-        alert(data.error || "Could not dispatch message. Ensure Evolution API VPS is online.");
+        alert(data.error || "Could not dispatch message.");
       }
     } catch (err: any) {
       alert("Error dispatching WhatsApp: " + err.message);
@@ -184,7 +234,8 @@ export default function OperatorCommandCenterPage() {
 
   // Toggle Status
   const handleUpdateStatus = (id: string, newStatus: "Processing" | "Ready for Pickup" | "Collected") => {
-    setTokens(tokens.map((t) => (t.id === id ? { ...t, status: newStatus } : t)));
+    const updated = tokens.map((t) => (t.id === id ? { ...t, status: newStatus } : t));
+    updateTokensState(updated);
   };
 
   const filteredTokens = tokens.filter(
@@ -489,15 +540,29 @@ export default function OperatorCommandCenterPage() {
                     <p className="text-xs text-emerald-100/70">Click WhatsApp button to alert guest when item is ready.</p>
                   </div>
 
-                  <div className="relative">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search token / name..."
-                      className="pl-9 pr-4 py-2 rounded-xl bg-white/5 border border-white/15 text-xs text-white focus:border-[#D4AF37] focus:outline-none w-full sm:w-48"
-                    />
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1 sm:flex-none">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search token / name..."
+                        className="pl-9 pr-4 py-2 rounded-xl bg-white/5 border border-white/15 text-xs text-white focus:border-[#D4AF37] focus:outline-none w-full sm:w-48"
+                      />
+                    </div>
+
+                    {tokens.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleResetQueue}
+                        className="px-3 py-2 rounded-xl bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-red-500/30 text-xs font-bold transition flex items-center space-x-1 cursor-pointer shrink-0"
+                        title="Reset Queue & Start Token #1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Reset Queue</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 

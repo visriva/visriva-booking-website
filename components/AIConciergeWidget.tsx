@@ -159,8 +159,12 @@ export default function AIConciergeWidget({ onApplyRecommendation }: AIConcierge
       onApplyRecommendation(rec.recommendedServices);
       setAppliedToast(true);
       setTimeout(() => setAppliedToast(false), 3500);
-      const el = document.getElementById("booking-calculator");
-      if (el) el.scrollIntoView({ behavior: "smooth" });
+      const el = document.getElementById("booking-engine") || document.getElementById("booking-calculator");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+      } else {
+        window.location.href = "/#booking-engine";
+      }
     }
   };
 

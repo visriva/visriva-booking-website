@@ -1482,6 +1482,121 @@ export async function saveOperatorConfig(
   }
 }
 
+export interface OperatorTokenItem {
+  id: string;
+  tokenNum: number;
+  guestName: string;
+  guestPhone: string;
+  itemType: "Tote Bag" | "Live Mug" | "Fridge Magnet" | "Keychain" | "Photo Frame";
+  status: "Processing" | "Ready for Pickup" | "Collected";
+  createdAt: string;
+  notes?: string;
+  customFields?: Record<string, string>;
+}
+
+export function subscribeOperatorTokens(
+  callback: (tokens: OperatorTokenItem[]) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem("visriva_operator_tokens");
+      if (local) {
+        try {
+          callback(JSON.parse(local));
+          return;
+        } catch (e) {}
+      }
+    }
+    callback([]);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("operator_tokens_updated", handleUpdate);
+  }
+
+  if (isDummyKey) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("operator_tokens_updated", handleUpdate);
+      }
+    };
+  }
+
+  try {
+    const docRef = doc(db, "config", "operator_tokens");
+    const unsub = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (Array.isArray(data.items)) {
+            callback(data.items as OperatorTokenItem[]);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("visriva_operator_tokens", JSON.stringify(data.items));
+            }
+          }
+        } else {
+          if (typeof window !== "undefined") {
+            const local = localStorage.getItem("visriva_operator_tokens");
+            if (local) {
+              try {
+                const parsed = JSON.parse(local);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  setDoc(docRef, { items: parsed, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      },
+      (err) => console.warn("Operator tokens snapshot warning:", err.message)
+    );
+
+    return () => {
+      unsub();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("operator_tokens_updated", handleUpdate);
+      }
+    };
+  } catch (e) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("operator_tokens_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveOperatorTokens(
+  tokens: OperatorTokenItem[]
+): Promise<{ success: boolean; firestoreSynced?: boolean; error?: string }> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("visriva_operator_tokens", JSON.stringify(tokens));
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("operator_tokens_updated"));
+  }
+
+  if (isDummyKey) {
+    return { success: true, firestoreSynced: false };
+  }
+
+  try {
+    const docRef = doc(db, "config", "operator_tokens");
+    await setDoc(docRef, { items: tokens, updatedAt: serverTimestamp() }, { merge: true });
+    return { success: true, firestoreSynced: true };
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : "Failed to save operator tokens";
+    return { success: true, firestoreSynced: false, error: errMessage };
+  }
+}
+
 /**
  * FEATURE TOGGLES CMS CONFIG (config/feature_toggles & localStorage)
  */

@@ -341,16 +341,24 @@ export default function BookingEngine() {
     e.preventDefault();
     setErrorMsg("");
 
+    const scrollForm = () => {
+      const el = document.getElementById("booking-engine");
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    };
+
     if (!eventDate) {
       setErrorMsg("Please select your event date.");
+      scrollForm();
       return;
     }
     if (!venue.trim()) {
       setErrorMsg("Please select your event venue location.");
+      scrollForm();
       return;
     }
     if (!clientName.trim() || !clientPhone.trim()) {
       setErrorMsg("Please provide your contact name and phone number.");
+      scrollForm();
       return;
     }
 
@@ -383,29 +391,35 @@ export default function BookingEngine() {
 
     if (res.success && res.id) {
       setSubmittedLead({ data: leadPayload, id: res.id });
+      scrollForm();
 
       // ── INSTANT WHATSAPP LEAD NOTIFICATION TO OWNER ──
       if (typeof window !== "undefined") {
-        const waMsg = encodeURIComponent(
-          `🚨 *NEW VISRIVA LIVE STATION BOOKING INQUIRY*\n\n` +
-          `👤 *Client Name:* ${clientName}\n` +
-          `📞 *Phone:* ${clientPhone}\n` +
-          `📍 *Venue:* ${venue}\n` +
-          `📅 *Event Date:* ${eventDate}\n` +
-          `🎉 *Event Type:* ${eventType}\n` +
-          `⏰ *Timings:* ${reportingTime} - ${endingTime}\n` +
-          `👥 *Guest Count:* ${pax} Guests\n` +
-          `✨ *Selected Stations:* ${selectedServices.join(", ")}\n` +
-          (appliedPerk ? `🎁 *Claimed Golden Wheel Perk:* ${appliedPerk.title} (Code: ${appliedPerk.code})\n` : "") +
-          `💰 *Estimated Total:* ${budgetInfo.amount} (${budgetInfo.tier})\n` +
-          (budgetInfo.discountAmount > 0 ? `🎉 *Multi-Station Combo Discount:* -₹${budgetInfo.discountAmount.toLocaleString("en-IN")} (10% OFF)\n` : "") +
-          `\n*Ref ID:* ${res.id}`
-        );
-        const targetPhone = (settings as any).whatsappNumber || "918884484828";
-        window.open(`https://wa.me/${targetPhone}?text=${waMsg}`, "_blank");
+        try {
+          const waMsg = encodeURIComponent(
+            `🚨 *NEW VISRIVA LIVE STATION BOOKING INQUIRY*\n\n` +
+            `👤 *Client Name:* ${clientName}\n` +
+            `📞 *Phone:* ${clientPhone}\n` +
+            `📍 *Venue:* ${venue}\n` +
+            `📅 *Event Date:* ${eventDate}\n` +
+            `🎉 *Event Type:* ${eventType}\n` +
+            `⏰ *Timings:* ${reportingTime} - ${endingTime}\n` +
+            `👥 *Guest Count:* ${pax} Guests\n` +
+            `✨ *Selected Stations:* ${selectedServices.join(", ")}\n` +
+            (appliedPerk ? `🎁 *Claimed Golden Wheel Perk:* ${appliedPerk.title} (Code: ${appliedPerk.code})\n` : "") +
+            `💰 *Estimated Total:* ${budgetInfo.amount} (${budgetInfo.tier})\n` +
+            (budgetInfo.discountAmount > 0 ? `🎉 *Multi-Station Combo Discount:* -₹${budgetInfo.discountAmount.toLocaleString("en-IN")} (10% OFF)\n` : "") +
+            `\n*Ref ID:* ${res.id}`
+          );
+          const targetPhone = (settings as any).whatsappNumber || "918884484828";
+          window.open(`https://wa.me/${targetPhone}?text=${waMsg}`, "_blank");
+        } catch (e) {
+          console.warn("WhatsApp window.open non-fatal warning:", e);
+        }
       }
     } else {
       setErrorMsg(res.error || "An unexpected error occurred. Please try again.");
+      scrollForm();
     }
   };
 

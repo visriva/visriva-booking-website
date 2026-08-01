@@ -56,6 +56,8 @@ export default function HeroSection() {
     const bookingElem = document.getElementById("booking-engine");
     if (bookingElem) {
       bookingElem.scrollIntoView({ behavior: "smooth" });
+    } else {
+      window.location.href = "/#booking-engine";
     }
   };
 

@@ -92,6 +92,8 @@ export default function PrintFramePreviewer() {
     const elem = document.getElementById("booking-engine");
     if (elem) {
       elem.scrollIntoView({ behavior: "smooth" });
+    } else {
+      window.location.href = "/#booking-engine";
     }
     setCopiedMsg(true);
     setTimeout(() => setCopiedMsg(false), 4000);

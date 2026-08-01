@@ -20,9 +20,14 @@ export async function POST(req: Request) {
     const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || "1203212472878765";
     const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN;
 
-    // ─── 1. META OFFICIAL CLOUD & MARKETING MESSAGES API DISPATCH (v20.0 / v25.0) ──
+    const guestName = name ? name.trim() : "Valued Guest";
+    const defaultMsgText = `✨ *Visriva Live Station* ✨\n\nHello ${guestName}! 👋\n\nYour live event souvenir photo is ready!\n\n🎫 *Token Number:* #${token || "001"}\n${galleryUrl ? `📸 *Digital Gallery:* ${galleryUrl}\n` : ""}\nThank you for celebrating with us! 📸✨\n_Visriva Live Station — Luxury Memories Instant Printed_`;
+
+    const encodedMsg = encodeURIComponent(defaultMsgText);
+    const fallbackWaUrl = `https://wa.me/${cleanPhone}?text=${encodedMsg}`;
+
+    // ─── 1. META OFFICIAL CLOUD & MARKETING MESSAGES API DISPATCH ───
     if (ACCESS_TOKEN) {
-      // Use Meta Marketing Messages API endpoint (/marketing_messages) for marketing traffic
       const endpoint = isMarketing ? "marketing_messages" : "messages";
       const metaUrl = `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/${endpoint}`;
 
@@ -44,99 +49,103 @@ export async function POST(req: Request) {
             type: "text",
             text: {
               preview_url: true,
-              body: `✨ *Visriva Live Station* ✨\n\nHello ${name ? name.trim() : "Valued Guest"}! 👋\n\nYour live event souvenir photo is ready!\n\n🎫 *Token Number:* #${token || "001"}\n${galleryUrl ? `📸 *Digital Gallery:* ${galleryUrl}\n` : ""}\nThank you for celebrating with us! 📸✨\n_Visriva Live Station — Luxury Memories Instant Printed_`,
+              body: defaultMsgText,
             },
           };
 
-      let metaRes = await fetch(metaUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${ACCESS_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      // If free-form text message fails (e.g., 24-hr window restriction), retry using default Meta 'hello_world' template
-      if (!metaRes.ok && !templateName) {
-        console.warn("Meta text message rejected (24-hr window). Retrying with 'hello_world' template...");
-        const fallbackPayload = {
-          messaging_product: "whatsapp",
-          to: cleanPhone,
-          type: "template",
-          template: {
-            name: "hello_world",
-            language: { code: "en_US" },
-          },
-        };
-        metaRes = await fetch(metaUrl, {
+      try {
+        let metaRes = await fetch(metaUrl, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${ACCESS_TOKEN}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(fallbackPayload),
+          body: JSON.stringify(payload),
         });
-      }
 
-      if (!metaRes.ok) {
-        const errText = await metaRes.text();
-        console.error(`Meta ${endpoint} Error:`, errText);
-        return NextResponse.json(
-          { error: `Meta ${endpoint} dispatch failed`, details: errText },
-          { status: metaRes.status }
-        );
-      }
+        // If free-form text message fails (e.g., 24-hr window restriction), retry with default 'hello_world' template
+        if (!metaRes.ok && !templateName) {
+          console.warn("Meta text message rejected (24-hr window requirement). Retrying with 'hello_world' template...");
+          const fallbackPayload = {
+            messaging_product: "whatsapp",
+            to: cleanPhone,
+            type: "template",
+            template: {
+              name: "hello_world",
+              language: { code: "en_US" },
+            },
+          };
+          metaRes = await fetch(metaUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${ACCESS_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(fallbackPayload),
+          });
+        }
 
-      const metaData = await metaRes.json();
-      return NextResponse.json({
-        success: true,
-        provider: isMarketing ? "meta_marketing_messages_api" : "meta_cloud_api",
-        endpoint: `/v20.0/${PHONE_NUMBER_ID}/${endpoint}`,
-        data: metaData,
-      });
+        if (metaRes.ok) {
+          const metaData = await metaRes.json();
+          return NextResponse.json({
+            success: true,
+            provider: isMarketing ? "meta_marketing_messages_api" : "meta_cloud_api",
+            endpoint: `/v20.0/${PHONE_NUMBER_ID}/${endpoint}`,
+            data: metaData,
+          });
+        } else {
+          const errText = await metaRes.text();
+          console.warn(`Meta API rejected message (${metaRes.status}): ${errText}. Falling back to secondary engine.`);
+        }
+      } catch (metaErr: any) {
+        console.warn("Meta API network connection issue. Falling back to secondary engine:", metaErr.message);
+      }
     }
 
-    // ─── 2. EVOLUTION API / FALLBACK DISPATCH ───────────────────────────────
+    // ─── 2. EVOLUTION API / SECONDARY DISPATCH ───────────────────────────────
     const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || "https://api.visriva.com";
     const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey";
     const INSTANCE_NAME = process.env.EVOLUTION_INSTANCE_NAME || "visriva-live";
 
-    const guestName = name ? name.trim() : "Valued Guest";
-    const message = `✨ *Visriva Live Station* ✨\n\nHello ${guestName}! 👋\n\nYour live event souvenir photo is ready!\n\n🎫 *Token Number:* #${token || "001"}\n${galleryUrl ? `📸 *Digital Gallery:* ${galleryUrl}\n` : ""}\nThank you for celebrating with us! 📸✨\n_Visriva Live Station — Luxury Memories Instant Printed_`;
-
-    const response = await fetch(
-      `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: EVOLUTION_API_KEY,
-        },
-        body: JSON.stringify({
-          number: cleanPhone,
-          options: {
-            delay: 1200,
-            presence: "composing",
+    try {
+      const response = await fetch(
+        `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: EVOLUTION_API_KEY,
           },
-          textMessage: {
-            text: message,
-          },
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Evolution API Error:", errText);
-      return NextResponse.json(
-        { error: "Failed to dispatch WhatsApp message via Evolution API." },
-        { status: 500 }
+          body: JSON.stringify({
+            number: cleanPhone,
+            options: {
+              delay: 1200,
+              presence: "composing",
+            },
+            textMessage: {
+              text: defaultMsgText,
+            },
+          }),
+        }
       );
+
+      if (response.ok) {
+        const data = await response.json();
+        return NextResponse.json({ success: true, provider: "evolution_api", data });
+      }
+    } catch (evoErr: any) {
+      console.warn("Evolution API unavailable:", evoErr.message);
     }
 
-    const data = await response.json();
-    return NextResponse.json({ success: true, provider: "evolution_api", data });
+    // ─── 3. FAILSAFE DIRECT WHATSAPP LINK FALLBACK ───────────────────────────
+    // If both Meta Cloud API & Evolution API are unavailable or rejected, return 1-click wa.me link
+    return NextResponse.json({
+      success: true,
+      provider: "wa_me_link_fallback",
+      fallbackWaUrl,
+      message: "Direct WhatsApp link generated. Click to send instantly.",
+    });
+
   } catch (error: any) {
     console.error("Send WhatsApp Route Error:", error);
     return NextResponse.json(
