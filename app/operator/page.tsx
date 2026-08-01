@@ -466,7 +466,7 @@ export default function OperatorCommandCenterPage() {
                   <Printer className="w-4 h-4 text-[#D4AF37]" />
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold font-serif text-[#D4AF37]">{printsCompleted}</div>
+                  <div className="text-2xl font-bold font-serif text-[#D4AF37]">{opConfig.printsCompleted ?? 0}</div>
                   <div className="flex items-center space-x-1">
                     <button
                       onClick={() => updateStock("printsCompleted", -1)}
@@ -491,7 +491,7 @@ export default function OperatorCommandCenterPage() {
                   <RefreshCw className="w-4 h-4 text-emerald-400" />
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold font-serif text-emerald-300">{paperRollPercent}%</div>
+                  <div className="text-2xl font-bold font-serif text-emerald-300">{opConfig.paperRollPercent ?? 0}%</div>
                   <div className="flex items-center space-x-1">
                     <button
                       onClick={() => updateStock("paperRollPercent", -5)}
@@ -516,7 +516,7 @@ export default function OperatorCommandCenterPage() {
                   <Layers className="w-4 h-4 text-cyan-400" />
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold font-serif text-cyan-200">{magnetBlanks}</div>
+                  <div className="text-2xl font-bold font-serif text-cyan-200">{opConfig.magnetBlanks ?? 0}</div>
                   <div className="flex items-center space-x-1">
                     <button
                       onClick={() => updateStock("magnetBlanks", -1)}
@@ -541,7 +541,7 @@ export default function OperatorCommandCenterPage() {
                   <ShoppingBag className="w-4 h-4 text-amber-400" />
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold font-serif text-amber-300">{toteBlanks}</div>
+                  <div className="text-2xl font-bold font-serif text-amber-300">{opConfig.toteBlanks ?? 0}</div>
                   <div className="flex items-center space-x-1">
                     <button
                       onClick={() => updateStock("toteBlanks", -1)}
@@ -566,7 +566,7 @@ export default function OperatorCommandCenterPage() {
                   <Coffee className="w-4 h-4 text-rose-400" />
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold font-serif text-rose-300">{mugStock}</div>
+                  <div className="text-2xl font-bold font-serif text-rose-300">{opConfig.mugStock ?? 0}</div>
                   <div className="flex items-center space-x-1">
                     <button
                       onClick={() => updateStock("mugStock", -1)}
