@@ -15,6 +15,7 @@ export default function WhatsAppAdminPage() {
   const [autoReplyText, setAutoReplyText] = useState<string>("");
   const [uiError, setUiError] = useState<string>("");
   const [saveLoading, setSaveLoading] = useState<boolean>(false);
+  const [webhookSyncLoading, setWebhookSyncLoading] = useState<boolean>(false);
   
   const [successToast, setSuccessToast] = useState<string>("");
   const [errorToast, setErrorToast] = useState<string>("");
@@ -150,6 +151,31 @@ export default function WhatsAppAdminPage() {
     }
   };
 
+  // 6. Sync Webhook — register https://visriva.com/api/whatsapp/webhook with Railway
+  const setupWebhook = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    setWebhookSyncLoading(true);
+    console.log("🔗 Sending setup_webhook request to /api/whatsapp/connect...");
+    try {
+      const res = await fetch("/api/whatsapp/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "setup_webhook" })
+      });
+      const data = await res.json();
+      console.log("📦 Webhook setup response:", data);
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      triggerToast(`✅ Webhook synced! Railway → ${data.url}`);
+    } catch (err: any) {
+      console.error("WEBHOOK SYNC FAILED:", err);
+      triggerToast(`Webhook sync failed: ${err.message}`, true);
+    } finally {
+      setWebhookSyncLoading(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[#011F15] text-white selection:bg-[#D4AF37] selection:text-[#011F15] flex flex-col">
       <Navbar />
@@ -248,6 +274,17 @@ export default function WhatsAppAdminPage() {
                 >
                   <RefreshCw className={`w-4 h-4 ${waLinkLoading ? "animate-spin" : ""}`} />
                   <span>Force Sync</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => setupWebhook(e)}
+                  disabled={webhookSyncLoading}
+                  title="Register https://visriva.com/api/whatsapp/webhook with Railway Evolution API"
+                  className="flex items-center justify-center space-x-2 px-6 py-3 rounded-full bg-white/5 text-[#D4AF37] border border-[#D4AF37]/30 hover:bg-[#D4AF37]/10 font-bold text-xs uppercase tracking-wider transition disabled:opacity-50 cursor-pointer"
+                >
+                  <Link2 className={`w-4 h-4 ${webhookSyncLoading ? "animate-spin" : ""}`} />
+                  <span>{webhookSyncLoading ? "Syncing..." : "Sync Webhook"}</span>
                 </button>
               </div>
             </div>

@@ -111,17 +111,57 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   console.log("📥 POST Request received at /api/whatsapp/connect");
   try {
+    const body = await req.json().catch(() => ({}));
+    const action = body.action || "connect";
+
     const config = await getEvolutionConfig();
     const baseUrl = config.url;
     const apiKey = config.key;
     const instanceName = config.instance;
 
-    console.log(`[POST connect] Using config: URL="${baseUrl}", Instance="${instanceName}"`);
+    console.log(`[POST connect] Using config: URL="${baseUrl}", Instance="${instanceName}", Action="${action}"`);
 
     // Determine active webhook URL based on the request host
     const host = req.headers.get("host");
     const protocol = host?.includes("localhost") || host?.includes("127.0.0.1") ? "http" : "https";
-    const webhookUrl = `${protocol}://${host}/api/whatsapp/webhook`;
+    const webhookUrl = host?.includes("visriva.com") 
+      ? "https://visriva.com/api/whatsapp/webhook"
+      : `${protocol}://${host}/api/whatsapp/webhook`;
+
+    if (action === "setup_webhook") {
+      const webhookSetUrl = `${baseUrl}/webhook/set/${instanceName}`;
+      console.log(`[Webhook Sync] Configuring webhook via POST ${webhookSetUrl} to URL ${webhookUrl}`);
+      
+      const webhookRes = await fetch(webhookSetUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: apiKey,
+        },
+        body: JSON.stringify({
+          enabled: true,
+          url: webhookUrl,
+          events: ["MESSAGES_UPSERT"]
+        })
+      });
+
+      const resStatus = webhookRes.status;
+      const resText = await webhookRes.text();
+      console.log(`[Webhook Sync] Response status: ${resStatus}, body: ${resText}`);
+
+      if (!webhookRes.ok) {
+        return NextResponse.json({ 
+          error: `Evolution Webhook set failed (${resStatus}): ${resText}` 
+        }, { status: resStatus });
+      }
+
+      return NextResponse.json({ 
+        success: true, 
+        message: "Webhook set successfully", 
+        url: webhookUrl,
+        response: resText 
+      });
+    }
 
     // STEP 1: CHECK IF INSTANCE IS ALREADY CONNECTED
     console.log(`[1/3] Checking connection status for '${instanceName}' via GET ${baseUrl}/instance/connectionState/${instanceName}...`);
