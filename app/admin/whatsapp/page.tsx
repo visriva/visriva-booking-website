@@ -10,6 +10,7 @@ export default function WhatsAppAdminPage() {
   const [waLinkQr, setWaLinkQr] = useState<string>("");
   const [waLinkLoading, setWaLinkLoading] = useState<boolean>(false);
   const [botActive, setBotActive] = useState<boolean>(false);
+  const [uiError, setUiError] = useState<string>("");
   
   const [successToast, setSuccessToast] = useState<string>("");
   const [errorToast, setErrorToast] = useState<string>("");
@@ -17,7 +18,7 @@ export default function WhatsAppAdminPage() {
   const triggerToast = (msg: string, isError = false) => {
     if (isError) {
       setErrorToast(msg);
-      setTimeout(() => setErrorToast(""), 5000);
+      setTimeout(() => setErrorToast(""), 6000);
     } else {
       setSuccessToast(msg);
       setTimeout(() => setSuccessToast(""), 4000);
@@ -25,12 +26,17 @@ export default function WhatsAppAdminPage() {
   };
 
   // 1. Fetch status of instance from backend proxy
-  const checkStatus = async () => {
+  const checkStatus = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     setWaLinkLoading(true);
+    setUiError("");
+    console.log("🚀 Checking status at /api/whatsapp/connect?action=status...");
     try {
       const res = await fetch("/api/whatsapp/connect?action=status");
+      console.log("📥 Check Status Response code:", res.status);
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       const data = await res.json();
+      console.log("📦 Status data received:", data);
       if (data.status === "connected") {
         setWaLinkStatus("connected");
         setWaLinkQr("");
@@ -38,8 +44,10 @@ export default function WhatsAppAdminPage() {
         setWaLinkStatus("disconnected");
       }
     } catch (err: any) {
+      console.error("FRONTEND CHECK STATUS FAILED:", err);
       setWaLinkStatus("disconnected");
-      triggerToast(`Failed to load connection status: ${err.message}`, true);
+      const msg = err?.message || String(err);
+      triggerToast(`Failed to load connection status: ${msg}`, true);
     } finally {
       setWaLinkLoading(false);
     }
@@ -48,7 +56,6 @@ export default function WhatsAppAdminPage() {
   // 2. Load bot toggle status and current connection status on mount
   useEffect(() => {
     checkStatus();
-    // Load bot active state from local storage or backend database settings
     try {
       const saved = localStorage.getItem("whatsapp_bot_active") === "true";
       setBotActive(saved);
@@ -56,23 +63,36 @@ export default function WhatsAppAdminPage() {
   }, []);
 
   // 3. Connect to instance to generate base64 QR Code
-  const connectInstance = async () => {
+  const connectInstance = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     setWaLinkLoading(true);
     setWaLinkQr("");
+    setUiError("");
+
+    console.log("Sending request to /api/whatsapp/connect...");
+
     try {
       const res = await fetch("/api/whatsapp/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" }
       });
+
+      console.log("📥 Connect Response HTTP Status:", res.status, res.statusText);
+
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`Connection failed: ${text.slice(0, 100)}`);
+        console.error("❌ Connect HTTP Error text:", text);
+        throw new Error(`Connection failed (${res.status}): ${text.slice(0, 150)}`);
       }
+
       const data = await res.json();
+      console.log("📦 Received response JSON:", data);
+
       const qrData = data.base64 || data.qrcode?.base64 || (typeof data.qrcode === "string" ? data.qrcode : "");
-      
+
       if (qrData) {
-        setWaLinkQr(qrData);
+        const cleanedQr = typeof qrData === "string" ? qrData.replace(/^data:image\/[a-z]+;base64,/, "") : qrData;
+        setWaLinkQr(cleanedQr);
         setWaLinkStatus("qr_ready");
         triggerToast("✅ Scan the QR code below to connect your device!");
       } else if (data.status === "connected" || data.instance?.state === "open") {
@@ -82,9 +102,11 @@ export default function WhatsAppAdminPage() {
       } else {
         throw new Error("No QR code returned from Evolution API.");
       }
-    } catch (err: any) {
-      console.error(err);
-      triggerToast(`QR Code Generation failed: ${err.message}`, true);
+    } catch (error: any) {
+      console.error("FRONTEND FETCH FAILED:", error);
+      const msg = error?.message || String(error);
+      setUiError(msg);
+      triggerToast(`QR Code Generation failed: ${msg}`, true);
       setWaLinkStatus("disconnected");
     } finally {
       setWaLinkLoading(false);
@@ -92,20 +114,17 @@ export default function WhatsAppAdminPage() {
   };
 
   // 4. Toggle Bot Active State
-  const toggleBot = async () => {
+  const toggleBot = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     const newState = !botActive;
     setBotActive(newState);
     try {
-      // Store locally
       localStorage.setItem("whatsapp_bot_active", String(newState));
-      
-      // Sync toggle state to Firestore db via our webhook PUT handler
       await fetch("/api/whatsapp/webhook", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ botActive: newState })
       });
-      
       triggerToast(newState ? "🤖 Auto-Responder Bot is now ACTIVE!" : "🛑 Auto-Responder Bot is now DEACTIVATED!");
     } catch (err: any) {
       triggerToast("Failed to save bot settings.", true);
@@ -170,7 +189,8 @@ export default function WhatsAppAdminPage() {
 
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
-                onClick={connectInstance}
+                type="button"
+                onClick={(e) => connectInstance(e)}
                 disabled={waLinkLoading}
                 className="flex items-center justify-center space-x-2 px-6 py-3.5 rounded-full bg-gold-gradient text-[#011F15] hover:shadow-gold-md font-extrabold text-sm uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer"
               >
@@ -179,7 +199,8 @@ export default function WhatsAppAdminPage() {
               </button>
 
               <button
-                onClick={checkStatus}
+                type="button"
+                onClick={(e) => checkStatus(e)}
                 disabled={waLinkLoading}
                 className="flex items-center justify-center space-x-2 px-6 py-3.5 rounded-full bg-white/5 text-white border border-white/10 hover:bg-white/10 font-bold text-sm uppercase tracking-wider transition disabled:opacity-50 cursor-pointer"
               >
@@ -191,6 +212,14 @@ export default function WhatsAppAdminPage() {
 
           {/* QR Code Container */}
           <div className="flex flex-col items-center justify-center p-6 rounded-2xl bg-black/40 border border-white/10 relative min-h-[250px]">
+            
+            {uiError && (
+              <div className="p-4 mb-4 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs text-center font-mono max-w-sm break-words">
+                <p className="font-bold mb-1">⚠️ Error Details:</p>
+                {uiError}
+              </div>
+            )}
+
             {waLinkLoading && !waLinkQr && (
               <div className="flex flex-col items-center space-y-3">
                 <RefreshCw className="w-10 h-10 text-[#D4AF37] animate-spin" />
@@ -198,7 +227,7 @@ export default function WhatsAppAdminPage() {
               </div>
             )}
             
-            {!waLinkLoading && !waLinkQr && waLinkStatus !== "connected" && (
+            {!waLinkLoading && !waLinkQr && !uiError && waLinkStatus !== "connected" && (
               <div className="text-center space-y-2 py-8">
                 <QrCode className="w-12 h-12 text-white/20 mx-auto" />
                 <p className="text-xs text-white/40">Click "Generate QR Code" to retrieve your coupling code</p>
@@ -240,7 +269,8 @@ export default function WhatsAppAdminPage() {
           </div>
 
           <button
-            onClick={toggleBot}
+            type="button"
+            onClick={(e) => toggleBot(e)}
             className={`flex items-center space-x-3 px-6 py-4 rounded-full border transition-all cursor-pointer ${
               botActive 
                 ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/40 font-bold" 
