@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 
 // Allow self-signed certs for self-hosted Evolution VPS connections
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 async function getFirebase() {
   const { initializeApp, getApps, getApp } = await import("firebase/app");
-  const { getFirestore, doc, getDoc, setDoc } = await import("firebase/firestore");
+  const { getFirestore, doc, getDoc } = await import("firebase/firestore");
 
   const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,13 +17,17 @@ async function getFirebase() {
   };
 
   const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  return { db: getFirestore(app), doc, getDoc, setDoc };
+  return { db: getFirestore(app), doc, getDoc };
 }
 
 async function getEvolutionConfig() {
   const defaultUrl = "https://evolution-api-production-d446.up.railway.app";
   const defaultKey = "VisrivaSecretKey2026_SecureKey";
   const defaultInstance = "visriva-live";
+
+  let url = process.env.EVOLUTION_API_URL || defaultUrl;
+  let key = process.env.EVOLUTION_API_KEY || defaultKey;
+  let instance = process.env.EVOLUTION_INSTANCE_NAME || defaultInstance;
 
   try {
     const fb = await getFirebase();
@@ -32,43 +36,20 @@ async function getEvolutionConfig() {
     
     if (snap.exists()) {
       const data = snap.data();
-      let url = data.backupEvoApiUrl || process.env.EVOLUTION_API_URL || defaultUrl;
-      const key = data.backupEvoApiKey || process.env.EVOLUTION_API_KEY || defaultKey;
-      const instance = data.backupInstanceName || process.env.EVOLUTION_INSTANCE_NAME || defaultInstance;
-      
-      if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        url = "https://" + url;
-      }
-      if (url.endsWith("/")) {
-        url = url.slice(0, -1);
-      }
-      console.log(`[Config Loader] Loaded config successfully: URL=${url}, Instance=${instance}`);
-      return { url, key, instance };
-    } else {
-      console.log("[Config Loader] Operator doc not found. Seeding default configs...");
-      await fb.setDoc(docRef, {
-        backupEvoApiUrl: defaultUrl,
-        backupEvoApiKey: defaultKey,
-        backupInstanceName: defaultInstance
-      });
+      if (data.backupEvoApiUrl) url = data.backupEvoApiUrl;
+      if (data.backupEvoApiKey) key = data.backupEvoApiKey;
+      if (data.backupInstanceName) instance = data.backupInstanceName;
     }
   } catch (err) {
-    console.warn("[Config Loader] Failed to load/initialize Evolution config, using env/defaults fallback:", err);
-  }
-  
-  let fallbackUrl = process.env.EVOLUTION_API_URL || defaultUrl;
-  if (!fallbackUrl.startsWith("http://") && !fallbackUrl.startsWith("https://")) {
-    fallbackUrl = "https://" + fallbackUrl;
-  }
-  if (fallbackUrl.endsWith("/")) {
-    fallbackUrl = fallbackUrl.slice(0, -1);
+    console.warn("[Config Loader] Firestore config load bypassed, using env/default config:", err);
   }
 
-  return {
-    url: fallbackUrl,
-    key: process.env.EVOLUTION_API_KEY || defaultKey,
-    instance: process.env.EVOLUTION_INSTANCE_NAME || defaultInstance,
-  };
+  url = url.replace(/\/$/, '');
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = "https://" + url;
+  }
+
+  return { url, key, instance };
 }
 
 export async function GET(req: Request) {
@@ -109,61 +90,53 @@ export async function POST(req: Request) {
   console.log("📥 POST Request received at /api/whatsapp/connect");
   try {
     const config = await getEvolutionConfig();
-    console.log(`[POST connect] Using Config: URL="${config.url}", Instance="${config.instance}"`);
+    const baseUrl = config.url;
+    const apiKey = config.key;
+    const instanceName = config.instance;
+
+    console.log(`[POST connect] Using config: URL="${baseUrl}", Instance="${instanceName}"`);
 
     // Determine active webhook URL based on the request host
     const host = req.headers.get("host");
     const protocol = host?.includes("localhost") || host?.includes("127.0.0.1") ? "http" : "https";
     const webhookUrl = `${protocol}://${host}/api/whatsapp/webhook`;
 
-    // ----------------------------------------------------
-    // STEP 1: Check / Create the Instance
-    // ----------------------------------------------------
-    const createUrl = `${config.url}/instance/create`;
-    console.log(`[Step 1] Attempting to create/verify instance via POST ${createUrl}`);
-    
-    const createRes = await fetch(createUrl, {
-      method: "POST",
+    // STEP 1: CREATE THE INSTANCE FIRST
+    console.log(`[1/2] Creating instance '${instanceName}' on Evolution API via POST ${baseUrl}/instance/create...`);
+    const createRes = await fetch(`${baseUrl}/instance/create`, {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        apikey: config.key
+        'Content-Type': 'application/json',
+        'apikey': apiKey,
       },
       body: JSON.stringify({
-        instanceName: config.instance,
-        qrcode: true
-      })
+        instanceName: instanceName,
+        qrcode: true,
+        integration: 'WHATSAPP-BAILEYS',
+      }),
     });
 
     const createStatus = createRes.status;
     const createBodyText = await createRes.text();
-    console.log(`[Step 1] Response received. Status: ${createStatus}`);
-    console.log(`[Step 1] Response Body: ${createBodyText}`);
+    console.log('[1/2] Create response status:', createStatus);
+    console.log('[1/2] Create response body:', createBodyText);
 
-    if (!createRes.ok) {
-      // If it fails but says it already exists, that is safe to ignore
-      if (createBodyText.includes("already exists") || createBodyText.includes("exists") || createStatus === 400) {
-        console.log(`[Step 1] Instance "${config.instance}" already exists. Proceeding safely to connect...`);
-      } else {
-        console.error(`[Step 1] Fatal instance creation error: Status=${createStatus}, Body=${createBodyText}`);
-        return NextResponse.json({ 
-          error: `Instance creation failed (${createStatus}): ${createBodyText}` 
-        }, { status: createStatus });
-      }
-    } else {
-      console.log(`[Step 1] Instance "${config.instance}" created successfully.`);
+    let createData: any = {};
+    try {
+      createData = JSON.parse(createBodyText);
+    } catch (e) {
+      console.warn('[1/2] Failed to parse create response body as JSON');
     }
 
-    // ----------------------------------------------------
-    // Webhook Configuration (Required for Auto-Responder)
-    // ----------------------------------------------------
-    const webhookSetUrl = `${config.url}/webhook/set/${config.instance}`;
+    // Configure Webhook so the auto-responder behaves correctly
+    const webhookSetUrl = `${baseUrl}/webhook/set/${instanceName}`;
     console.log(`[Webhook] Configuring webhook via POST ${webhookSetUrl}`);
     try {
       const webhookRes = await fetch(webhookSetUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: config.key,
+          apikey: apiKey,
         },
         body: JSON.stringify({
           enabled: true,
@@ -179,59 +152,51 @@ export async function POST(req: Request) {
       console.warn(`[Webhook] Warning: Failed to set webhook URL: ${webhookErr.message}`);
     }
 
-    // ----------------------------------------------------
-    // STEP 2: Fetch the QR Code
-    // ----------------------------------------------------
-    const connectUrl = `${config.url}/instance/connect/${config.instance}`;
-    console.log(`[Step 2] Fetching QR Code via GET ${connectUrl}`);
-
-    const connectRes = await fetch(connectUrl, {
-      method: "GET",
+    // STEP 2: CONNECT / FETCH QR CODE
+    console.log(`[2/2] Fetching QR Code for instance '${instanceName}' via GET ${baseUrl}/instance/connect/${instanceName}...`);
+    const connectRes = await fetch(`${baseUrl}/instance/connect/${instanceName}`, {
+      method: 'GET',
       headers: {
-        apikey: config.key
-      }
+        'apikey': apiKey,
+      },
     });
-
+    
     const connectStatus = connectRes.status;
     const connectBodyText = await connectRes.text();
-    console.log(`[Step 2] Response received. Status: ${connectStatus}`);
+    console.log('[2/2] Connect response status:', connectStatus);
+    console.log('[2/2] Connect response body (truncated):', connectBodyText.slice(0, 200));
 
-    if (!connectRes.ok) {
-      console.error(`[Step 2] Fatal connection/QR fetch error: Status=${connectStatus}, Body=${connectBodyText}`);
-      return NextResponse.json({ 
-        error: `Evolution connect failed (${connectStatus}): ${connectBodyText}` 
-      }, { status: connectStatus });
-    }
-
-    let parsedData;
+    let connectData: any = {};
     try {
-      parsedData = JSON.parse(connectBodyText);
-      console.log("[Step 2] Parsed Response Keys:", Object.keys(parsedData));
-    } catch (parseErr) {
-      console.error("[Step 2] Failed to parse JSON response:", parseErr);
+      connectData = JSON.parse(connectBodyText);
+    } catch (e) {
+      console.error('[2/2] Failed to parse connect response body as JSON:', e);
       return NextResponse.json({ 
-        error: `Invalid JSON response from connect endpoint: ${connectBodyText.slice(0, 100)}` 
+        error: 'Invalid JSON response from connect endpoint', 
+        details: { connectBodyText } 
       }, { status: 500 });
     }
 
-    // Extract the base64 code from the response and strip the prefix if it's there.
-    let rawBase64 = parsedData.base64 || parsedData.qrcode?.base64 || parsedData.qrcode || parsedData.code || "";
-    if (typeof rawBase64 === "string") {
-      rawBase64 = rawBase64.replace(/^data:image\/[a-z]+;base64,/, "");
-    }
-    
-    if (rawBase64) {
-      console.log(`[Step 2] Base64 QR Code extracted and cleaned successfully (Length: ${rawBase64.length})`);
-    } else {
-      console.warn("[Step 2] Warning: No base64 field found in JSON payload. Full Payload:", connectBodyText);
+    // Extract base64 QR code string from wherever Evolution API returns it
+    let rawBase64 = connectData.base64 || connectData.qrcode?.base64 || createData.qrcode?.base64 || createData.base64 || '';
+
+    // Strip prefix if already attached
+    if (typeof rawBase64 === 'string') {
+      rawBase64 = rawBase64.replace(/^data:image\/[a-z]+;base64,/, '');
     }
 
-    return NextResponse.json({
-      ...parsedData,
-      base64: rawBase64
-    });
+    if (!rawBase64) {
+      console.error('[POST Error] Failed to retrieve QR code from server response:', { createData, connectData });
+      return NextResponse.json({ 
+        error: 'Failed to retrieve QR code from server response', 
+        details: { createData, connectData } 
+      }, { status: 400 });
+    }
+
+    console.log(`[POST Success] Successfully retrieved QR Base64 (length: ${rawBase64.length})`);
+    return NextResponse.json({ base64: rawBase64 });
   } catch (error: any) {
-    console.error("[POST Exception]:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('SERVER ROUTE ERROR:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
