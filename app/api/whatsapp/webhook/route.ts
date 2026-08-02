@@ -1,542 +1,131 @@
 import { NextResponse } from "next/server";
-import type {
-  WAMessage,
-  MessageType,
-  AIReplyPayload,
-} from "@/types/whatsapp-agent";
 
-// ─── Firebase Admin-style server access (using REST for server routes) ───────
+// Allow self-signed certs for self-hosted Evolution VPS connections
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-const FIRESTORE_PROJECT = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "visriva-live-station";
-
-async function firestoreREST(method: string, path: string, body?: any) {
-  // We use the client SDK pattern via dynamic import for server routes
-  // This avoids issues with Firebase Admin in Edge/Serverless
+async function getFirebase() {
   const { initializeApp, getApps, getApp } = await import("firebase/app");
-  const {
-    getFirestore,
-    collection,
-    doc,
-    getDoc,
-    getDocs,
-    setDoc,
-    addDoc,
-    updateDoc,
-    query,
-    orderBy,
-    limit,
-    serverTimestamp,
-    increment,
-  } = await import("firebase/firestore");
+  const { getFirestore, doc, getDoc, setDoc } = await import("firebase/firestore");
 
   const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: FIRESTORE_PROJECT,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "visriva-live-station",
     storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   };
 
   const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  return { db: getFirestore(app), doc, getDoc, getDocs, setDoc, addDoc, updateDoc, collection, query, orderBy, limit, serverTimestamp, increment };
+  return { db: getFirestore(app), doc, getDoc, setDoc };
 }
 
-// ─── GET: Meta Webhook Verification Endpoint ──────────────────────────────────
-export async function GET(req: Request) {
+async function getEvolutionConfig() {
   try {
-    const { searchParams } = new URL(req.url);
-    const mode = searchParams.get("hub.mode");
-    const token = searchParams.get("hub.verify_token");
-    const challenge = searchParams.get("hub.challenge");
-
-    const VERIFY_TOKEN =
-      process.env.WHATSAPP_VERIFY_TOKEN || "visriva_whatsapp_verify_token_2026";
-
-    // Meta Webhook verification protocol
-    if (mode === "subscribe" && (token === VERIFY_TOKEN || token === "visriva_whatsapp_verify_token_2026")) {
-      console.log("✅ Meta WhatsApp Webhook Verified Successfully!");
-      return new Response(challenge || "OK", {
-        status: 200,
-        headers: { "Content-Type": "text/plain" },
-      });
+    const fb = await getFirebase();
+    const docRef = fb.doc(fb.db, "config", "operator");
+    const snap = await fb.getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      let url = data.backupEvoApiUrl || process.env.EVOLUTION_API_URL || "https://evolution-api-production-d446.up.railway.app";
+      const key = data.backupEvoApiKey || process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey";
+      const instance = data.backupInstanceName || process.env.EVOLUTION_INSTANCE_NAME || "visriva-live";
+      
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        url = "https://" + url;
+      }
+      if (url.endsWith("/")) {
+        url = url.slice(0, -1);
+      }
+      return { url, key, instance };
     }
-
-    // Fallback: If Meta sends request with challenge parameter
-    if (challenge) {
-      return new Response(challenge, {
-        status: 200,
-        headers: { "Content-Type": "text/plain" },
-      });
-    }
-
-    return new Response("Forbidden", { status: 403 });
-  } catch (error: any) {
-    console.error("Meta Webhook Verification Error:", error);
-    return new Response("Internal Error", { status: 500 });
+  } catch (e) {
+    console.error("Failed to load Evolution config:", e);
   }
+  return {
+    url: "https://evolution-api-production-d446.up.railway.app",
+    key: "VisrivaSecretKey2026_SecureKey",
+    instance: "visriva-live"
+  };
 }
 
-// ─── Helper: Download media from Meta ─────────────────────────────────────────
-
-async function downloadMetaMedia(mediaId: string): Promise<{ url: string; mimeType: string } | null> {
-  const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN;
-  if (!ACCESS_TOKEN || !mediaId) return null;
-
-  try {
-    // Step 1: Get media URL from Meta
-    const metaRes = await fetch(`https://graph.facebook.com/v20.0/${mediaId}`, {
-      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
-    });
-
-    if (!metaRes.ok) return null;
-
-    const metaData = await metaRes.json();
-    return {
-      url: metaData.url || "",
-      mimeType: metaData.mime_type || "application/octet-stream",
-    };
-  } catch (err) {
-    console.error("Media download error:", err);
-    return null;
-  }
-}
-
-// ─── Helper: Send read receipt to Meta ────────────────────────────────────────
-
-async function sendReadReceipt(messageId: string) {
-  const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN;
-  if (!ACCESS_TOKEN || !PHONE_NUMBER_ID || !messageId) return;
-
-  try {
-    await fetch(`https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${ACCESS_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        status: "read",
-        message_id: messageId,
-      }),
-    });
-  } catch (err) {
-    console.error("Read receipt error:", err);
-  }
-}
-
-async function sendMetaAlert(text: string) {
-  const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || "1203212472878765";
-  const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN;
-  if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) return;
-
-  try {
-    const res = await fetch(`https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${ACCESS_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: "918884484828",
-        type: "text",
-        text: { body: text },
-      }),
-    });
-    console.log("Meta Alert Sent status:", res.status);
-  } catch (err) {
-    console.error("Meta Alert Send error:", err);
-  }
-}
-
-// ─── Helper: Trigger AI reply ─────────────────────────────────────────────────
-
-async function triggerAIReply(payload: AIReplyPayload, origin: string) {
-  try {
-    const res = await fetch(`${origin}/api/ai-agent/reply`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      console.error("AI reply trigger failed:", await res.text());
-    }
-  } catch (err) {
-    console.error("AI reply trigger error:", err);
-  }
-}
-
-// ─── POST: Meta Webhook Incoming Message & Event Handler ──────────────────────
 export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // ─── EVOLUTION API PAYLOAD HANDLER ───────────────────────────────────────
-    if (body.event) {
-      const firebase = await firestoreREST("", "");
-
-      // 1. Handle Connection State Changes
-      if (body.event === "connection.update") {
-        const state = body.data?.state || body.data?.status;
-        console.log(`🔌 Evolution Connection State changed for instance ${body.instance}:`, state);
-        if (state === "close" || state === "disconnected" || state === "logout") {
-          await sendMetaAlert(`⚠️ *Visriva WhatsApp Bot Alert:* Your connected WhatsApp session (*${body.instance || "visriva-live"}*) has been disconnected! Please scan the QR code in the Admin Panel immediately to re-link your device.`);
-        }
-        return NextResponse.json({ status: "EVENT_RECEIVED" }, { status: 200 });
-      }
-
-      // 2. Handle Incoming Customer Messages
-      if (body.event === "messages.upsert") {
-        const fromMe = body.data?.key?.fromMe;
-        if (fromMe) {
-          return NextResponse.json({ status: "EVENT_RECEIVED" }, { status: 200 });
-        }
-
-        const remoteJid = body.data?.key?.remoteJid;
-        const from = remoteJid ? remoteJid.split("@")[0] : "";
-        if (!from) {
-          return NextResponse.json({ status: "EVENT_RECEIVED" }, { status: 200 });
-        }
-
-        const messageId = body.data?.key?.id;
-        const senderName = body.data?.pushName || "Customer";
-        
-        let content = "";
-        let msgType: MessageType = "text";
-
-        const messageContent = body.data?.message;
-        if (messageContent) {
-          if (messageContent.conversation) {
-            content = messageContent.conversation;
-          } else if (messageContent.extendedTextMessage?.text) {
-            content = messageContent.extendedTextMessage.text;
-          } else if (messageContent.imageMessage) {
-            msgType = "image";
-            content = messageContent.imageMessage.caption || "📷 Image";
-          }
-        }
-
-        if (!content) {
-          return NextResponse.json({ status: "EVENT_RECEIVED" }, { status: 200 });
-        }
-
-        const convRef = firebase.doc(firebase.db, "wa_conversations", from);
-        const convSnap = await firebase.getDoc(convRef);
-
-        if (convSnap.exists()) {
-          await firebase.updateDoc(convRef, {
-            lastMessage: content.slice(0, 100),
-            lastMessageSender: "customer",
-            lastActivityAt: firebase.serverTimestamp(),
-            customerLastMessageAt: firebase.serverTimestamp(),
-            unreadCount: firebase.increment(1),
-            windowOpen: true,
-            resolved: false,
-          });
-        } else {
-          let defaultMode = "ai";
-          try {
-            const settingsRef = firebase.doc(firebase.db, "wa_agent_settings", "global");
-            const settingsSnap = await firebase.getDoc(settingsRef);
-            if (settingsSnap.exists()) {
-              defaultMode = settingsSnap.data()?.defaultMode || "ai";
-            }
-          } catch (e) {}
-
-          await firebase.setDoc(convRef, {
-            phone: from,
-            name: senderName,
-            mode: defaultMode,
-            lastMessage: content.slice(0, 100),
-            lastMessageSender: "customer",
-            lastActivityAt: firebase.serverTimestamp(),
-            customerLastMessageAt: firebase.serverTimestamp(),
-            unreadCount: 1,
-            windowOpen: true,
-            resolved: false,
-            createdAt: firebase.serverTimestamp(),
-          });
-        }
-
-        const msgColRef = firebase.collection(firebase.db, "wa_conversations", from, "messages");
-        const waMessage: Omit<WAMessage, "id"> = {
-          sender: "customer",
-          type: msgType,
-          content,
-          waMessageId: messageId,
-          status: "delivered",
-          timestamp: firebase.serverTimestamp(),
-        };
-        await firebase.addDoc(msgColRef, waMessage);
-
-        const updatedConvSnap = await firebase.getDoc(convRef);
-        const convData = updatedConvSnap.data();
-        const isAIMode = convData?.mode === "ai";
-
-        let aiEnabled = true;
-        try {
-          const settingsRef = firebase.doc(firebase.db, "wa_agent_settings", "global");
-          const settingsSnap = await firebase.getDoc(settingsRef);
-          if (settingsSnap.exists()) {
-            aiEnabled = settingsSnap.data()?.aiEnabled !== false;
-          }
-        } catch (e) {}
-
-        if (isAIMode && aiEnabled) {
-          const url = new URL(req.url);
-          const origin = url.origin;
-          triggerAIReply({
-            phone: from,
-            customerMessage: content,
-            messageType: msgType,
-          }, origin);
-        }
-      }
-
-      return NextResponse.json({ status: "EVENT_RECEIVED" }, { status: 200 });
+    if (body.event !== "messages.upsert") {
+      return NextResponse.json({ status: "IGNORED_EVENT" });
     }
 
-    // Check if this is a WhatsApp Business Account notification (Meta Cloud API fallback)
-    if (body.object !== "whatsapp_business_account") {
-      return NextResponse.json({ error: "Not a whatsapp_business_account event" }, { status: 404 });
+    const messageData = body.data;
+    const fromMe = messageData?.key?.fromMe;
+    const remoteJid = messageData?.key?.remoteJid;
+
+    // Ignore messages sent by ourselves and group chats (@g.us)
+    if (fromMe || !remoteJid || remoteJid.endsWith("@g.us")) {
+      return NextResponse.json({ status: "IGNORED_SENDER" });
     }
 
-    const entry = body.entry?.[0];
-    const changes = entry?.changes?.[0]?.value;
+    const phone = remoteJid.split("@")[0];
 
-    if (!changes) {
-      return NextResponse.json({ status: "EVENT_RECEIVED" }, { status: 200 });
+    // Check if auto-responder bot toggle is active in Firestore
+    const fb = await getFirebase();
+    const botRef = fb.doc(fb.db, "config", "whatsapp_bot");
+    const botSnap = await fb.getDoc(botRef);
+    
+    const isBotActive = botSnap.exists() ? botSnap.data()?.botActive === true : false;
+    
+    if (!isBotActive) {
+      return NextResponse.json({ status: "BOT_DISABLED" });
     }
 
-    const contacts = changes.contacts;
-    const messages = changes.messages;
-    const statuses = changes.statuses;
+    const config = await getEvolutionConfig();
+    const replyText = "Hi! I am currently operating a live printing station for an event and will get back to you shortly!";
 
-    // ── 1. Handle Incoming Customer Messages ──────────────────────────────────
-    if (messages && messages.length > 0) {
-      const firebase = await firestoreREST("", "");
+    console.log(`🔌 Dispatching auto-reply via Evolution API to: ${phone}`);
 
-      for (const message of messages) {
-        const from = message.from; // Sender phone number
-        const messageId = message.id;
-        const senderName = contacts?.[0]?.profile?.name || "Customer";
-
-        // Determine message type and content
-        let msgType: MessageType = "text";
-        let content = "";
-        let mediaUrl = "";
-        let mediaMimeType = "";
-        let mediaFilename = "";
-
-        switch (message.type) {
-          case "text":
-            msgType = "text";
-            content = message.text?.body || "";
-            break;
-
-          case "image":
-            msgType = "image";
-            content = message.image?.caption || "📷 Image";
-            if (message.image?.id) {
-              const media = await downloadMetaMedia(message.image.id);
-              if (media) {
-                mediaUrl = media.url;
-                mediaMimeType = media.mimeType;
-              }
-            }
-            break;
-
-          case "document":
-            msgType = "document";
-            mediaFilename = message.document?.filename || "Document";
-            content = `📄 ${mediaFilename}`;
-            if (message.document?.id) {
-              const media = await downloadMetaMedia(message.document.id);
-              if (media) {
-                mediaUrl = media.url;
-                mediaMimeType = media.mimeType;
-              }
-            }
-            break;
-
-          case "audio":
-            msgType = "audio";
-            content = "🎵 Audio message";
-            if (message.audio?.id) {
-              const media = await downloadMetaMedia(message.audio.id);
-              if (media) {
-                mediaUrl = media.url;
-                mediaMimeType = media.mimeType;
-              }
-            }
-            break;
-
-          case "video":
-            msgType = "video";
-            content = message.video?.caption || "🎥 Video";
-            if (message.video?.id) {
-              const media = await downloadMetaMedia(message.video.id);
-              if (media) {
-                mediaUrl = media.url;
-                mediaMimeType = media.mimeType;
-              }
-            }
-            break;
-
-          case "sticker":
-            msgType = "sticker";
-            content = "🏷️ Sticker";
-            break;
-
-          case "location":
-            msgType = "location";
-            content = `📍 Location: ${message.location?.latitude}, ${message.location?.longitude}`;
-            break;
-
-          case "contacts":
-            msgType = "contact";
-            content = `👤 Contact shared`;
-            break;
-
-          default:
-            content = message.text?.body || `[${message.type || "unknown"} message]`;
+    const response = await fetch(`${config.url}/message/sendText/${config.instance}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: config.key
+      },
+      body: JSON.stringify({
+        number: phone,
+        options: {
+          delay: 1000,
+          presence: "composing"
+        },
+        textMessage: {
+          text: replyText
         }
+      })
+    });
 
-        console.log(`💬 Incoming WhatsApp message from ${senderName} (${from}): "${content}"`);
-
-        // ── Store message in Firestore ──────────────────────────────────────
-        const waMessage: Omit<WAMessage, "id"> = {
-          sender: "customer",
-          type: msgType,
-          content,
-          mediaUrl: mediaUrl || undefined,
-          mediaMimeType: mediaMimeType || undefined,
-          mediaFilename: mediaFilename || undefined,
-          waMessageId: messageId,
-          status: "delivered",
-          timestamp: firebase.serverTimestamp(),
-        };
-
-        // Add message to subcollection
-        const msgColRef = firebase.collection(firebase.db, "wa_conversations", from, "messages");
-        await firebase.addDoc(msgColRef, waMessage);
-
-        // ── Create or update conversation ───────────────────────────────────
-        const convRef = firebase.doc(firebase.db, "wa_conversations", from);
-        const convSnap = await firebase.getDoc(convRef);
-
-        if (convSnap.exists()) {
-          await firebase.updateDoc(convRef, {
-            name: senderName,
-            lastMessage: content.slice(0, 100),
-            lastMessageSender: "customer",
-            lastActivityAt: firebase.serverTimestamp(),
-            customerLastMessageAt: firebase.serverTimestamp(),
-            unreadCount: firebase.increment(1),
-            windowOpen: true,
-          });
-        } else {
-          // Check global default mode
-          let defaultMode = "ai";
-          try {
-            const settingsRef = firebase.doc(firebase.db, "wa_agent_settings", "global");
-            const settingsSnap = await firebase.getDoc(settingsRef);
-            if (settingsSnap.exists()) {
-              defaultMode = settingsSnap.data()?.defaultMode || "ai";
-            }
-          } catch (e) {}
-
-          await firebase.setDoc(convRef, {
-            phone: from,
-            name: senderName,
-            mode: defaultMode,
-            lastMessage: content.slice(0, 100),
-            lastMessageSender: "customer",
-            lastActivityAt: firebase.serverTimestamp(),
-            customerLastMessageAt: firebase.serverTimestamp(),
-            unreadCount: 1,
-            windowOpen: true,
-            resolved: false,
-            createdAt: firebase.serverTimestamp(),
-          });
-        }
-
-        // ── Send read receipt ───────────────────────────────────────────────
-        sendReadReceipt(messageId);
-
-        // ── Check if AI mode → trigger AI reply ────────────────────────────
-        const updatedConvSnap = await firebase.getDoc(convRef);
-        const convData = updatedConvSnap.data();
-        const isAIMode = convData?.mode === "ai";
-
-        // Check global AI enabled
-        let aiEnabled = true;
-        try {
-          const settingsRef = firebase.doc(firebase.db, "wa_agent_settings", "global");
-          const settingsSnap = await firebase.getDoc(settingsRef);
-          if (settingsSnap.exists()) {
-            aiEnabled = settingsSnap.data()?.aiEnabled !== false;
-          }
-        } catch (e) {}
-
-        if (isAIMode && aiEnabled) {
-          // Get the origin URL for internal API call
-          const url = new URL(req.url);
-          const origin = url.origin;
-
-          // Fire and forget — don't block webhook response
-          triggerAIReply({
-            phone: from,
-            customerMessage: content,
-            messageType: msgType,
-            mediaUrl: mediaUrl || undefined,
-            mediaMimeType: mediaMimeType || undefined,
-          }, origin);
-        }
-      }
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Evolution sendText failed:", errText);
+      return NextResponse.json({ error: "Failed to send auto-reply via Evolution API", details: errText }, { status: 500 });
     }
 
-    // ── 2. Handle Message Status Updates ──────────────────────────────────────
-    if (statuses && statuses.length > 0) {
-      const firebase = await firestoreREST("", "");
+    return NextResponse.json({ success: true, message: "Auto-reply sent successfully" });
 
-      for (const statusObj of statuses) {
-        const recipientId = statusObj.recipient_id;
-        const status = statusObj.status; // 'sent', 'delivered', 'read', 'failed'
-        const waMessageId = statusObj.id;
-
-        console.log(`📬 WhatsApp delivery status: ${recipientId} → [${status.toUpperCase()}]`);
-
-        // Update message status in Firestore if we can find it
-        if (recipientId && waMessageId) {
-          try {
-            const { query: q, where } = await import("firebase/firestore");
-            const msgsRef = firebase.collection(firebase.db, "wa_conversations", recipientId, "messages");
-            const msgQuery = q(msgsRef, firebase.orderBy("timestamp", "desc"), firebase.limit(10));
-            const msgSnap = await firebase.getDocs(msgQuery);
-
-            for (const msgDoc of msgSnap.docs) {
-              if (msgDoc.data().waMessageId === waMessageId) {
-                await firebase.updateDoc(msgDoc.ref, { status });
-                break;
-              }
-            }
-          } catch (e) {
-            // Non-critical — log and continue
-            console.warn("Status update warning:", e);
-          }
-        }
-      }
-    }
-
-    // Always return 200 OK to Meta to confirm receipt
-    return NextResponse.json({ status: "EVENT_RECEIVED" }, { status: 200 });
   } catch (error: any) {
-    console.error("Meta Webhook Event Processing Error:", error);
-    // Still return 200 to prevent Meta from retrying
-    return NextResponse.json({ status: "EVENT_RECEIVED" }, { status: 200 });
+    console.error("WhatsApp Webhook Error:", error);
+    return NextResponse.json({ error: error.message || "Webhook processing error" }, { status: 500 });
+  }
+}
+
+// ─── PUT: Sync Bot Setting State ─────────────────────────────────────────────
+export async function PUT(req: Request) {
+  try {
+    const { botActive } = await req.json();
+    const fb = await getFirebase();
+    const botRef = fb.doc(fb.db, "config", "whatsapp_bot");
+    
+    await fb.setDoc(botRef, { botActive }, { merge: true });
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

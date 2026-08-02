@@ -28,7 +28,7 @@ export default function WhatsAppAdminPage() {
   const checkStatus = async () => {
     setWaLinkLoading(true);
     try {
-      const res = await fetch("/api/whatsapp/instance?action=status");
+      const res = await fetch("/api/whatsapp/connect?action=status");
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       const data = await res.json();
       if (data.status === "connected") {
@@ -60,7 +60,10 @@ export default function WhatsAppAdminPage() {
     setWaLinkLoading(true);
     setWaLinkQr("");
     try {
-      const res = await fetch("/api/whatsapp/instance?action=connect");
+      const res = await fetch("/api/whatsapp/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`Connection failed: ${text.slice(0, 100)}`);
@@ -88,31 +91,7 @@ export default function WhatsAppAdminPage() {
     }
   };
 
-  // 4. Disconnect WhatsApp Session
-  const disconnectInstance = async () => {
-    if (!confirm("Are you sure you want to disconnect your WhatsApp bot?")) return;
-    setWaLinkLoading(true);
-    try {
-      const res = await fetch("/api/whatsapp/instance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "logout" })
-      });
-      if (!res.ok) throw new Error("Logout request failed");
-      const data = await res.json();
-      if (data.success) {
-        setWaLinkStatus("disconnected");
-        setWaLinkQr("");
-        triggerToast("🔌 WhatsApp session successfully disconnected!");
-      }
-    } catch (err: any) {
-      triggerToast(`Disconnect failed: ${err.message}`, true);
-    } finally {
-      setWaLinkLoading(false);
-    }
-  };
-
-  // 5. Toggle Bot Active State
+  // 4. Toggle Bot Active State
   const toggleBot = async () => {
     const newState = !botActive;
     setBotActive(newState);
@@ -120,8 +99,8 @@ export default function WhatsAppAdminPage() {
       // Store locally
       localStorage.setItem("whatsapp_bot_active", String(newState));
       
-      // Sync toggle state to Firestore db
-      await fetch("/api/whatsapp-webhook", {
+      // Sync toggle state to Firestore db via our webhook PUT handler
+      await fetch("/api/whatsapp/webhook", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ botActive: newState })
@@ -207,16 +186,6 @@ export default function WhatsAppAdminPage() {
                 <RefreshCw className={`w-4 h-4 ${waLinkLoading ? "animate-spin" : ""}`} />
                 <span>Check Status</span>
               </button>
-
-              {waLinkStatus === "connected" && (
-                <button
-                  onClick={disconnectInstance}
-                  disabled={waLinkLoading}
-                  className="flex items-center justify-center space-x-2 px-6 py-3.5 rounded-full bg-red-950/40 text-red-400 border border-red-500/30 hover:bg-red-900/20 font-bold text-sm uppercase tracking-wider transition disabled:opacity-50 cursor-pointer"
-                >
-                  Disconnect
-                </button>
-              )}
             </div>
           </div>
 
@@ -225,7 +194,7 @@ export default function WhatsAppAdminPage() {
             {waLinkLoading && !waLinkQr && (
               <div className="flex flex-col items-center space-y-3">
                 <RefreshCw className="w-10 h-10 text-[#D4AF37] animate-spin" />
-                <span className="text-xs text-white/50 font-mono">Contacting VPS Gateway...</span>
+                <span className="text-xs text-white/50 font-mono">Generating Secure QR Code...</span>
               </div>
             )}
             
@@ -266,7 +235,7 @@ export default function WhatsAppAdminPage() {
             </div>
             <h4 className="font-serif text-xl font-bold text-white">WhatsApp Auto-Responder Bot</h4>
             <p className="text-xs text-emerald-100/60 max-w-md">
-              Toggle this switch to automatically respond to new inquiries with: "Hi! I am currently operating a live printing station. I will get back to you shortly!"
+              Toggle this switch to automatically respond to new inquiries with: "Hi! I am currently operating a live printing station for an event and will get back to you shortly!"
             </p>
           </div>
 
