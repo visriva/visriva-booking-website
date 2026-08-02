@@ -80,7 +80,7 @@ async function ensureInstanceExists(config: { url: string; key: string; instance
     
     if (needsCreation) {
       console.log(`🔌 Evolution instance ${config.instance} not found. Re-creating...`);
-      await fetch(`${config.url}/instance/create`, {
+      const createRes = await fetch(`${config.url}/instance/create`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -92,9 +92,21 @@ async function ensureInstanceExists(config: { url: string; key: string; instance
           qrcode: true
         })
       });
+      
+      if (!createRes.ok) {
+        const errText = await createRes.text();
+        if (errText.includes("already exists") || errText.includes("exists") || createRes.status === 400) {
+          console.log(`🔌 Instance ${config.instance} already exists on the server. Proceeding to connect...`);
+        } else {
+          throw new Error(`Instance creation failed (${createRes.status}): ${errText}`);
+        }
+      }
+      
+      console.log(`🔌 Instance ${config.instance} ready!`);
     }
-  } catch (e) {
-    console.warn("Failed to check or auto-create Evolution instance:", e);
+  } catch (e: any) {
+    console.error("Failed to check or auto-create Evolution instance:", e);
+    throw new Error(`Failed to initialize instance: ${e.message}`);
   }
 }
 
