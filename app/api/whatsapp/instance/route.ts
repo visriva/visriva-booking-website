@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+// Allow self-signed certificates for self-hosted Evolution VPS connections
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 async function getFirebase() {
   const { initializeApp, getApps, getApp } = await import("firebase/app");
   const { getFirestore, doc, getDoc } = await import("firebase/firestore");
@@ -25,17 +28,26 @@ async function getEvolutionConfig() {
     
     if (snap.exists()) {
       const data = snap.data();
-      const url = data.backupEvoApiUrl || process.env.EVOLUTION_API_URL || "https://api.visriva.com";
+      let url = data.backupEvoApiUrl || process.env.EVOLUTION_API_URL || "https://api.visriva.com";
       const key = data.backupEvoApiKey || process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey";
       const instance = data.backupInstanceName || process.env.EVOLUTION_INSTANCE_NAME || "visriva-live";
+      
+      // Strip trailing slash
+      if (url.endsWith("/")) {
+        url = url.slice(0, -1);
+      }
       return { url, key, instance };
     }
   } catch (err) {
     console.warn("Failed to load Evolution config from Firestore, falling back to env:", err);
   }
   
+  let url = process.env.EVOLUTION_API_URL || "https://api.visriva.com";
+  if (url.endsWith("/")) {
+    url = url.slice(0, -1);
+  }
   return {
-    url: process.env.EVOLUTION_API_URL || "https://api.visriva.com",
+    url,
     key: process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey",
     instance: process.env.EVOLUTION_INSTANCE_NAME || "visriva-live",
   };
@@ -43,12 +55,12 @@ async function getEvolutionConfig() {
 
 async function ensureInstanceExists(config: { url: string; key: string; instance: string }) {
   try {
-    // 1. Check connection status of the instance
+    // Check connection status of the instance
     const checkRes = await fetch(`${config.url}/instance/connectionStatus/${config.instance}`, {
       headers: { apikey: config.key }
     });
     
-    // If connectionStatus fails with 404, we must create the instance
+    // If instance is missing, recreate it
     if (checkRes.status === 404) {
       console.log(`🔌 Evolution instance ${config.instance} not found. Re-creating...`);
       await fetch(`${config.url}/instance/create`, {
@@ -80,13 +92,12 @@ export async function GET(req: Request) {
     await ensureInstanceExists(config);
 
     if (action === "status") {
-      // Fetch connection status from Evolution API
       const res = await fetch(`${config.url}/instance/connectionStatus/${config.instance}`, {
         headers: { apikey: config.key }
       });
       
       if (!res.ok) {
-        return NextResponse.json({ state: "close", status: "disconnected" });
+        return NextResponse.json({ state: "close", status: "disconnected", details: `HTTP error ${res.status}` });
       }
 
       const data = await res.json();
@@ -129,6 +140,11 @@ export async function GET(req: Request) {
         headers: { apikey: config.key }
       });
       
+      if (!res.ok) {
+        const errText = await res.text();
+        return NextResponse.json({ error: `Evolution server connect failed (${res.status}): ${errText.slice(0, 100)}` }, { status: res.status });
+      }
+
       const data = await res.json();
       return NextResponse.json(data);
     }
@@ -136,7 +152,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error: any) {
     console.error("Evolution Instance GET Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to reach Evolution server" }, { status: 500 });
   }
 }
 
@@ -151,6 +167,11 @@ export async function POST(req: Request) {
         headers: { apikey: config.key }
       });
       
+      if (!res.ok) {
+        const errText = await res.text();
+        return NextResponse.json({ error: `Evolution logout failed (${res.status}): ${errText}` }, { status: res.status });
+      }
+
       const data = await res.json();
       return NextResponse.json({ success: true, data });
     }

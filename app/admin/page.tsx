@@ -219,15 +219,24 @@ export default function AdminDashboardPage() {
     setWaLinkLoading(true);
     try {
       const res = await fetch("/api/whatsapp/instance?action=status");
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Server status check failed (${res.status}): ${text.slice(0, 80)}`);
+      }
       const data = await res.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
       if (data.status === "connected") {
         setWaLinkStatus("connected");
         setWaLinkQr("");
       } else {
         setWaLinkStatus("disconnected");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setErrorToast(`❌ Status Check failed: ${err.message || err}`);
+      setTimeout(() => setErrorToast(""), 5000);
       setWaLinkStatus("disconnected");
     } finally {
       setWaLinkLoading(false);
@@ -236,19 +245,36 @@ export default function AdminDashboardPage() {
 
   const connectWa = async () => {
     setWaLinkLoading(true);
+    setWaLinkQr("");
     try {
       const res = await fetch("/api/whatsapp/instance?action=connect");
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Server connect failed (${res.status}): ${text.slice(0, 80)}`);
+      }
       const data = await res.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
       const qrCodeData = data.base64 || data.qrcode?.base64 || (typeof data.qrcode === "string" ? data.qrcode : "");
       if (qrCodeData) {
         setWaLinkQr(qrCodeData);
         setWaLinkStatus("qr_ready");
+        setSuccessToast("✅ QR Code generated successfully!");
+        setTimeout(() => setSuccessToast(""), 4000);
       } else if (data.status === "CONNECTED" || data.status === "connected" || data.instance?.state === "open") {
         setWaLinkStatus("connected");
         setWaLinkQr("");
+        setSuccessToast("🟢 WhatsApp session is already connected!");
+        setTimeout(() => setSuccessToast(""), 4000);
+      } else {
+        throw new Error("No QR code base64 returned from WhatsApp gateway.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setErrorToast(`❌ QR Generation failed: ${err.message || err}`);
+      setTimeout(() => setErrorToast(""), 6000);
+      setWaLinkStatus("disconnected");
     } finally {
       setWaLinkLoading(false);
     }
@@ -263,15 +289,24 @@ export default function AdminDashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "logout" })
       });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Server logout failed (${res.status}): ${text.slice(0, 80)}`);
+      }
       const data = await res.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
       if (data.success) {
         setWaLinkStatus("disconnected");
         setWaLinkQr("");
         setSuccessToast("🔌 WhatsApp session successfully disconnected!");
         setTimeout(() => setSuccessToast(""), 4000);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setErrorToast(`❌ Disconnect failed: ${err.message || err}`);
+      setTimeout(() => setErrorToast(""), 5000);
     } finally {
       setWaLinkLoading(false);
     }
