@@ -38,7 +38,6 @@ import {
   TrendingUp,
   QrCode,
   Power,
-  RefreshCw,
 } from "lucide-react";
 import { FaInstagram, FaLinkedin } from "react-icons/fa";
 import Navbar from "@/components/Navbar";
