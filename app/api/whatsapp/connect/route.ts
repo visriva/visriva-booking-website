@@ -214,16 +214,22 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
-    // Extract the base64 code from the response. Look at multiple possible properties for safety.
-    const base64Data = parsedData.base64 || parsedData.qrcode?.base64 || parsedData.code || "";
+    // Extract the base64 code from the response and strip the prefix if it's there.
+    let rawBase64 = parsedData.base64 || parsedData.qrcode?.base64 || parsedData.qrcode || parsedData.code || "";
+    if (typeof rawBase64 === "string") {
+      rawBase64 = rawBase64.replace(/^data:image\/[a-z]+;base64,/, "");
+    }
     
-    if (base64Data) {
-      console.log(`[Step 2] Base64 QR Code extracted successfully (Length: ${base64Data.length})`);
+    if (rawBase64) {
+      console.log(`[Step 2] Base64 QR Code extracted and cleaned successfully (Length: ${rawBase64.length})`);
     } else {
       console.warn("[Step 2] Warning: No base64 field found in JSON payload. Full Payload:", connectBodyText);
     }
 
-    return NextResponse.json(parsedData);
+    return NextResponse.json({
+      ...parsedData,
+      base64: rawBase64
+    });
   } catch (error: any) {
     console.error("[POST Exception]:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -208,7 +208,7 @@ export default function WhatsAppAdminPage() {
             {waLinkQr && waLinkStatus === "qr_ready" && (
               <div className="space-y-4 text-center">
                 <div className="bg-white p-4 rounded-xl inline-block shadow-lg border-2 border-[#D4AF37]">
-                  <img src={waLinkQr} alt="WhatsApp Linking QR Code" className="w-48 h-48" />
+                  <img src={`data:image/png;base64,${waLinkQr}`} alt="WhatsApp QR Code" className="mx-auto rounded-lg shadow-lg w-48 h-48" />
                 </div>
                 <p className="text-xs text-[#D4AF37] font-mono animate-pulse">⚠️ Code changes every 20 seconds. Scan now.</p>
               </div>
