@@ -1,0 +1,22 @@
+
+> visriva-booking-app@0.1.0 build
+> next build
+
+   Creating an optimized production build ...
+
+> Build error occurred
+Error: EPERM: operation not permitted, scandir '/Users/g1/Desktop/Busniess /LIVE STATION /Website/app'
+    at async Object.readdir (node:internal/fs/promises:955:18)
+    at async /Users/g1/Desktop/Busniess /LIVE STATION /Website/node_modules/next/dist/lib/recursive-readdir.js:39:29
+    at async Promise.all (index 0)
+    at async recursiveReadDir (/Users/g1/Desktop/Busniess /LIVE STATION /Website/node_modules/next/dist/lib/recursive-readdir.js:32:25)
+    at async Span.traceAsyncFn (/Users/g1/Desktop/Busniess /LIVE STATION /Website/node_modules/next/dist/trace/trace.js:105:20)
+    at async /Users/g1/Desktop/Busniess /LIVE STATION /Website/node_modules/next/dist/build/index.js:328:34
+    at async Span.traceAsyncFn (/Users/g1/Desktop/Busniess /LIVE STATION /Website/node_modules/next/dist/trace/trace.js:105:20)
+    at async build (/Users/g1/Desktop/Busniess /LIVE STATION /Website/node_modules/next/dist/build/index.js:185:29)
+    at async main (/Users/g1/Desktop/Busniess /LIVE STATION /Website/node_modules/next/dist/bin/next:157:5) {
+  errno: -1,
+  code: 'EPERM',
+  syscall: 'scandir',
+  path: '/Users/g1/Desktop/Busniess /LIVE STATION /Website/app'
+}

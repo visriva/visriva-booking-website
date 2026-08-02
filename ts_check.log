@@ -1,0 +1,21 @@
+.next/types/app/ai-agent/layout.ts(2,24): error TS2307: Cannot find module '../../../../app/ai-agent/layout.js' or its corresponding type declarations.
+.next/types/app/ai-agent/layout.ts(5,29): error TS2307: Cannot find module '../../../../app/ai-agent/layout.js' or its corresponding type declarations.
+.next/types/app/ai-agent/page.ts(2,24): error TS2307: Cannot find module '../../../../app/ai-agent/page.js' or its corresponding type declarations.
+.next/types/app/ai-agent/page.ts(5,29): error TS2307: Cannot find module '../../../../app/ai-agent/page.js' or its corresponding type declarations.
+.next/types/app/api/whatsapp/webhook/route.ts(2,24): error TS2307: Cannot find module '../../../../../../app/api/whatsapp/webhook/route.js' or its corresponding type declarations.
+.next/types/app/api/whatsapp/webhook/route.ts(5,29): error TS2307: Cannot find module '../../../../../../app/api/whatsapp/webhook/route.js' or its corresponding type declarations.
+.next/types/app/layout.ts(2,24): error TS2307: Cannot find module '../../../app/layout.js' or its corresponding type declarations.
+.next/types/app/layout.ts(5,29): error TS2307: Cannot find module '../../../app/layout.js' or its corresponding type declarations.
+app/page.tsx(2,25): error TS2307: Cannot find module '@/components/HeroSection' or its corresponding type declarations.
+app/page.tsx(3,22): error TS2307: Cannot find module '@/components/TrustBar' or its corresponding type declarations.
+app/page.tsx(4,23): error TS2307: Cannot find module '@/components/BentoGrid' or its corresponding type declarations.
+app/page.tsx(5,27): error TS2307: Cannot find module '@/components/WhatsIncluded' or its corresponding type declarations.
+app/page.tsx(6,24): error TS2307: Cannot find module '@/components/WhyVisriva' or its corresponding type declarations.
+app/page.tsx(7,30): error TS2307: Cannot find module '@/components/PortfolioGallery' or its corresponding type declarations.
+app/page.tsx(8,33): error TS2307: Cannot find module '@/components/PrintFramePreviewer' or its corresponding type declarations.
+app/page.tsx(9,30): error TS2307: Cannot find module '@/components/GoldenPerksWheel' or its corresponding type declarations.
+components/BookingEngine.tsx(41,29): error TS2307: Cannot find module './CalendlySuccess' or its corresponding type declarations.
+components/BookingEngine.tsx(42,34): error TS2307: Cannot find module './LocationAutocomplete' or its corresponding type declarations.
+components/BookingEngine.tsx(43,31): error TS2307: Cannot find module './AIConciergeWidget' or its corresponding type declarations.
+components/Navbar.tsx(8,30): error TS2307: Cannot find module '@/components/Magnetic3DButton' or its corresponding type declarations.
+components/Navbar.tsx(120,41): error TS7006: Parameter 'e' implicitly has an 'any' type.

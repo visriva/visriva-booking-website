@@ -66,7 +66,7 @@ export default function OperatorCommandCenterPage() {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) return parsed;
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     return [];
@@ -85,7 +85,7 @@ export default function OperatorCommandCenterPage() {
             const maxToken = Math.max(...parsed.map((t: TokenItem) => t.tokenNum || 0));
             return maxToken >= 1 ? maxToken + 1 : 1;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     return 1;
@@ -105,7 +105,7 @@ export default function OperatorCommandCenterPage() {
       setPendingSync(true);
       try {
         await saveOperatorTokens(currentTokens);
-      } catch (e) {}
+      } catch (e) { }
       setPendingSync(false);
     }
   };
@@ -141,7 +141,7 @@ export default function OperatorCommandCenterPage() {
       if (wakeLock !== null) {
         wakeLock.release().then(() => {
           wakeLock = null;
-        }).catch(() => {});
+        }).catch(() => { });
       }
     };
   }, [authenticated]);
@@ -177,7 +177,7 @@ export default function OperatorCommandCenterPage() {
             if (Array.isArray(parsed)) {
               syncPendingTokens(parsed);
             }
-          } catch (e) {}
+          } catch (e) { }
         }
       }
     };
@@ -400,9 +400,8 @@ export default function OperatorCommandCenterPage() {
   // Check Master Admin Enable/Disable Toggle
   if (featureToggles.enableOperatorPortal === false && opConfig.enabled === false) {
     return (
-      <main className={`min-h-screen text-white selection:bg-[#D4AF37] selection:text-[#011F15] transition-colors duration-300 ${
-        oledTheme ? "bg-black" : "bg-[#011F15]"
-      }`}>
+      <main className={`min-h-screen text-white selection:bg-[#D4AF37] selection:text-[#011F15] transition-colors duration-300 ${oledTheme ? "bg-black" : "bg-[#011F15]"
+        }`}>
         <Navbar />
         <div className="pt-44 pb-28 px-4 text-center max-w-md mx-auto space-y-4">
           <Lock className="w-12 h-12 text-[#D4AF37] mx-auto opacity-70" />
@@ -425,13 +424,12 @@ export default function OperatorCommandCenterPage() {
   };
 
   return (
-    <main className={`min-h-screen text-white selection:bg-[#D4AF37] selection:text-[#011F15] transition-colors duration-300 ${
-      oledTheme ? "bg-black" : "bg-[#011F15]"
-    }`}>
+    <main className={`min-h-screen text-white selection:bg-[#D4AF37] selection:text-[#011F15] transition-colors duration-300 ${oledTheme ? "bg-black" : "bg-[#011F15]"
+      }`}>
       <Navbar />
 
       <div className="pt-36 sm:pt-40 pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        
+
         {/* HEADER */}
         <div className="text-center max-w-3xl mx-auto mb-10 space-y-3">
           <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-black/50 border border-[#D4AF37]/40 text-[#D4AF37] text-xs font-bold uppercase tracking-widest backdrop-blur-md font-cinzel">
@@ -447,11 +445,10 @@ export default function OperatorCommandCenterPage() {
 
           {/* Online/Offline Status Indicator */}
           <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
-            <span className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase font-bold tracking-wider border transition-all ${
-              isOnline 
-                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
-                : "bg-rose-500/20 text-rose-300 border-rose-500/30 animate-pulse"
-            }`}>
+            <span className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase font-bold tracking-wider border transition-all ${isOnline
+              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+              : "bg-rose-500/20 text-rose-300 border-rose-500/30 animate-pulse"
+              }`}>
               <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-ping" : "bg-rose-400"}`}></span>
               <span>{isOnline ? "Venue Network Online" : "Venue Offline (Queue Caching)"}</span>
             </span>
@@ -466,11 +463,10 @@ export default function OperatorCommandCenterPage() {
             <button
               type="button"
               onClick={() => setOledTheme(!oledTheme)}
-              className={`px-3 py-1 rounded-full text-[10px] font-mono uppercase font-bold tracking-wider border transition-all cursor-pointer flex items-center space-x-1 ${
-                oledTheme 
-                  ? "bg-amber-500 text-black border-amber-500 shadow-md font-extrabold" 
-                  : "bg-white/5 text-white/70 border-white/20 hover:bg-white/10"
-              }`}
+              className={`px-3 py-1 rounded-full text-[10px] font-mono uppercase font-bold tracking-wider border transition-all cursor-pointer flex items-center space-x-1 ${oledTheme
+                ? "bg-amber-500 text-black border-amber-500 shadow-md font-extrabold"
+                : "bg-white/5 text-white/70 border-white/20 hover:bg-white/10"
+                }`}
             >
               <span>🔋 {oledTheme ? "OLED Mode Active" : "OLED Battery Saver"}</span>
             </button>
@@ -521,7 +517,7 @@ export default function OperatorCommandCenterPage() {
         ) : (
           /* AUTHENTICATED DASHBOARD WORKSPACE */
           <div className="space-y-10">
-            
+
             {/* 1. REAL-TIME EVENT INVENTORY & PRINT STATS CARDS */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
               <div className="p-4 rounded-2xl bg-black/40 border border-[#D4AF37]/30 backdrop-blur-md space-y-2">
@@ -652,7 +648,7 @@ export default function OperatorCommandCenterPage() {
 
             {/* 2. MAIN TOKEN MANAGER & PICKUP ALERT SYSTEM */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              
+
               {/* LEFT: Add Token Form (lg:col-span-4) */}
               <div className="lg:col-span-4 bg-black/40 border border-white/10 rounded-3xl p-6 backdrop-blur-xl shadow-xl space-y-5">
                 <div className="flex items-center space-x-2 text-[#D4AF37] border-b border-white/10 pb-3">
@@ -689,9 +685,8 @@ export default function OperatorCommandCenterPage() {
                       value={guestPhone}
                       onChange={(e) => handlePhoneInputChange(e.target.value)}
                       placeholder="e.g. 918884484828"
-                      className={`w-full px-3.5 py-2.5 rounded-xl bg-white/5 border text-sm font-mono focus:outline-none transition ${
-                        phoneError ? "border-amber-400 focus:border-amber-400" : "border-white/15 focus:border-[#D4AF37]"
-                      }`}
+                      className={`w-full px-3.5 py-2.5 rounded-xl bg-white/5 border text-sm font-mono focus:outline-none transition ${phoneError ? "border-amber-400 focus:border-amber-400" : "border-white/15 focus:border-[#D4AF37]"
+                        }`}
                     />
                     {phoneError && (
                       <p className="text-[10px] text-amber-300 font-sans mt-1 leading-tight">
@@ -727,7 +722,7 @@ export default function OperatorCommandCenterPage() {
 
               {/* RIGHT: Token Queue & Instant WhatsApp Alert Trigger (lg:col-span-8) */}
               <div className="lg:col-span-8 bg-black/40 border border-white/10 rounded-3xl p-6 backdrop-blur-xl shadow-xl space-y-4">
-                
+
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
                   <div>
                     <h3 className="font-serif text-xl font-bold text-white">Live Collection Queue</h3>
@@ -770,13 +765,12 @@ export default function OperatorCommandCenterPage() {
                     filteredTokens.map((token) => (
                       <div
                         key={token.id}
-                        className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                          token.status === "Ready for Pickup"
-                            ? "bg-emerald-950/40 border-emerald-400/50"
-                            : token.status === "Collected"
+                        className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${token.status === "Ready for Pickup"
+                          ? "bg-emerald-950/40 border-emerald-400/50"
+                          : token.status === "Collected"
                             ? "bg-white/5 border-white/10 opacity-60"
                             : "bg-black/50 border-white/15"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center space-x-3">
                           <div className="w-12 h-12 rounded-xl bg-gold-gradient text-[#011F15] font-serif font-extrabold text-lg flex items-center justify-center shrink-0 shadow-md">
@@ -849,11 +843,10 @@ export default function OperatorCommandCenterPage() {
                                 token.status === "Collected" ? "Processing" : "Collected"
                               )
                             }
-                            className={`px-3 py-2 rounded-xl text-xs font-bold transition border cursor-pointer ${
-                              token.status === "Collected"
-                                ? "bg-white/10 border-white/20 text-white"
-                                : "bg-emerald-500/20 border-emerald-400 text-emerald-300"
-                            }`}
+                            className={`px-3 py-2 rounded-xl text-xs font-bold transition border cursor-pointer ${token.status === "Collected"
+                              ? "bg-white/10 border-white/20 text-white"
+                              : "bg-emerald-500/20 border-emerald-400 text-emerald-300"
+                              }`}
                           >
                             {token.status === "Collected" ? "Reset" : "Mark Collected"}
                           </button>
@@ -885,7 +878,7 @@ export default function OperatorCommandCenterPage() {
       {qrModalOpen && qrModalData && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-[#011F15] border border-[#D4AF37]/40 rounded-3xl p-6 sm:p-8 max-w-sm w-full relative space-y-5 shadow-2xl text-center">
-            
+
             <button
               onClick={() => {
                 setQrModalOpen(false);
@@ -920,7 +913,7 @@ export default function OperatorCommandCenterPage() {
               <p className="text-[11px] text-amber-200 font-medium">
                 👉 Point guest camera here &amp; send the pre-filled text!
               </p>
-              
+
               <div className="pt-2 border-t border-white/10 flex flex-col gap-2">
                 <a
                   href={qrModalData.fallbackWaUrl}
@@ -930,7 +923,7 @@ export default function OperatorCommandCenterPage() {
                 >
                   Open WhatsApp Web Manual Link
                 </a>
-                
+
                 <button
                   onClick={() => {
                     setQrModalOpen(false);

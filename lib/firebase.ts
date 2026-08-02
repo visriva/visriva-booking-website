@@ -11,6 +11,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { getStorage, ref, deleteObject } from "firebase/storage";
+import { getAuth } from "firebase/auth";
 
 const isDummyKey = !process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY === "AIzaSyDummyKeyForDevelopment";
 
@@ -31,6 +32,7 @@ if (typeof window !== "undefined") {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+export const auth = getAuth(app);
 
 // Canvas-based client-side image compressor with HEIC/HEIF iPhone photo format converter
 export async function compressImageFile(

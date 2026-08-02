@@ -32,5 +32,16 @@ service cloud.firestore {
       allow read, update: if true;
       allow delete: if true;
     }
+
+    // ─── WhatsApp AI Agent ────────────────────────────────────────────────────
+    match /wa_conversations/{document=**} {
+      allow read, write: if true;
+    }
+    match /wa_agent_settings/{document=**} {
+      allow read, write: if true;
+    }
+    match /wa_kb_documents/{document=**} {
+      allow read, write: if true;
+    }
   }
 }
