@@ -36,6 +36,9 @@ import {
   Crown,
   ShoppingBag,
   TrendingUp,
+  QrCode,
+  Power,
+  RefreshCw,
 } from "lucide-react";
 import { FaInstagram, FaLinkedin } from "react-icons/fa";
 import Navbar from "@/components/Navbar";
@@ -207,6 +210,79 @@ export default function AdminDashboardPage() {
   // AI WhatsApp Assistant State for Admin Leads
   const [adminAiModalOpen, setAdminAiModalOpen] = useState(false);
   const [adminSelectedLeadForAI, setAdminSelectedLeadForAI] = useState<any>(null);
+
+  // WhatsApp Linker State
+  const [waLinkStatus, setWaLinkStatus] = useState<string>("disconnected");
+  const [waLinkQr, setWaLinkQr] = useState<string>("");
+  const [waLinkLoading, setWaLinkLoading] = useState<boolean>(false);
+
+  const checkWaStatus = async () => {
+    setWaLinkLoading(true);
+    try {
+      const res = await fetch("/api/whatsapp/instance?action=status");
+      const data = await res.json();
+      if (data.status === "connected") {
+        setWaLinkStatus("connected");
+        setWaLinkQr("");
+      } else {
+        setWaLinkStatus("disconnected");
+      }
+    } catch (err) {
+      console.error(err);
+      setWaLinkStatus("disconnected");
+    } finally {
+      setWaLinkLoading(false);
+    }
+  };
+
+  const connectWa = async () => {
+    setWaLinkLoading(true);
+    try {
+      const res = await fetch("/api/whatsapp/instance?action=connect");
+      const data = await res.json();
+      if (data.base64) {
+        setWaLinkQr(data.base64);
+        setWaLinkStatus("qr_ready");
+      } else if (data.status === "CONNECTED" || data.status === "connected" || data.instance?.state === "open") {
+        setWaLinkStatus("connected");
+        setWaLinkQr("");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setWaLinkLoading(false);
+    }
+  };
+
+  const disconnectWa = async () => {
+    if (!confirm("Are you sure you want to disconnect your WhatsApp session?")) return;
+    setWaLinkLoading(true);
+    try {
+      const res = await fetch("/api/whatsapp/instance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "logout" })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setWaLinkStatus("disconnected");
+        setWaLinkQr("");
+        setSuccessToast("🔌 WhatsApp session successfully disconnected!");
+        setTimeout(() => setSuccessToast(""), 4000);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setWaLinkLoading(false);
+    }
+  };
+
+  // Poll WhatsApp status when the scanner tab is opened
+  useEffect(() => {
+    if (activeCategory === "ai" && activeTab === "aiWhatsAppScanner") {
+      checkWaStatus();
+    }
+  }, [activeCategory, activeTab]);
 
   // Subscriptions on mount
   useEffect(() => {
@@ -1092,6 +1168,16 @@ export default function AdminDashboardPage() {
                 }`}
               >
                 💬 WhatsApp Templates
+              </button>
+              <button
+                onClick={() => setActiveTab("aiWhatsAppScanner")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                  activeTab === "aiWhatsAppScanner"
+                    ? "bg-[#D4AF37] text-[#011F15] border-[#D4AF37] font-extrabold shadow-md"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                🔌 Connect WhatsApp Account
               </button>
             </div>
           )}
@@ -4229,6 +4315,148 @@ export default function AdminDashboardPage() {
                     }
                     className="w-full bg-black/60 border border-white/20 rounded-2xl p-3 text-xs font-sans text-white leading-relaxed"
                   />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: CONNECT WHATSAPP ACCOUNT (QR LINKER) */}
+          {activeTab === "aiWhatsAppScanner" && activeCategory === "ai" && (
+            <div className="space-y-6">
+              {/* Header Card */}
+              <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-2xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                        <QrCode className="w-5 h-5" />
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-serif font-bold text-white">
+                        Connect WhatsApp Account
+                      </h2>
+                    </div>
+                    <p className="text-xs text-emerald-100/70">
+                      Scan the live QR code to link your own WhatsApp device. Once connected, the AI Chatbot will automatically reply to customer inquiries.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={checkWaStatus}
+                      disabled={waLinkLoading}
+                      className="px-4 py-2.5 rounded-xl border border-white/20 text-white font-bold text-xs hover:bg-white/10 transition cursor-pointer flex items-center space-x-1.5 disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${waLinkLoading ? "animate-spin" : ""}`} />
+                      <span>Check Status</span>
+                    </button>
+                    {waLinkStatus === "connected" && (
+                      <button
+                        onClick={disconnectWa}
+                        disabled={waLinkLoading}
+                        className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center space-x-1.5 disabled:opacity-50"
+                      >
+                        <Power className="w-4 h-4" />
+                        <span>Disconnect Session</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Status and Scanner Panel */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left side: Instructions & Current Status */}
+                <div className="glass-card rounded-3xl p-6 border border-white/10 space-y-6">
+                  <h3 className="font-bold text-sm text-white">Session Status Overview</h3>
+                  
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-white/60">Connection State:</span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider ${
+                        waLinkStatus === "connected"
+                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40"
+                          : waLinkStatus === "qr_ready"
+                          ? "bg-amber-500/20 text-amber-300 border border-amber-400/40"
+                          : "bg-rose-500/20 text-rose-300 border border-rose-400/40"
+                      }`}>
+                        {waLinkStatus === "connected" ? "🟢 Connected & Live" : waLinkStatus === "qr_ready" ? "🟡 Ready to Scan" : "🔴 Disconnected"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-white/5 pt-3">
+                      <span className="text-xs text-white/60">Instance Name:</span>
+                      <span className="text-xs font-mono text-white font-bold">visriva-live</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider">How to Connect:</h4>
+                    <ol className="list-decimal list-inside text-xs text-emerald-100/70 space-y-2 leading-relaxed">
+                      <li>Ensure your phone has WhatsApp installed.</li>
+                      <li>Click the <strong className="text-white">"Generate QR Code"</strong> button on the right.</li>
+                      <li>Open WhatsApp on your phone ➡️ Settings ➡️ <strong className="text-white">Linked Devices</strong>.</li>
+                      <li>Tap <strong className="text-white">Link a Device</strong> and point your camera at the QR code.</li>
+                      <li>Once scanned, the status above will automatically change to <strong className="text-emerald-400">"Connected"</strong> and your AI WhatsApp agent is online!</li>
+                    </ol>
+                  </div>
+                </div>
+
+                {/* Right side: Live QR Code Display */}
+                <div className="glass-card rounded-3xl p-6 border border-white/10 flex flex-col items-center justify-center min-h-[300px] text-center space-y-4">
+                  {waLinkStatus === "connected" ? (
+                    <div className="space-y-4 py-8">
+                      <div className="w-20 h-20 bg-emerald-500/20 border border-emerald-400/40 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
+                        <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-lg text-white">Your WhatsApp is Linked!</h4>
+                        <p className="text-xs text-emerald-100/70 max-w-xs mx-auto leading-relaxed mt-1">
+                          The AI Agent is fully connected to your WhatsApp number and will automatically handle and respond to incoming chats.
+                        </p>
+                      </div>
+                    </div>
+                  ) : waLinkStatus === "qr_ready" && waLinkQr ? (
+                    <div className="space-y-4">
+                      <h4 className="font-bold text-sm text-white">Scan with WhatsApp</h4>
+                      <div className="p-4 bg-white rounded-2xl inline-block shadow-xl border-4 border-[#D4AF37]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img 
+                          src={waLinkQr} 
+                          alt="WhatsApp Linking QR Code" 
+                          className="w-56 h-56 object-contain"
+                        />
+                      </div>
+                      <p className="text-xs text-emerald-100/70 leading-relaxed max-w-xs">
+                        This QR code changes periodically. Scan it quickly. If it expires, click "Generate QR Code" again.
+                      </p>
+                      <button
+                        onClick={connectWa}
+                        disabled={waLinkLoading}
+                        className="px-4 py-2 rounded-xl border border-white/20 text-white font-bold text-xs hover:bg-white/10 transition"
+                      >
+                        Refresh QR Code
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 py-8">
+                      <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-full flex items-center justify-center mx-auto">
+                        <QrCode className="w-8 h-8 text-white/40" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-white">No Active Session</h4>
+                        <p className="text-xs text-emerald-100/60 max-w-xs mx-auto leading-relaxed mt-1">
+                          Generate a live QR code to pair your phone and activate automated responses.
+                        </p>
+                      </div>
+                      <button
+                        onClick={connectWa}
+                        disabled={waLinkLoading}
+                        className="px-6 py-3 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer disabled:opacity-50"
+                      >
+                        {waLinkLoading ? "Generating..." : "Generate QR Code"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
