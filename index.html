@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visriva | Live Keepsake Stations</title>
+    <!-- Import Outfit & Playfair Display fonts for high-end luxury feel -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Playfair+Display:ital,wght@0,600;0,800;1,600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --emerald-bg: #01140e;
+            --emerald-card: rgba(3, 37, 26, 0.55);
+            --gold: #D4AF37;
+            --gold-glow: rgba(212, 175, 55, 0.35);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--emerald-bg);
+            background-image: radial-gradient(circle at 50% 50%, #032b1d 0%, #01140e 100%);
+            font-family: 'Outfit', sans-serif;
+            perspective: 1200px;
+            overflow: hidden;
+        }
+
+        /* Ambient background glow */
+        .ambient-glow {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(212, 175, 55, 0.08), transparent 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-12px) rotate(0.5deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+
+        .card-container {
+            width: 340px;
+            height: 560px;
+            position: relative;
+            transform-style: preserve-3d;
+            z-index: 10;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .card {
+            width: 100%;
+            height: 100%;
+            background: var(--emerald-card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 24px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), inset 0 0 25px rgba(212, 175, 55, 0.05);
+            position: absolute;
+            transform: translateZ(20px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 45px 25px;
+            box-sizing: border-box;
+            color: var(--gold);
+            transform-style: preserve-3d;
+        }
+
+        /* The lighting reflection effect */
+        .glare {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 50% 50%, rgba(212, 175, 55, 0), transparent 60%);
+            opacity: 0;
+            pointer-events: none;
+            border-radius: 24px;
+            transition: opacity 0.4s ease;
+            z-index: 2;
+        }
+
+        /* Floating elements (Z-axis pushing) */
+        .logo {
+            font-family: 'Playfair Display', serif;
+            font-size: 38px;
+            font-weight: 800;
+            letter-spacing: 4px;
+            margin-bottom: 5px;
+            transform: translateZ(60px);
+            text-shadow: 0 12px 24px rgba(0, 0, 0, 0.6);
+            color: #ffffff;
+            background: linear-gradient(135deg, #ffffff 30%, var(--gold) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 45px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            font-weight: 600;
+            transform: translateZ(45px);
+        }
+
+        .links {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            width: 100%;
+            transform: translateZ(40px);
+        }
+
+        .link-btn {
+            display: block;
+            text-align: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            background-clip: padding-box;
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 14px;
+            letter-spacing: 1px;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .link-btn:hover,
+        .link-btn:active {
+            background: var(--gold);
+            color: #01140e;
+            border-color: var(--gold);
+            box-shadow: 0 0 25px var(--gold-glow);
+            transform: scale(1.03) translateZ(10px);
+        }
+
+        .primary-btn {
+            background: var(--gold);
+            color: #01140e;
+            margin-top: auto;
+            width: 100%;
+            border-color: var(--gold);
+            transform: translateZ(50px);
+            box-shadow: 0 8px 20px rgba(212, 175, 55, 0.2);
+        }
+
+        .primary-btn:hover {
+            background: #ffffff;
+            color: #01140e;
+            border-color: #ffffff;
+            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.25);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="ambient-glow"></div>
+
+    <div class="card-container" id="card">
+        <div class="card">
+            <div class="glare" id="glare"></div>
+
+            <div class="logo">VISRIVA</div>
+            <div class="subtitle">LIVE KEEPSAKE STATIONS</div>
+
+            <div class="links">
+                <a href="https://visriva.com" class="link-btn">Visit Website</a>
+                <a href="https://instagram.com/visriva.live" class="link-btn">Instagram Gallery</a>
+                <a href="https://wa.me/918884484828" class="link-btn">Book on WhatsApp</a>
+            </div>
+
+            <a href="tel:+918884484828" class="link-btn primary-btn">Save to Contacts</a>
+        </div>
+    </div>
+
+    <script>
+        const card = document.getElementById('card');
+        const glare = document.getElementById('glare');
+
+        const handleMove = function(e) {
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const rect = card.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+
+            const rotateX = ((y - centerY) / centerY) * -12;
+            const rotateY = ((x - centerX) / centerX) * 12;
+
+            card.style.transform = 'rotateX(' + rotateX + 'deg) rotateY(' + rotateY + 'deg)';
+
+            glare.style.opacity = '1';
+            glare.style.background = 'radial-gradient(circle at ' + x + 'px ' + y + 'px, rgba(212, 175, 55, 0.25), transparent 60%)';
+        };
+
+        const resetCard = function() {
+            card.style.transform = 'rotateX(0deg) rotateY(0deg)';
+            glare.style.opacity = '0';
+            card.style.transition = 'transform 0.5s ease';
+        };
+
+        card.addEventListener('mousemove', handleMove);
+        card.addEventListener('touchmove', handleMove);
+
+        card.addEventListener('mouseleave', resetCard);
+        card.addEventListener('touchend', resetCard);
+
+        card.addEventListener('mouseenter', function() { 
+            card.style.transition = 'none'; 
+        });
+        card.addEventListener('touchstart', function() { 
+            card.style.transition = 'none'; 
+        });
+    </script>
+</body>
+</html>
