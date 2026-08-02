@@ -15,7 +15,13 @@ import {
   FeatureTogglesConfig,
 } from "@/lib/firebase";
 
-export default function Navbar() {
+import { FaWhatsapp } from "react-icons/fa";
+
+interface NavbarProps {
+  onWhatsAppIconClick?: () => void;
+}
+
+export default function Navbar({ onWhatsAppIconClick }: NavbarProps = {}) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [contact, setContact] = useState<GlobalSettingsConfig>(DEFAULT_GLOBAL_SETTINGS);
@@ -115,14 +121,24 @@ export default function Navbar() {
             </a>
           </div>
 
-          {/* RIGHT SIDE: Mobile Compact Check Availability Button */}
+          {/* RIGHT SIDE: Mobile Compact Check Availability or WhatsApp Bot Linker */}
           <div className="flex items-center">
-            <Magnetic3DButton onClick={(e) => scrollToSection(e, "booking-engine")} href="/#booking-engine">
-              <div className="relative inline-flex items-center space-x-1.5 px-3 py-1.5 text-[11px] sm:px-5 sm:py-2.5 sm:text-sm font-bold rounded-full bg-gold-gradient text-[#011F15] shadow-gold-sm hover:shadow-gold-md transition-all duration-300 whitespace-nowrap">
-                <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#011F15]" />
-                <span>Check Availability</span>
-              </div>
-            </Magnetic3DButton>
+            {onWhatsAppIconClick ? (
+              <button 
+                onClick={onWhatsAppIconClick}
+                className="relative inline-flex items-center space-x-2 px-4 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm font-extrabold rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border border-[#D4AF37] hover:scale-105 transition-all duration-300 shadow-md shadow-emerald-500/20 cursor-pointer"
+              >
+                <FaWhatsapp className="w-4 h-4 sm:w-5 sm:h-5 text-white animate-pulse" />
+                <span>WhatsApp Bot Linker</span>
+              </button>
+            ) : (
+              <Magnetic3DButton onClick={(e) => scrollToSection(e, "booking-engine")} href="/#booking-engine">
+                <div className="relative inline-flex items-center space-x-1.5 px-3 py-1.5 text-[11px] sm:px-5 sm:py-2.5 sm:text-sm font-bold rounded-full bg-gold-gradient text-[#011F15] shadow-gold-sm hover:shadow-gold-md transition-all duration-300 whitespace-nowrap">
+                  <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#011F15]" />
+                  <span>Check Availability</span>
+                </div>
+              </Magnetic3DButton>
+            )}
           </div>
 
         </div>

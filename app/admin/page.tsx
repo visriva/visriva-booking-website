@@ -239,8 +239,9 @@ export default function AdminDashboardPage() {
     try {
       const res = await fetch("/api/whatsapp/instance?action=connect");
       const data = await res.json();
-      if (data.base64) {
-        setWaLinkQr(data.base64);
+      const qrCodeData = data.base64 || data.qrcode?.base64 || (typeof data.qrcode === "string" ? data.qrcode : "");
+      if (qrCodeData) {
+        setWaLinkQr(qrCodeData);
         setWaLinkStatus("qr_ready");
       } else if (data.status === "CONNECTED" || data.status === "connected" || data.instance?.state === "open") {
         setWaLinkStatus("connected");
@@ -784,7 +785,7 @@ export default function AdminDashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#011F15] text-white selection:bg-[#D4AF37] selection:text-[#011F15] flex flex-col">
-      <Navbar />
+      <Navbar onWhatsAppIconClick={() => { setActiveCategory("ai"); setActiveTab("aiWhatsAppScanner"); }} />
 
       {/* Floating Success & Error Toasts */}
       {successToast && (
@@ -2362,82 +2363,6 @@ export default function AdminDashboardPage() {
                 <div className="flex items-center space-x-2 text-xs font-mono text-[#D4AF37] bg-[#D4AF37]/10 px-4 py-2 rounded-xl border border-[#D4AF37]/30">
                   <Sparkles className="w-4 h-4 text-[#D4AF37]" />
                   <span>Firestore Real-Time CRM</span>
-                </div>
-              </div>
-
-              {/* CALENDAR AVAILABILITY & BLOCKED DATES MANAGER */}
-              <div className="glass-card rounded-3xl p-6 border border-[#D4AF37]/40 space-y-4 bg-black/40">
-                <div className="flex items-center space-x-2 text-[#D4AF37] font-bold text-sm uppercase tracking-wider font-mono">
-                  <Calendar className="w-5 h-5 text-[#D4AF37]" />
-                  <span>📅 Calendar Availability Manager (Live Website Availability Badge)</span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* 1. Fully Booked Dates */}
-                  <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 space-y-3">
-                    <span className="text-xs font-bold text-red-300 uppercase tracking-wider block font-mono">
-                      🔴 Blocked / Fully Booked Dates
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="date"
-                        value={newFullyBookedDate}
-                        onChange={(e) => setNewFullyBookedDate(e.target.value)}
-                        className="bg-black/60 border border-red-500/40 rounded-xl px-3 py-2 text-xs text-white outline-none"
-                      />
-                      <button
-                        onClick={handleAddFullyBookedDate}
-                        className="px-3 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs cursor-pointer"
-                      >
-                        Add Blocked Date +
-                      </button>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {(blockedDates.fullyBookedDates || []).map((d) => (
-                        <span key={d} className="inline-flex items-center space-x-1.5 bg-red-950/80 text-red-300 border border-red-500/40 text-xs px-2.5 py-1 rounded-lg font-mono">
-                          <span>{d}</span>
-                          <button onClick={() => handleRemoveFullyBookedDate(d)} className="text-red-400 hover:text-white font-bold ml-1 cursor-pointer">&times;</button>
-                        </span>
-                      ))}
-                      {(!blockedDates.fullyBookedDates || blockedDates.fullyBookedDates.length === 0) && (
-                        <span className="text-[11px] text-white/50 italic">No fully booked dates set.</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 2. High Demand Dates */}
-                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3">
-                    <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block font-mono">
-                      🟡 High Demand Dates (1 Rig Remaining)
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="date"
-                        value={newHighDemandDate}
-                        onChange={(e) => setNewHighDemandDate(e.target.value)}
-                        className="bg-black/60 border border-amber-500/40 rounded-xl px-3 py-2 text-xs text-white outline-none"
-                      />
-                      <button
-                        onClick={handleAddHighDemandDate}
-                        className="px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs cursor-pointer"
-                      >
-                        Add High Demand +
-                      </button>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {(blockedDates.highDemandDates || []).map((d) => (
-                        <span key={d} className="inline-flex items-center space-x-1.5 bg-amber-950/80 text-amber-300 border border-amber-500/40 text-xs px-2.5 py-1 rounded-lg font-mono">
-                          <span>{d}</span>
-                          <button onClick={() => handleRemoveHighDemandDate(d)} className="text-amber-400 hover:text-white font-bold ml-1 cursor-pointer">&times;</button>
-                        </span>
-                      ))}
-                      {(!blockedDates.highDemandDates || blockedDates.highDemandDates.length === 0) && (
-                        <span className="text-[11px] text-white/50 italic">No high demand dates set.</span>
-                      )}
-                    </div>
-                  </div>
                 </div>
               </div>
 

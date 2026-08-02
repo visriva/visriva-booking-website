@@ -41,12 +41,43 @@ async function getEvolutionConfig() {
   };
 }
 
+async function ensureInstanceExists(config: { url: string; key: string; instance: string }) {
+  try {
+    // 1. Check connection status of the instance
+    const checkRes = await fetch(`${config.url}/instance/connectionStatus/${config.instance}`, {
+      headers: { apikey: config.key }
+    });
+    
+    // If connectionStatus fails with 404, we must create the instance
+    if (checkRes.status === 404) {
+      console.log(`🔌 Evolution instance ${config.instance} not found. Re-creating...`);
+      await fetch(`${config.url}/instance/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: config.key
+        },
+        body: JSON.stringify({
+          instanceName: config.instance,
+          token: config.key,
+          qrcode: true
+        })
+      });
+    }
+  } catch (e) {
+    console.warn("Failed to check or auto-create Evolution instance:", e);
+  }
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const action = searchParams.get("action") || "status";
     
     const config = await getEvolutionConfig();
+    
+    // Auto-create instance if it is missing
+    await ensureInstanceExists(config);
 
     if (action === "status") {
       // Fetch connection status from Evolution API
