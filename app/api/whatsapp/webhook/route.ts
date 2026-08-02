@@ -127,6 +127,31 @@ async function sendReadReceipt(messageId: string) {
   }
 }
 
+async function sendMetaAlert(text: string) {
+  const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || "1203212472878765";
+  const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN;
+  if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) return;
+
+  try {
+    const res = await fetch(`https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${ACCESS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: "918884484828",
+        type: "text",
+        text: { body: text },
+      }),
+    });
+    console.log("Meta Alert Sent status:", res.status);
+  } catch (err) {
+    console.error("Meta Alert Send error:", err);
+  }
+}
+
 // ─── Helper: Trigger AI reply ─────────────────────────────────────────────────
 
 async function triggerAIReply(payload: AIReplyPayload, origin: string) {
@@ -149,7 +174,132 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // Check if this is a WhatsApp Business Account notification
+    // ─── EVOLUTION API PAYLOAD HANDLER ───────────────────────────────────────
+    if (body.event) {
+      const firebase = await firestoreREST("", "");
+
+      // 1. Handle Connection State Changes
+      if (body.event === "connection.update") {
+        const state = body.data?.state || body.data?.status;
+        console.log(`🔌 Evolution Connection State changed for instance ${body.instance}:`, state);
+        if (state === "close" || state === "disconnected" || state === "logout") {
+          await sendMetaAlert(`⚠️ *Visriva WhatsApp Bot Alert:* Your connected WhatsApp session (*${body.instance || "visriva-live"}*) has been disconnected! Please scan the QR code in the Admin Panel immediately to re-link your device.`);
+        }
+        return NextResponse.json({ status: "EVENT_RECEIVED" }, { status: 200 });
+      }
+
+      // 2. Handle Incoming Customer Messages
+      if (body.event === "messages.upsert") {
+        const fromMe = body.data?.key?.fromMe;
+        if (fromMe) {
+          return NextResponse.json({ status: "EVENT_RECEIVED" }, { status: 200 });
+        }
+
+        const remoteJid = body.data?.key?.remoteJid;
+        const from = remoteJid ? remoteJid.split("@")[0] : "";
+        if (!from) {
+          return NextResponse.json({ status: "EVENT_RECEIVED" }, { status: 200 });
+        }
+
+        const messageId = body.data?.key?.id;
+        const senderName = body.data?.pushName || "Customer";
+        
+        let content = "";
+        let msgType: MessageType = "text";
+
+        const messageContent = body.data?.message;
+        if (messageContent) {
+          if (messageContent.conversation) {
+            content = messageContent.conversation;
+          } else if (messageContent.extendedTextMessage?.text) {
+            content = messageContent.extendedTextMessage.text;
+          } else if (messageContent.imageMessage) {
+            msgType = "image";
+            content = messageContent.imageMessage.caption || "📷 Image";
+          }
+        }
+
+        if (!content) {
+          return NextResponse.json({ status: "EVENT_RECEIVED" }, { status: 200 });
+        }
+
+        const convRef = firebase.doc(firebase.db, "wa_conversations", from);
+        const convSnap = await firebase.getDoc(convRef);
+
+        if (convSnap.exists()) {
+          await firebase.updateDoc(convRef, {
+            lastMessage: content.slice(0, 100),
+            lastMessageSender: "customer",
+            lastActivityAt: firebase.serverTimestamp(),
+            customerLastMessageAt: firebase.serverTimestamp(),
+            unreadCount: firebase.increment(1),
+            windowOpen: true,
+            resolved: false,
+          });
+        } else {
+          let defaultMode = "ai";
+          try {
+            const settingsRef = firebase.doc(firebase.db, "wa_agent_settings", "global");
+            const settingsSnap = await firebase.getDoc(settingsRef);
+            if (settingsSnap.exists()) {
+              defaultMode = settingsSnap.data()?.defaultMode || "ai";
+            }
+          } catch (e) {}
+
+          await firebase.setDoc(convRef, {
+            phone: from,
+            name: senderName,
+            mode: defaultMode,
+            lastMessage: content.slice(0, 100),
+            lastMessageSender: "customer",
+            lastActivityAt: firebase.serverTimestamp(),
+            customerLastMessageAt: firebase.serverTimestamp(),
+            unreadCount: 1,
+            windowOpen: true,
+            resolved: false,
+            createdAt: firebase.serverTimestamp(),
+          });
+        }
+
+        const msgColRef = firebase.collection(firebase.db, "wa_conversations", from, "messages");
+        const waMessage: Omit<WAMessage, "id"> = {
+          sender: "customer",
+          type: msgType,
+          content,
+          waMessageId: messageId,
+          status: "delivered",
+          timestamp: firebase.serverTimestamp(),
+        };
+        await firebase.addDoc(msgColRef, waMessage);
+
+        const updatedConvSnap = await firebase.getDoc(convRef);
+        const convData = updatedConvSnap.data();
+        const isAIMode = convData?.mode === "ai";
+
+        let aiEnabled = true;
+        try {
+          const settingsRef = firebase.doc(firebase.db, "wa_agent_settings", "global");
+          const settingsSnap = await firebase.getDoc(settingsRef);
+          if (settingsSnap.exists()) {
+            aiEnabled = settingsSnap.data()?.aiEnabled !== false;
+          }
+        } catch (e) {}
+
+        if (isAIMode && aiEnabled) {
+          const url = new URL(req.url);
+          const origin = url.origin;
+          triggerAIReply({
+            phone: from,
+            customerMessage: content,
+            messageType: msgType,
+          }, origin);
+        }
+      }
+
+      return NextResponse.json({ status: "EVENT_RECEIVED" }, { status: 200 });
+    }
+
+    // Check if this is a WhatsApp Business Account notification (Meta Cloud API fallback)
     if (body.object !== "whatsapp_business_account") {
       return NextResponse.json({ error: "Not a whatsapp_business_account event" }, { status: 404 });
     }

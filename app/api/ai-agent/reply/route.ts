@@ -28,6 +28,43 @@ async function getFirebase() {
   };
 }
 
+async function getEvolutionConfig() {
+  try {
+    const fb = await getFirebase();
+    const docRef = fb.doc(fb.db, "site_config", "operator");
+    const snap = await fb.getDoc(docRef);
+    
+    if (snap.exists()) {
+      const data = snap.data();
+      const url = data.backupEvoApiUrl || process.env.EVOLUTION_API_URL || "https://api.visriva.com";
+      const key = data.backupEvoApiKey || process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey";
+      const instance = data.backupInstanceName || process.env.EVOLUTION_INSTANCE_NAME || "visriva-live";
+      return { url, key, instance };
+    }
+  } catch (err) {
+    console.warn("Failed to load Evolution config from Firestore, falling back to env:", err);
+  }
+  
+  return {
+    url: process.env.EVOLUTION_API_URL || "https://api.visriva.com",
+    key: process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey",
+    instance: process.env.EVOLUTION_INSTANCE_NAME || "visriva-live",
+  };
+}
+
+async function checkEvolutionConnected(config: { url: string; key: string; instance: string }) {
+  try {
+    const res = await fetch(`${config.url}/instance/connectionStatus/${config.instance}`, {
+      headers: { apikey: config.key }
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.instance?.state === "open";
+  } catch (e) {
+    return false;
+  }
+}
+
 // ─── RAG Search (inline for server route) ────────────────────────────────────
 
 const STOP_WORDS = new Set([
@@ -243,46 +280,88 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Empty AI response" }, { status: 500 });
     }
 
-    // ── 7. Send reply via Meta Cloud API ─────────────────────────────────────
-    const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN;
+    // ── 7. Send reply via Evolution API (if connected) or Meta Cloud API ────
+    const evoConfig = await getEvolutionConfig();
+    const isEvoConnected = await checkEvolutionConnected(evoConfig);
 
     let sentViaApi = false;
     let waMessageId = "";
 
-    if (PHONE_NUMBER_ID && ACCESS_TOKEN) {
+    if (isEvoConnected) {
       try {
-        const sendRes = await fetch(
-          `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+        console.log(`🔌 Outgoing reply: Routing via active Evolution instance [${evoConfig.instance}] to ${phone}`);
+        const evoSendRes = await fetch(
+          `${evoConfig.url}/message/sendText/${evoConfig.instance}`,
           {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${ACCESS_TOKEN}`,
               "Content-Type": "application/json",
+              apikey: evoConfig.key,
             },
             body: JSON.stringify({
-              messaging_product: "whatsapp",
-              recipient_type: "individual",
-              to: phone,
-              type: "text",
-              text: {
-                preview_url: true,
-                body: aiReply,
+              number: phone,
+              options: {
+                delay: 1000,
+                presence: "composing",
+                linkPreview: true,
+              },
+              textMessage: {
+                text: aiReply,
               },
             }),
           }
         );
 
-        if (sendRes.ok) {
-          const sendData = await sendRes.json();
-          waMessageId = sendData.messages?.[0]?.id || "";
+        if (evoSendRes.ok) {
+          const evoSendData = await evoSendRes.ok ? await evoSendRes.json() : {};
+          waMessageId = evoSendData.key?.id || "";
           sentViaApi = true;
         } else {
-          const errText = await sendRes.text();
-          console.error("Meta send error:", errText);
+          console.error("Evolution send failed, falling back to Meta Cloud API...");
         }
-      } catch (sendErr) {
-        console.error("Meta send exception:", sendErr);
+      } catch (evoSendErr) {
+        console.error("Evolution send exception, falling back to Meta...", evoSendErr);
+      }
+    }
+
+    if (!sentViaApi) {
+      const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+      const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN;
+
+      if (PHONE_NUMBER_ID && ACCESS_TOKEN) {
+        try {
+          const sendRes = await fetch(
+            `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${ACCESS_TOKEN}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: phone,
+                type: "text",
+                text: {
+                  preview_url: true,
+                  body: aiReply,
+                },
+              }),
+            }
+          );
+
+          if (sendRes.ok) {
+            const sendData = await sendRes.json();
+            waMessageId = sendData.messages?.[0]?.id || "";
+            sentViaApi = true;
+          } else {
+            const errText = await sendRes.text();
+            console.error("Meta send error:", errText);
+          }
+        } catch (sendErr) {
+          console.error("Meta send exception:", sendErr);
+        }
       }
     }
 
