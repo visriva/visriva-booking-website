@@ -35,6 +35,7 @@ import {
   subscribeOperatorTokens,
   saveOperatorTokens,
   OperatorTokenItem as TokenItem,
+  subscribeWhatsAppBotConfig,
 } from "@/lib/firebase";
 import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
 
@@ -57,6 +58,7 @@ export default function OperatorCommandCenterPage() {
 
   const [opConfig, setOpConfig] = useState<OperatorConfig>(DEFAULT_OPERATOR_CONFIG);
   const [featureToggles, setFeatureToggles] = useState<FeatureTogglesConfig>(DEFAULT_FEATURE_TOGGLES);
+  const [waBotConnected, setWaBotConnected] = useState<boolean>(false);
 
   // Token Management State with Firestore & Local Persistence
   const [tokens, setTokens] = useState<TokenItem[]>(() => {
@@ -165,6 +167,11 @@ export default function OperatorCommandCenterPage() {
         }
       }
     });
+    const unsubWhatsApp = subscribeWhatsAppBotConfig((config) => {
+      if (config) {
+        setWaBotConnected(config.connectionStatus === "open");
+      }
+    });
 
     const handleOnline = () => {
       setIsOnline(true);
@@ -199,6 +206,7 @@ export default function OperatorCommandCenterPage() {
       unsubOp();
       unsubToggles();
       unsubTokens();
+      unsubWhatsApp();
       clearInterval(tickInterval);
       if (typeof window !== "undefined") {
         window.removeEventListener("online", handleOnline);
@@ -451,6 +459,14 @@ export default function OperatorCommandCenterPage() {
               }`}>
               <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-ping" : "bg-rose-400"}`}></span>
               <span>{isOnline ? "Venue Network Online" : "Venue Offline (Queue Caching)"}</span>
+            </span>
+
+            <span className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase font-bold tracking-wider border transition-all ${waBotConnected
+              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+              : "bg-rose-500/10 text-rose-300 border-rose-500/20"
+              }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${waBotConnected ? "bg-emerald-400" : "bg-rose-400"}`}></span>
+              <span>WhatsApp Bot: {waBotConnected ? "Connected ✅" : "Disconnected ❌"}</span>
             </span>
 
             {pendingSync && (

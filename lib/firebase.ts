@@ -3012,4 +3012,111 @@ export async function savePlannersConfig(
   }
 }
 
+export interface WhatsAppBotConfig {
+  isActive: boolean;
+  botActive?: boolean; // For backward compatibility
+  autoReplyText: string;
+  instanceName: string;
+  connectionStatus: "open" | "connecting" | "close" | string;
+  lastSyncedAt?: string;
+}
+
+export const DEFAULT_WHATSAPP_BOT_CONFIG: WhatsAppBotConfig = {
+  isActive: true,
+  botActive: true,
+  autoReplyText: 'Hi! I am currently operating a live printing station for an event and will get back to you shortly!',
+  instanceName: 'visriva-live',
+  connectionStatus: 'close',
+};
+
+export function subscribeWhatsAppBotConfig(
+  callback: (config: WhatsAppBotConfig) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem("visriva_whatsapp_bot_config");
+      if (local) {
+        try {
+          callback({ ...DEFAULT_WHATSAPP_BOT_CONFIG, ...JSON.parse(local) });
+          return;
+        } catch (e) {}
+      }
+    }
+    callback(DEFAULT_WHATSAPP_BOT_CONFIG);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("whatsapp_bot_config_updated", handleUpdate);
+  }
+
+  try {
+    const docRef = doc(db, "config", "whatsapp_bot");
+    const unsubscribe = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as WhatsAppBotConfig;
+          const merged = { ...DEFAULT_WHATSAPP_BOT_CONFIG, ...data };
+          if (typeof window !== "undefined") {
+            localStorage.setItem("visriva_whatsapp_bot_config", JSON.stringify(merged));
+          }
+          callback(merged);
+        } else {
+          loadLocal();
+        }
+      },
+      () => loadLocal()
+    );
+
+    return () => {
+      unsubscribe();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("whatsapp_bot_config_updated", handleUpdate);
+      }
+    };
+  } catch (e) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("whatsapp_bot_config_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveWhatsAppBotConfig(
+  config: Partial<WhatsAppBotConfig>
+): Promise<{ success: boolean; firestoreSynced?: boolean; error?: string }> {
+  const syncedConfig = { ...config };
+  if (config.isActive !== undefined) {
+    syncedConfig.botActive = config.isActive;
+  } else if (config.botActive !== undefined) {
+    syncedConfig.isActive = config.botActive;
+  }
+
+  if (typeof window !== "undefined") {
+    const local = localStorage.getItem("visriva_whatsapp_bot_config");
+    const current = local ? JSON.parse(local) : DEFAULT_WHATSAPP_BOT_CONFIG;
+    const merged = { ...current, ...syncedConfig };
+    localStorage.setItem("visriva_whatsapp_bot_config", JSON.stringify(merged));
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("whatsapp_bot_config_updated"));
+  }
+
+  try {
+    const docRef = doc(db, "config", "whatsapp_bot");
+    await setDoc(docRef, syncedConfig, { merge: true });
+    return { success: true, firestoreSynced: true };
+  } catch (e: any) {
+    console.warn("saveWhatsAppBotConfig Firestore fallback note:", e?.message);
+    return { success: true, firestoreSynced: false, error: e?.message };
+  }
+}
+
+
 

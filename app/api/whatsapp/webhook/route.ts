@@ -73,14 +73,15 @@ export async function POST(req: Request) {
     const botRef = fb.doc(fb.db, "config", "whatsapp_bot");
     const botSnap = await fb.getDoc(botRef);
     
-    const isBotActive = botSnap.exists() ? botSnap.data()?.botActive === true : false;
+    const botData = botSnap.exists() ? botSnap.data() : {};
+    const isBotActive = botData?.isActive === true || botData?.botActive === true;
     
     if (!isBotActive) {
       return NextResponse.json({ status: "BOT_DISABLED" });
     }
 
     const config = await getEvolutionConfig();
-    const replyText = "Hi! I am currently operating a live printing station for an event and will get back to you shortly!";
+    const replyText = botData?.autoReplyText || "Hi! I am currently operating a live printing station for an event and will get back to you shortly!";
 
     console.log(`🔌 Dispatching auto-reply via Evolution API to: ${phone}`);
 
@@ -119,11 +120,33 @@ export async function POST(req: Request) {
 // ─── PUT: Sync Bot Setting State ─────────────────────────────────────────────
 export async function PUT(req: Request) {
   try {
-    const { botActive } = await req.json();
+    const body = await req.json();
     const fb = await getFirebase();
     const botRef = fb.doc(fb.db, "config", "whatsapp_bot");
     
-    await fb.setDoc(botRef, { botActive }, { merge: true });
+    const updateData: any = {};
+    if (body.isActive !== undefined) {
+      updateData.isActive = body.isActive;
+      updateData.botActive = body.isActive;
+    }
+    if (body.botActive !== undefined) {
+      updateData.isActive = body.botActive;
+      updateData.botActive = body.botActive;
+    }
+    if (body.autoReplyText !== undefined) {
+      updateData.autoReplyText = body.autoReplyText;
+    }
+    if (body.instanceName !== undefined) {
+      updateData.instanceName = body.instanceName;
+    }
+    if (body.connectionStatus !== undefined) {
+      updateData.connectionStatus = body.connectionStatus;
+    }
+    if (body.lastSyncedAt !== undefined) {
+      updateData.lastSyncedAt = body.lastSyncedAt;
+    }
+    
+    await fb.setDoc(botRef, updateData, { merge: true });
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

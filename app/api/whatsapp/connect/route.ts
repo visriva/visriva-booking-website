@@ -5,7 +5,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 async function getFirebase() {
   const { initializeApp, getApps, getApp } = await import("firebase/app");
-  const { getFirestore, doc, getDoc } = await import("firebase/firestore");
+  const { getFirestore, doc, getDoc, setDoc } = await import("firebase/firestore");
 
   const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,7 +17,7 @@ async function getFirebase() {
   };
 
   const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  return { db: getFirestore(app), doc, getDoc };
+  return { db: getFirestore(app), doc, getDoc, setDoc };
 }
 
 async function getEvolutionConfig() {
@@ -68,15 +68,36 @@ export async function GET(req: Request) {
       
       if (!res.ok) {
         console.log(`[GET status] Connection check returned status ${res.status}. Treating as disconnected.`);
+        try {
+          const fb = await getFirebase();
+          const docRef = fb.doc(fb.db, "config", "whatsapp_bot");
+          await fb.setDoc(docRef, {
+            connectionStatus: "close",
+            lastSyncedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch (dbErr) {}
         return NextResponse.json({ state: "close", status: "disconnected" });
       }
 
       const data = await res.json();
       console.log("[GET status] Connection status data:", JSON.stringify(data));
       const state = data?.instance?.state || data?.state;
+      const isConnected = state === "open" || state === "connected";
+      
+      try {
+        const fb = await getFirebase();
+        const docRef = fb.doc(fb.db, "config", "whatsapp_bot");
+        await fb.setDoc(docRef, {
+          connectionStatus: isConnected ? "open" : "close",
+          lastSyncedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (dbErr) {
+        console.warn("[GET status] Failed to save connectionStatus to Firestore:", dbErr);
+      }
+
       return NextResponse.json({
         state: state || "close",
-        status: (state === "open" || state === "connected") ? "connected" : "disconnected",
+        status: isConnected ? "connected" : "disconnected",
       });
     }
 
@@ -115,6 +136,14 @@ export async function POST(req: Request) {
       const state = statusData?.instance?.state || statusData?.state;
       if (state === 'open' || state === 'connected') {
         console.log('Instance is already connected and open!');
+        try {
+          const fb = await getFirebase();
+          const docRef = fb.doc(fb.db, "config", "whatsapp_bot");
+          await fb.setDoc(docRef, {
+            connectionStatus: "open",
+            lastSyncedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch (dbErr) {}
         return NextResponse.json({ connected: true, state: 'open' });
       }
     } else {
@@ -136,6 +165,14 @@ export async function POST(req: Request) {
       }
       if (rawBase64) {
         console.log(`[2/3] Successfully retrieved existing QR code.`);
+        try {
+          const fb = await getFirebase();
+          const docRef = fb.doc(fb.db, "config", "whatsapp_bot");
+          await fb.setDoc(docRef, {
+            connectionStatus: "close",
+            lastSyncedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch (dbErr) {}
         return NextResponse.json({ connected: false, base64: rawBase64 });
       }
     } else {
@@ -207,6 +244,14 @@ export async function POST(req: Request) {
           rawBase64 = rawBase64.replace(/^data:image\/[a-z]+;base64,/, '');
         }
         if (rawBase64) {
+          try {
+            const fb = await getFirebase();
+            const docRef = fb.doc(fb.db, "config", "whatsapp_bot");
+            await fb.setDoc(docRef, {
+              connectionStatus: "close",
+              lastSyncedAt: new Date().toISOString()
+            }, { merge: true });
+          } catch (dbErr) {}
           return NextResponse.json({ connected: false, base64: rawBase64 });
         }
       }
@@ -218,6 +263,14 @@ export async function POST(req: Request) {
     }
 
     if (rawBase64) {
+      try {
+        const fb = await getFirebase();
+        const docRef = fb.doc(fb.db, "config", "whatsapp_bot");
+        await fb.setDoc(docRef, {
+          connectionStatus: "close",
+          lastSyncedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (dbErr) {}
       return NextResponse.json({ connected: false, base64: rawBase64 });
     }
 
