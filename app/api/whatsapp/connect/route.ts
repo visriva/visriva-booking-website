@@ -59,10 +59,10 @@ export async function GET(req: Request) {
     const action = searchParams.get("action") || "status";
     
     const config = await getEvolutionConfig();
-    console.log(`[GET status] Querying connection status for: ${config.url}/instance/connectionStatus/${config.instance}`);
+    console.log(`[GET status] Querying connection status for: ${config.url}/instance/connectionState/${config.instance}`);
 
     if (action === "status") {
-      const res = await fetch(`${config.url}/instance/connectionStatus/${config.instance}`, {
+      const res = await fetch(`${config.url}/instance/connectionState/${config.instance}`, {
         headers: { apikey: config.key }
       });
       
@@ -73,9 +73,10 @@ export async function GET(req: Request) {
 
       const data = await res.json();
       console.log("[GET status] Connection status data:", JSON.stringify(data));
+      const state = data?.instance?.state || data?.state;
       return NextResponse.json({
-        state: data.instance?.state || "close",
-        status: data.instance?.state === "open" ? "connected" : "disconnected",
+        state: state || "close",
+        status: (state === "open" || state === "connected") ? "connected" : "disconnected",
       });
     }
 
@@ -101,8 +102,48 @@ export async function POST(req: Request) {
     const protocol = host?.includes("localhost") || host?.includes("127.0.0.1") ? "http" : "https";
     const webhookUrl = `${protocol}://${host}/api/whatsapp/webhook`;
 
-    // STEP 1: CREATE THE INSTANCE FIRST
-    console.log(`[1/2] Creating instance '${instanceName}' on Evolution API via POST ${baseUrl}/instance/create...`);
+    // STEP 1: CHECK IF INSTANCE IS ALREADY CONNECTED
+    console.log(`[1/3] Checking connection status for '${instanceName}' via GET ${baseUrl}/instance/connectionState/${instanceName}...`);
+    const statusRes = await fetch(`${baseUrl}/instance/connectionState/${instanceName}`, {
+      method: 'GET',
+      headers: { 'apikey': apiKey },
+    });
+
+    if (statusRes.ok) {
+      const statusData = await statusRes.json();
+      console.log(`[1/3] Connection status payload:`, JSON.stringify(statusData));
+      const state = statusData?.instance?.state || statusData?.state;
+      if (state === 'open' || state === 'connected') {
+        console.log('Instance is already connected and open!');
+        return NextResponse.json({ connected: true, state: 'open' });
+      }
+    } else {
+      console.log(`[1/3] Status check failed or instance doesn't exist yet (Status: ${statusRes.status}).`);
+    }
+
+    // STEP 2: TRY CONNECTING / FETCHING EXISTING QR
+    console.log(`[2/3] Attempting to fetch existing QR code for '${instanceName}' via GET ${baseUrl}/instance/connect/${instanceName}...`);
+    const connectRes = await fetch(`${baseUrl}/instance/connect/${instanceName}`, {
+      method: 'GET',
+      headers: { 'apikey': apiKey },
+    });
+
+    if (connectRes.ok) {
+      const connectData = await connectRes.json();
+      let rawBase64 = connectData.base64 || connectData.qrcode?.base64 || connectData.code || '';
+      if (typeof rawBase64 === 'string') {
+        rawBase64 = rawBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+      }
+      if (rawBase64) {
+        console.log(`[2/3] Successfully retrieved existing QR code.`);
+        return NextResponse.json({ connected: false, base64: rawBase64 });
+      }
+    } else {
+      console.log(`[2/3] Fetching existing QR code failed (Status: ${connectRes.status}).`);
+    }
+
+    // STEP 3: CREATE INSTANCE ONLY IF IT DOESN'T EXIST
+    console.log(`[3/3] Creating new instance '${instanceName}' via POST ${baseUrl}/instance/create...`);
     const createRes = await fetch(`${baseUrl}/instance/create`, {
       method: 'POST',
       headers: {
@@ -118,83 +159,73 @@ export async function POST(req: Request) {
 
     const createStatus = createRes.status;
     const createBodyText = await createRes.text();
-    console.log('[1/2] Create response status:', createStatus);
-    console.log('[1/2] Create response body:', createBodyText);
+    console.log('[3/3] Create response status:', createStatus);
+    console.log('[3/3] Create response body:', createBodyText);
 
     let createData: any = {};
     try {
       createData = JSON.parse(createBodyText);
     } catch (e) {
-      console.warn('[1/2] Failed to parse create response body as JSON');
+      console.warn('[3/3] Failed to parse create response body as JSON');
     }
 
-    // Configure Webhook so the auto-responder behaves correctly
-    const webhookSetUrl = `${baseUrl}/webhook/set/${instanceName}`;
-    console.log(`[Webhook] Configuring webhook via POST ${webhookSetUrl}`);
-    try {
-      const webhookRes = await fetch(webhookSetUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: apiKey,
-        },
-        body: JSON.stringify({
-          enabled: true,
-          url: webhookUrl,
-          events: [
-            "CONNECTION_UPDATE",
-            "MESSAGES_UPSERT"
-          ]
-        })
+    if (createRes.ok || createStatus === 400 || createStatus === 403) {
+      // Configure Webhook since we're setting up the instance
+      const webhookSetUrl = `${baseUrl}/webhook/set/${instanceName}`;
+      console.log(`[Webhook] Configuring webhook via POST ${webhookSetUrl}`);
+      try {
+        const webhookRes = await fetch(webhookSetUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: apiKey,
+          },
+          body: JSON.stringify({
+            enabled: true,
+            url: webhookUrl,
+            events: [
+              "CONNECTION_UPDATE",
+              "MESSAGES_UPSERT"
+            ]
+          })
+        });
+        console.log(`[Webhook] Configured successfully. Status: ${webhookRes.status}`);
+      } catch (webhookErr: any) {
+        console.warn(`[Webhook] Warning: Failed to set webhook URL: ${webhookErr.message}`);
+      }
+
+      // Fetch the QR code again now that it has been created/re-initialized
+      console.log(`[3/3] Re-fetching connect after create...`);
+      const retryConnectRes = await fetch(`${baseUrl}/instance/connect/${instanceName}`, {
+        method: 'GET',
+        headers: { 'apikey': apiKey },
       });
-      console.log(`[Webhook] Configured successfully. Status: ${webhookRes.status}`);
-    } catch (webhookErr: any) {
-      console.warn(`[Webhook] Warning: Failed to set webhook URL: ${webhookErr.message}`);
+      if (retryConnectRes.ok) {
+        const retryConnectData = await retryConnectRes.json();
+        let rawBase64 = retryConnectData.base64 || retryConnectData.qrcode?.base64 || retryConnectData.code || '';
+        if (typeof rawBase64 === 'string') {
+          rawBase64 = rawBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+        }
+        if (rawBase64) {
+          return NextResponse.json({ connected: false, base64: rawBase64 });
+        }
+      }
     }
 
-    // STEP 2: CONNECT / FETCH QR CODE
-    console.log(`[2/2] Fetching QR Code for instance '${instanceName}' via GET ${baseUrl}/instance/connect/${instanceName}...`);
-    const connectRes = await fetch(`${baseUrl}/instance/connect/${instanceName}`, {
-      method: 'GET',
-      headers: {
-        'apikey': apiKey,
-      },
-    });
-    
-    const connectStatus = connectRes.status;
-    const connectBodyText = await connectRes.text();
-    console.log('[2/2] Connect response status:', connectStatus);
-    console.log('[2/2] Connect response body (truncated):', connectBodyText.slice(0, 200));
-
-    let connectData: any = {};
-    try {
-      connectData = JSON.parse(connectBodyText);
-    } catch (e) {
-      console.error('[2/2] Failed to parse connect response body as JSON:', e);
-      return NextResponse.json({ 
-        error: 'Invalid JSON response from connect endpoint', 
-        details: { connectBodyText } 
-      }, { status: 500 });
-    }
-
-    // Extract base64 QR code string from wherever Evolution API returns it
-    let rawBase64 = connectData.base64 || connectData.qrcode?.base64 || createData.qrcode?.base64 || createData.base64 || '';
-
-    // Strip prefix if already attached
+    let rawBase64 = createData.base64 || createData.qrcode?.base64 || '';
     if (typeof rawBase64 === 'string') {
       rawBase64 = rawBase64.replace(/^data:image\/[a-z]+;base64,/, '');
     }
 
-    if (!rawBase64) {
-      console.error('[POST Error] Failed to retrieve QR code from server response:', { createData, connectData });
-      return NextResponse.json({ 
-        error: 'Failed to retrieve QR code from server response', 
-        details: { createData, connectData } 
-      }, { status: 400 });
+    if (rawBase64) {
+      return NextResponse.json({ connected: false, base64: rawBase64 });
     }
 
-    console.log(`[POST Success] Successfully retrieved QR Base64 (length: ${rawBase64.length})`);
-    return NextResponse.json({ base64: rawBase64 });
+    return NextResponse.json({
+      error: 'Unable to connect or create instance',
+      details: { createData }
+    }, { status: 400 });
+
   } catch (error: any) {
     console.error('SERVER ROUTE ERROR:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });

@@ -90,15 +90,15 @@ export default function WhatsAppAdminPage() {
 
       const qrData = data.base64 || data.qrcode?.base64 || (typeof data.qrcode === "string" ? data.qrcode : "");
 
-      if (qrData) {
+      if (data.connected === true || data.status === "connected" || data.instance?.state === "open" || data.state === "open") {
+        setWaLinkStatus("connected");
+        setWaLinkQr("");
+        triggerToast("🟢 WhatsApp is already connected!");
+      } else if (qrData) {
         const cleanedQr = typeof qrData === "string" ? qrData.replace(/^data:image\/[a-z]+;base64,/, "") : qrData;
         setWaLinkQr(cleanedQr);
         setWaLinkStatus("qr_ready");
         triggerToast("✅ Scan the QR code below to connect your device!");
-      } else if (data.status === "connected" || data.instance?.state === "open") {
-        setWaLinkStatus("connected");
-        setWaLinkQr("");
-        triggerToast("🟢 WhatsApp is already connected!");
       } else {
         throw new Error("No QR code returned from Evolution API.");
       }
@@ -183,7 +183,7 @@ export default function WhatsAppAdminPage() {
                 <span className="px-3 py-1 rounded-full bg-amber-500/10 text-[#D4AF37] border border-[#D4AF37]/30 text-xs font-bold uppercase tracking-wider">QR Code Ready</span>
               )}
               {waLinkStatus === "connected" && (
-                <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold uppercase tracking-wider">🟢 Connected &amp; Active</span>
+                <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold uppercase tracking-wider">WhatsApp Connected &amp; Sync Active ✅</span>
               )}
             </div>
 
