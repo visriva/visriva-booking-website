@@ -50,7 +50,7 @@ async function run() {
     let targetServiceId = targetService?.id;
 
     if (!targetServiceId) {
-      console.log("➕ Service 'evolution-api' not found. Creating service from atendare/evolution-api:latest image...");
+      console.log("➕ Service 'evolution-api' not found. Creating service from evoapicloud/evolution-api:latest image...");
       const createServiceData = await graphql(`
         mutation serviceCreate($input: ServiceCreateInput!) {
           serviceCreate(input: $input) {
@@ -63,7 +63,7 @@ async function run() {
           projectId,
           name: "evolution-api",
           source: {
-            image: "atendare/evolution-api:latest"
+            image: "evoapicloud/evolution-api:latest"
           }
         }
       });

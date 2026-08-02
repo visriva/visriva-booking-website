@@ -62,13 +62,21 @@ async function getEvolutionConfig() {
 
 async function ensureInstanceExists(config: { url: string; key: string; instance: string }) {
   try {
-    // Check connection status of the instance
+    let needsCreation = false;
     const checkRes = await fetch(`${config.url}/instance/connectionStatus/${config.instance}`, {
       headers: { apikey: config.key }
     });
     
-    // If instance is missing, recreate it
-    if (checkRes.status === 404) {
+    if (!checkRes.ok) {
+      needsCreation = true;
+    } else {
+      const data = await checkRes.json();
+      if (data.error || data.message?.includes("not found") || data.message?.includes("not exist")) {
+        needsCreation = true;
+      }
+    }
+    
+    if (needsCreation) {
       console.log(`🔌 Evolution instance ${config.instance} not found. Re-creating...`);
       await fetch(`${config.url}/instance/create`, {
         method: "POST",
