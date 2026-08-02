@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     }
 
     const config = await getEvolutionConfig();
-    const replyText = "Hi! I am currently operating a live printing station. I will get back to you shortly!";
+    const replyText = "Hi! I am currently operating a live printing station for an event and will get back to you shortly!";
 
     console.log(`🔌 Dispatching auto-reply message via Evolution API to: ${phone}`);
 
