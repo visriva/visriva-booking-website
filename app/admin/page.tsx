@@ -132,7 +132,7 @@ export default function AdminDashboardPage() {
 
   // Admin Dashboard Tabs: 1. Global Settings | 2. Website Text | 3. Print Previewer | 4. Golden Wheel | 5. Pricing & Services | 6. Gallery Manager | 7. Booking CRM | 8. Feature Toggles | 9. Bento Grid CMS | 10. Service Toggles | 11. Hero Card Studio | 12. AI Concierge CMS | 13. AI WhatsApp CMS | 14. Real Impact Stats CMS | 15. Planners CMS
   const [activeTab, setActiveTab] = useState<
-    "globalSettings" | "websiteText" | "printPreviewer" | "goldenWheel" | "pricingServices" | "galleryManager" | "bookingCRM" | "operatorTab" | "featureToggles" | "bentoGrid" | "serviceToggles" | "heroCardStudio" | "aiConciergeCMS" | "aiWhatsAppCMS" | "impactStatsCMS" | "plannersCMS"
+    "globalSettings" | "websiteText" | "printPreviewer" | "goldenWheel" | "pricingServices" | "galleryManager" | "bookingCRM" | "operatorTab" | "featureToggles" | "bentoGrid" | "serviceToggles" | "heroCardStudio" | "aiConciergeCMS" | "aiWhatsAppCMS" | "aiWhatsAppScanner" | "impactStatsCMS" | "plannersCMS"
   >("globalSettings");
 
   const [activeCategory, setActiveCategory] = useState<
