@@ -1,78 +1,60 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 
-// Disable TLS verification for Railway self-hosted instances
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
-const EVO_URL     = (process.env.EVOLUTION_API_URL     || "https://evolution-api-production-d446.up.railway.app").replace(/\/$/, "");
-const EVO_KEY     = process.env.EVOLUTION_API_KEY      || "VisrivaSecretKey2026_SecureKey";
-const EVO_INST    = process.env.EVOLUTION_INSTANCE_NAME || "visriva-live";
-const WEBHOOK_URL = "https://visriva.com/api/whatsapp/webhook";
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 export async function POST() {
-  const endpoint = `${EVO_URL}/webhook/set/${EVO_INST}`;
+  const baseUrl = process.env.EVOLUTION_API_URL?.replace(/\/$/, '');
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instanceName = process.env.EVOLUTION_INSTANCE_NAME || 'visriva-live';
+  const webhookUrl = 'https://visriva.com/api/whatsapp/webhook';
 
-  console.log(`[sync-webhook] Registering webhook → ${endpoint}`);
-  console.log(`[sync-webhook] Payload URL: ${WEBHOOK_URL}`);
+  if (!baseUrl || !apiKey) {
+    return NextResponse.json({ error: 'Missing environment variables: EVOLUTION_API_URL or EVOLUTION_API_KEY' }, { status: 500 });
+  }
 
-  let rawBody = "";
-  let status  = 0;
+  const endpoint = `${baseUrl}/webhook/set/${instanceName}`;
 
   try {
+    console.log(`[sync-webhook] Setting webhook for '${instanceName}' → '${webhookUrl}'`);
+    console.log(`[sync-webhook] Endpoint: ${endpoint}`);
+
     const res = await fetch(endpoint, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        apikey: EVO_KEY,
+        'Content-Type': 'application/json',
+        apikey: apiKey,
       },
       body: JSON.stringify({
         webhook: {
-          url:     WEBHOOK_URL,
+          url: webhookUrl,
           enabled: true,
-          events:  ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
+          events: ['MESSAGES_UPSERT', 'MESSAGES_SET'],
         },
       }),
     });
 
-    status  = res.status;
-    rawBody = await res.text();
+    const rawText = await res.text();
+    console.log(`[sync-webhook] Railway responded ${res.status}: ${rawText}`);
 
-    console.log(`[sync-webhook] Railway responded ${status}: ${rawBody}`);
-
-    // Try to parse JSON — Railway returns JSON on success AND on error
-    let parsed: unknown = rawBody;
-    try { parsed = JSON.parse(rawBody); } catch {}
+    let data: unknown = rawText;
+    try { data = JSON.parse(rawText); } catch {}
 
     if (!res.ok) {
       return NextResponse.json(
-        {
-          success: false,
-          status,
-          error:   `Railway returned ${status}`,
-          detail:  parsed,
-          endpoint,
-        },
+        { error: 'Failed to set webhook on Railway', details: data, status: res.status },
         { status: res.status }
       );
     }
 
     return NextResponse.json({
-      success:  true,
-      status,
-      message:  `Webhook registered on instance '${EVO_INST}'`,
-      url:      WEBHOOK_URL,
+      success: true,
+      message: `Webhook registered for instance '${instanceName}'`,
+      url: webhookUrl,
       endpoint,
-      response: parsed,
+      response: data,
     });
-
-  } catch (err: any) {
-    console.error("[sync-webhook] Fetch threw:", err);
-    return NextResponse.json(
-      {
-        success: false,
-        error:   err.message || "Network error reaching Railway",
-        endpoint,
-      },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    console.error('[sync-webhook] Fetch threw:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
