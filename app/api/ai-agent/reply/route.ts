@@ -39,6 +39,12 @@ async function getEvolutionConfig() {
       let url = data.backupEvoApiUrl || process.env.EVOLUTION_API_URL || "https://api.visriva.com";
       const key = data.backupEvoApiKey || process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey";
       const instance = data.backupInstanceName || process.env.EVOLUTION_INSTANCE_NAME || "visriva-live";
+      
+      // Prepend https:// if protocol is missing
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        url = "https://" + url;
+      }
+      // Strip trailing slash
       if (url.endsWith("/")) {
         url = url.slice(0, -1);
       }
@@ -48,8 +54,15 @@ async function getEvolutionConfig() {
     console.warn("Failed to load Evolution config from Firestore, falling back to env:", err);
   }
   
+  let url = process.env.EVOLUTION_API_URL || "https://api.visriva.com";
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = "https://" + url;
+  }
+  if (url.endsWith("/")) {
+    url = url.slice(0, -1);
+  }
   return {
-    url: process.env.EVOLUTION_API_URL || "https://api.visriva.com",
+    url,
     key: process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey",
     instance: process.env.EVOLUTION_INSTANCE_NAME || "visriva-live",
   };
