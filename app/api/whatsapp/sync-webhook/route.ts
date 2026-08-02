@@ -9,41 +9,55 @@ export async function POST() {
   const webhookUrl = 'https://visriva.com/api/whatsapp/webhook';
 
   if (!baseUrl || !apiKey) {
-    return NextResponse.json({ error: 'Missing environment variables: EVOLUTION_API_URL or EVOLUTION_API_KEY' }, { status: 500 });
+    return NextResponse.json({ error: 'Missing environment variables' }, { status: 500 });
   }
 
   const endpoint = `${baseUrl}/webhook/set/${instanceName}`;
 
   try {
-    console.log(`[sync-webhook] Setting webhook for '${instanceName}' → '${webhookUrl}'`);
+    console.log(`[sync-webhook] Setting webhook for '${instanceName}' to '${webhookUrl}'...`);
     console.log(`[sync-webhook] Endpoint: ${endpoint}`);
+    console.log(`[sync-webhook] API Key (first 8 chars): ${apiKey.slice(0, 8)}...`);
 
+    // Note: Evolution API v2 requires 'apikey' (lowercase) in headers
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apikey: apiKey,
+        'apikey': apiKey,
       },
       body: JSON.stringify({
         webhook: {
           url: webhookUrl,
           enabled: true,
-          events: ['MESSAGES_UPSERT', 'MESSAGES_SET'],
+          events: [
+            'MESSAGES_UPSERT',
+            'MESSAGES_SET',
+            'CONNECTION_UPDATE',
+          ],
         },
       }),
     });
 
-    const rawText = await res.text();
-    console.log(`[sync-webhook] Railway responded ${res.status}: ${rawText}`);
+    const responseText = await res.text();
+    let data: unknown;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      data = { message: responseText };
+    }
 
-    let data: unknown = rawText;
-    try { data = JSON.parse(rawText); } catch {}
+    console.log('[sync-webhook] Railway response status:', res.status);
+    console.log('[sync-webhook] Railway response body:', responseText);
 
     if (!res.ok) {
-      return NextResponse.json(
-        { error: 'Failed to set webhook on Railway', details: data, status: res.status },
-        { status: res.status }
-      );
+      return NextResponse.json({
+        error: `Railway returned HTTP ${res.status}`,
+        details: data,
+        status: res.status,
+        endpoint,
+        apiKeyHint: `${apiKey.slice(0, 8)}...`,
+      }, { status: res.status });
     }
 
     return NextResponse.json({
