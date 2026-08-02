@@ -23,7 +23,7 @@ async function getFirebase() {
 async function getEvolutionConfig() {
   try {
     const fb = await getFirebase();
-    const docRef = fb.doc(fb.db, "site_config", "operator");
+    const docRef = fb.doc(fb.db, "config", "operator");
     const snap = await fb.getDoc(docRef);
     
     if (snap.exists()) {

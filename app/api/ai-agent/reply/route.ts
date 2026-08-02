@@ -31,14 +31,17 @@ async function getFirebase() {
 async function getEvolutionConfig() {
   try {
     const fb = await getFirebase();
-    const docRef = fb.doc(fb.db, "site_config", "operator");
+    const docRef = fb.doc(fb.db, "config", "operator");
     const snap = await fb.getDoc(docRef);
     
     if (snap.exists()) {
       const data = snap.data();
-      const url = data.backupEvoApiUrl || process.env.EVOLUTION_API_URL || "https://api.visriva.com";
+      let url = data.backupEvoApiUrl || process.env.EVOLUTION_API_URL || "https://api.visriva.com";
       const key = data.backupEvoApiKey || process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey";
       const instance = data.backupInstanceName || process.env.EVOLUTION_INSTANCE_NAME || "visriva-live";
+      if (url.endsWith("/")) {
+        url = url.slice(0, -1);
+      }
       return { url, key, instance };
     }
   } catch (err) {
