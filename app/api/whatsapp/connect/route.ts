@@ -139,9 +139,11 @@ export async function POST(req: Request) {
           apikey: apiKey,
         },
         body: JSON.stringify({
-          enabled: true,
-          url: webhookUrl,
-          events: ["MESSAGES_UPSERT"]
+          webhook: {
+            url: webhookUrl,
+            enabled: true,
+            events: ["MESSAGES_UPSERT"]
+          }
         })
       });
 
@@ -258,12 +260,14 @@ export async function POST(req: Request) {
             apikey: apiKey,
           },
           body: JSON.stringify({
-            enabled: true,
-            url: webhookUrl,
-            events: [
-              "CONNECTION_UPDATE",
-              "MESSAGES_UPSERT"
-            ]
+            webhook: {
+              url: webhookUrl,
+              enabled: true,
+              events: [
+                "CONNECTION_UPDATE",
+                "MESSAGES_UPSERT"
+              ]
+            }
           })
         });
         console.log(`[Webhook] Configured successfully. Status: ${webhookRes.status}`);
