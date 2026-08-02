@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import type { AgentSettings } from "@/types/whatsapp-agent";
-import { DEFAULT_AGENT_SETTINGS, subscribeSettings, updateSettings } from "@/lib/ai-agent";
+import { DEFAULT_AGENT_SETTINGS } from "@/types/whatsapp-agent";
+import { subscribeSettings, updateSettings } from "@/lib/ai-agent";
 import KnowledgeBaseUploader from "./KnowledgeBaseUploader";
 
 type TabId = "ai" | "kb" | "defaults" | "api";

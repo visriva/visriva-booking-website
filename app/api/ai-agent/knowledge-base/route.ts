@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     if (mimeType === "application/pdf" || fileName.endsWith(".pdf")) {
       // PDF extraction using pdf-parse
       try {
-        const pdfParse = (await import("pdf-parse")).default;
+        const pdfParse = (await import("pdf-parse") as any).default || (await import("pdf-parse") as any);
         const buffer = Buffer.from(await file.arrayBuffer());
         const pdfData = await pdfParse(buffer);
         extractedText = pdfData.text || "";
