@@ -161,9 +161,19 @@ export async function POST(req: Request) {
     }
 
     // 2. Connect / Generate QR Code
-    const res = await fetch(`${config.url}/instance/connect/${config.instance}`, {
+    // Try POST first (standard in v2.x), fallback to GET if POST returns 404 or 405
+    let res = await fetch(`${config.url}/instance/connect/${config.instance}`, {
+      method: "POST",
       headers: { apikey: config.key }
     });
+    
+    if (res.status === 404 || res.status === 405) {
+      console.log(`🔌 POST connect failed with ${res.status}. Falling back to GET...`);
+      res = await fetch(`${config.url}/instance/connect/${config.instance}`, {
+        method: "GET",
+        headers: { apikey: config.key }
+      });
+    }
     
     if (!res.ok) {
       const errText = await res.text();
