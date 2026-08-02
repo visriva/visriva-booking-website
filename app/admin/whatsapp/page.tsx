@@ -52,6 +52,7 @@ export default function WhatsAppCRMPage() {
   const [autoReplyText, setAutoReplyText] = useState("");
   const [saveLoading, setSaveLoading] = useState(false);
   const [webhookSyncLoading, setWebhookSyncLoading] = useState(false);
+  const [webhookResult, setWebhookResult] = useState<{ success: boolean; message?: string; url?: string; error?: string; detail?: unknown; status?: number } | null>(null);
 
   // Connection
   const [waStatus, setWaStatus] = useState<"checking" | "connected" | "disconnected" | "qr_ready">("checking");
@@ -165,17 +166,25 @@ export default function WhatsAppCRMPage() {
 
   const syncWebhook = async () => {
     setWebhookSyncLoading(true);
+    setWebhookResult(null);
+    console.log("[Force Sync] Calling /api/whatsapp/sync-webhook...");
     try {
-      const res = await fetch("/api/whatsapp/connect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "setup_webhook" }),
-      });
+      const res = await fetch("/api/whatsapp/sync-webhook", { method: "POST" });
       const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || "Failed");
-      toast(`✅ Webhook registered: ${data.url}`);
-    } catch (err: any) { toast(`Webhook sync failed: ${err.message}`, true); }
-    finally { setWebhookSyncLoading(false); }
+      console.log("[Force Sync] Response:", data);
+      setWebhookResult(data);
+      if (data.success) {
+        toast(`✅ Webhook registered! Railway → Vercel active.`);
+      } else {
+        toast(`Railway returned ${data.status}: ${data.error}`, true);
+      }
+    } catch (err: any) {
+      console.error("[Force Sync] Threw:", err);
+      setWebhookResult({ success: false, error: err.message });
+      toast(`Network error: ${err.message}`, true);
+    } finally {
+      setWebhookSyncLoading(false);
+    }
   };
 
   const toggleBot = async () => {
@@ -318,12 +327,33 @@ export default function WhatsAppCRMPage() {
               {/* Webhook */}
               <div className="space-y-3 p-4 rounded-xl bg-white/5 border border-white/10">
                 <p className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider">Webhook Registration</p>
-                <p className="text-[11px] text-white/50 font-mono break-all">visriva.com/api/whatsapp/webhook</p>
-                <button type="button" onClick={syncWebhook} disabled={webhookSyncLoading}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 border border-[#D4AF37]/30 text-[#D4AF37] text-xs font-bold uppercase tracking-wider transition disabled:opacity-50 cursor-pointer hover:bg-[#D4AF37]/10">
-                  {webhookSyncLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
-                  {webhookSyncLoading ? "Syncing..." : "Sync Webhook"}
+                <p className="text-[11px] text-white/50 font-mono break-all">Target: visriva.com/api/whatsapp/webhook</p>
+
+                {/* Prominent Force Sync button */}
+                <button
+                  type="button"
+                  onClick={syncWebhook}
+                  disabled={webhookSyncLoading}
+                  className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#D4AF37] text-[#011F15] text-xs font-extrabold uppercase tracking-wider shadow-lg transition disabled:opacity-50 cursor-pointer hover:brightness-110 active:scale-95"
+                >
+                  {webhookSyncLoading
+                    ? <><RefreshCw className="w-4 h-4 animate-spin" /> Registering on Railway...</>
+                    : <><Link2 className="w-4 h-4" /> ⚡ Force Sync Webhook</>
+                  }
                 </button>
+
+                {/* Inline result panel */}
+                {webhookResult && (
+                  <div className={`rounded-lg p-3 text-[10px] font-mono border ${webhookResult.success ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" : "bg-red-500/10 border-red-500/20 text-red-300"}`}>
+                    <p className="font-bold mb-1 text-[11px]">{webhookResult.success ? "✅ SUCCESS" : `❌ FAILED (HTTP ${webhookResult.status ?? "—"})`}</p>
+                    {webhookResult.success && <p>URL: {webhookResult.url}</p>}
+                    {webhookResult.error && <p>Error: {webhookResult.error}</p>}
+                    {webhookResult.detail !== undefined && (
+                      <pre className="mt-1 whitespace-pre-wrap break-all opacity-80">{JSON.stringify(webhookResult.detail, null, 2)}</pre>
+                    )}
+                  </div>
+                )}
+
                 {botConfig?.lastSyncedAt && (
                   <p className="text-[10px] text-white/30 font-mono">Last sync: {new Date(botConfig.lastSyncedAt).toLocaleString()}</p>
                 )}
