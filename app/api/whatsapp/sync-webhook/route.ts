@@ -10,9 +10,8 @@ const WEBHOOK_URL  = 'https://visriva.com/api/whatsapp/webhook';
 export async function POST() {
   const endpoint = `${EVO_URL}/webhook/set/${EVO_INSTANCE}`;
 
-  console.log(`[sync-webhook] Setting webhook for '${EVO_INSTANCE}' → '${WEBHOOK_URL}'`);
+  console.log(`[sync-webhook] Registering webhook for '${EVO_INSTANCE}' → '${WEBHOOK_URL}'`);
   console.log(`[sync-webhook] Endpoint: ${endpoint}`);
-  console.log(`[sync-webhook] API Key prefix: ${EVO_KEY.slice(0, 8)}...`);
 
   if (!EVO_URL || !EVO_KEY) {
     return NextResponse.json({ error: 'Missing EVOLUTION_API_URL or EVOLUTION_API_KEY environment variables' }, { status: 500 });
@@ -30,20 +29,20 @@ export async function POST() {
         webhook: {
           url:     WEBHOOK_URL,
           enabled: true,
-          events:  [
-            'MESSAGES_UPSERT',
-            'MESSAGES_SET',
-            'CONNECTION_UPDATE',
-          ],
+          events:  ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
         },
       }),
     });
 
     const responseText = await res.text();
     let data: unknown;
-    try { data = JSON.parse(responseText); } catch { data = { message: responseText }; }
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      data = { message: responseText };
+    }
 
-    console.log(`[sync-webhook] Railway responded HTTP ${res.status}:`, responseText);
+    console.log(`[sync-webhook] Railway response HTTP ${res.status}:`, responseText);
 
     if (!res.ok) {
       return NextResponse.json(
@@ -60,14 +59,13 @@ export async function POST() {
 
     return NextResponse.json({
       success:  true,
-      message:  `Webhook registered for instance '${EVO_INSTANCE}'`,
+      response: data,
       url:      WEBHOOK_URL,
       endpoint,
-      response: data,
     });
 
   } catch (error: any) {
-    console.error('[sync-webhook] Fetch error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('[sync-webhook] Top-level error:', error);
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }

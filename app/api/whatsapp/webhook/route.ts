@@ -26,7 +26,7 @@ async function getFirebase() {
   return { db: getFirestore(app), doc, getDoc, collection, addDoc, setDoc, serverTimestamp };
 }
 
-// ─── Save message to Firestore chats ──────────────────────────────────────────
+// ─── Save message to Firestore ────────────────────────────────────────────────
 async function saveChatMessage(
   phone: string,
   sender: 'user' | 'bot' | 'admin',
@@ -59,22 +59,22 @@ async function saveChatMessage(
   }
 }
 
-// ─── GET — Health Check Endpoint for Webhook Setup ────────────────────────────
+// ─── GET: Health Check Endpoint for Webhook Verification ──────────────────────
 export async function GET() {
-  return NextResponse.json({ status: 'online' });
+  return NextResponse.json({ status: 'active' });
 }
 
-// ─── POST — Incoming Evolution API Webhook Event Receiver ─────────────────────
+// ─── POST: Incoming Webhook Receiver ──────────────────────────────────────────
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null);
     if (!body) {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return NextResponse.json({ status: 'success', note: 'empty or non-JSON body' });
     }
 
-    console.log('🔥 INCOMING WEBHOOK PAYLOAD:', JSON.stringify(body, null, 2));
+    console.log('🔥 WEBHOOK RECEIVED RAW PAYLOAD:', JSON.stringify(body, null, 2));
 
-    // Safely extract event data — Evolution API v2 nests payload under body.data
+    // Safely extract payload data
     const data = body?.data || body;
 
     const remoteJid: string  = data?.key?.remoteJid  || data?.sender      || data?.remoteJid || '';
@@ -88,35 +88,41 @@ export async function POST(request: Request) {
       data?.body                                    ||
       '';
 
-    // Ignore group messages (@g.us), self-sent messages (fromMe === true), or empty text
+    // Ignore group chats (@g.us), self-sent messages (fromMe === true), or empty text
     if (!remoteJid || fromMe || remoteJid.endsWith('@g.us') || !messageContent.trim()) {
-      console.log('[webhook] Ignored — fromMe, group chat, or empty message text.', { remoteJid, fromMe });
-      return NextResponse.json({ status: 'ignored', reason: 'Missing JID, sent by self, group, or empty text' });
+      console.log('[webhook] Ignored — sent by self, group, or no text body.');
+      return NextResponse.json({ status: 'success', note: 'ignored message' });
     }
 
-    // Clean phone number (strip JID suffixes, keep digits only)
+    // Clean phone number
     const phoneNumber = remoteJid.replace(/@s\.whatsapp\.net|@g\.us/g, '').replace(/[^0-9]/g, '');
-    console.log(`[webhook] ✉️ Incoming message from ${phoneNumber} (${pushName}): "${messageContent}"`);
+    console.log(`[webhook] ✉️ Message from ${phoneNumber} (${pushName}): "${messageContent}"`);
 
-    // 1. Save incoming user message to database
+    // 1. Save incoming user message to Firestore
     await saveChatMessage(phoneNumber, 'user', messageContent, pushName || phoneNumber);
 
-    // 2. Fetch bot active status & custom auto-reply text from Firestore
-    const fb = await getFirebase();
-    const botSnap = await fb.getDoc(fb.doc(fb.db, 'config', 'whatsapp_bot'));
-    const botData = botSnap.exists() ? botSnap.data() : {};
-    const isBotActive = botData?.isActive === true || botData?.botActive === true;
+    // 2. Check bot settings
+    let isBotActive = true;
+    let customFallback = 'Hi! I am currently operating a live printing station for an event and will get back to you shortly!';
 
-    if (!isBotActive) {
-      console.log('[webhook] Bot is currently disabled — user message saved, auto-reply skipped.');
-      return NextResponse.json({ status: 'saved', replied: false, reason: 'bot_disabled' });
+    try {
+      const fb = await getFirebase();
+      const botSnap = await fb.getDoc(fb.doc(fb.db, 'config', 'whatsapp_bot'));
+      if (botSnap.exists()) {
+        const botData = botSnap.data();
+        isBotActive = botData?.isActive === true || botData?.botActive === true;
+        if (botData?.autoReplyText) customFallback = botData.autoReplyText;
+      }
+    } catch (e) {
+      console.warn('[webhook] Could not read bot config from Firestore, using defaults:', e);
     }
 
-    // 3. Build smart response based on keywords or fallback to custom reply text
-    const customFallback: string =
-      botData?.autoReplyText ||
-      'Hi! I am currently operating a live printing station for an event and will get back to you shortly!';
+    if (!isBotActive) {
+      console.log('[webhook] Bot disabled — message saved, auto-reply skipped.');
+      return NextResponse.json({ status: 'success', note: 'bot_disabled' });
+    }
 
+    // 3. Build smart response based on keywords
     let replyText = customFallback;
     const lower = messageContent.toLowerCase();
 
@@ -166,30 +172,36 @@ export async function POST(request: Request) {
         '*Visriva Live Station* — Creating memories, one print at a time! ✨';
     }
 
-    // 4. Send automated text response back via Evolution API
+    // 4. Send flat JSON reply { number, text } to Evolution API
     console.log(`[webhook] 🤖 Sending auto-reply to ${phoneNumber}...`);
-    const sendRes = await fetch(`${EVO_URL}/message/sendText/${EVO_INSTANCE}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': EVO_KEY,
-      },
-      body: JSON.stringify({
-        number: phoneNumber,
-        text: replyText,
-      }),
-    });
+    try {
+      const sendRes = await fetch(`${EVO_URL}/message/sendText/${EVO_INSTANCE}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': EVO_KEY,
+        },
+        body: JSON.stringify({
+          number: phoneNumber,
+          text:   replyText,
+        }),
+      });
 
-    const sendResult = await sendRes.json().catch(() => ({}));
-    console.log('🤖 BOT AUTO-REPLY SENT RESULT:', sendResult);
+      const sendResult = await sendRes.json().catch(() => ({}));
+      console.log('🤖 BOT AUTO-REPLY SENT RESULT:', sendResult);
+    } catch (sendErr) {
+      console.error('[webhook] Error sending text message:', sendErr);
+    }
 
-    // 5. Save outgoing bot reply to database chat thread
+    // 5. Save bot reply to Firestore
     await saveChatMessage(phoneNumber, 'bot', replyText, pushName || phoneNumber);
 
-    return NextResponse.json({ status: 'success', replied: true, phone: phoneNumber });
+    // Always return success JSON to prevent Railway packet retries
+    return NextResponse.json({ status: 'success' });
 
   } catch (error: any) {
-    console.error('❌ WEBHOOK CRASH ERROR:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('❌ WEBHOOK TOP-LEVEL ERROR:', error);
+    // Always return valid JSON status 200/500
+    return NextResponse.json({ status: 'success', error: error.message });
   }
 }

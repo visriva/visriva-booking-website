@@ -172,7 +172,7 @@ export default function WhatsAppCRMPage() {
     try {
       const res = await fetch("/api/whatsapp/connect?action=status", { signal: AbortSignal.timeout(8000) });
       if (!res.ok) { setWaStatus("disconnected"); return; }
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ status: "disconnected" }));
       setWaStatus(data.status === "connected" ? "connected" : "disconnected");
     } catch { setWaStatus("disconnected"); }
   };
@@ -186,7 +186,7 @@ export default function WhatsAppCRMPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "connect" }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: `Server error (HTTP ${res.status})` }));
       if (data.connected)   { setWaStatus("connected"); toast("✅ WhatsApp is already connected!"); }
       else if (data.base64) { setWaQr(data.base64); setWaStatus("qr_ready"); toast("📱 Scan the QR code with WhatsApp."); }
       else                  throw new Error(data.error || "No QR code returned");
@@ -199,7 +199,7 @@ export default function WhatsAppCRMPage() {
     setWebhookResult(null);
     try {
       const res  = await fetch("/api/whatsapp/sync-webhook", { method: "POST" });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ success: false, error: `Server returned non-JSON response (HTTP ${res.status})` }));
       setWebhookResult(data);
       if (data.success) {
         toast("✅ Webhook synced successfully! Railway → Vercel active.");
