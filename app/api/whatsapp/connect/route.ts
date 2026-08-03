@@ -1,330 +1,192 @@
 import { NextResponse } from 'next/server';
 
-// Allow self-signed certs for self-hosted Evolution VPS connections
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
+const EVO_URL      = (process.env.EVOLUTION_API_URL      || 'https://evolution-api-production-d446.up.railway.app').replace(/\/$/, '');
+const EVO_KEY      = process.env.EVOLUTION_API_KEY       || 'VisrivaSecretKey2026_SecureKey';
+const EVO_INSTANCE = process.env.EVOLUTION_INSTANCE_NAME || 'visriva-live';
+
+const evoHeaders = {
+  'Content-Type': 'application/json',
+  'apikey': EVO_KEY,
+};
+
+// ─── Shared Firebase init ────────────────────────────────────────────────────
 async function getFirebase() {
-  const { initializeApp, getApps, getApp } = await import("firebase/app");
-  const { getFirestore, doc, getDoc, setDoc } = await import("firebase/firestore");
-
-  const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "visriva-live-station",
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  };
-
-  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  const { initializeApp, getApps, getApp } = await import('firebase/app');
+  const { getFirestore, doc, getDoc, setDoc } = await import('firebase/firestore');
+  const app = getApps().length === 0
+    ? initializeApp({
+        apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+        authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+        projectId:         process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'visriva-live-station',
+        storageBucket:     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+        appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+      })
+    : getApp();
   return { db: getFirestore(app), doc, getDoc, setDoc };
 }
 
-async function getEvolutionConfig() {
-  const defaultUrl = "https://evolution-api-production-d446.up.railway.app";
-  const defaultKey = "VisrivaSecretKey2026_SecureKey";
-  const defaultInstance = "visriva-live";
-
-  let url = process.env.EVOLUTION_API_URL || defaultUrl;
-  let key = process.env.EVOLUTION_API_KEY || defaultKey;
-  let instance = process.env.EVOLUTION_INSTANCE_NAME || defaultInstance;
-
+async function syncStatusToFirestore(status: string) {
   try {
     const fb = await getFirebase();
-    const docRef = fb.doc(fb.db, "config", "operator");
-    const snap = await fb.getDoc(docRef);
-    
-    if (snap.exists()) {
-      const data = snap.data();
-      if (data.backupEvoApiUrl) url = data.backupEvoApiUrl;
-      if (data.backupEvoApiKey) key = data.backupEvoApiKey;
-      if (data.backupInstanceName) instance = data.backupInstanceName;
-    }
-  } catch (err) {
-    console.warn("[Config Loader] Firestore config load bypassed, using env/default config:", err);
+    await fb.setDoc(
+      fb.doc(fb.db, 'config', 'whatsapp_bot'),
+      { connectionStatus: status, lastSyncedAt: new Date().toISOString() },
+      { merge: true }
+    );
+  } catch (e) {
+    console.warn('[connect] Firestore sync skipped:', e);
   }
-
-  url = url.replace(/\/$/, '');
-  if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    url = "https://" + url;
-  }
-
-  return { url, key, instance };
 }
 
+// ─── GET — connection status check ──────────────────────────────────────────
 export async function GET(req: Request) {
-  console.log("📥 GET Request received at /api/whatsapp/connect");
-  try {
-    const { searchParams } = new URL(req.url);
-    const action = searchParams.get("action") || "status";
-    
-    const config = await getEvolutionConfig();
-    console.log(`[GET status] Querying connection status for: ${config.url}/instance/connectionState/${config.instance}`);
+  const { searchParams } = new URL(req.url);
+  const action = searchParams.get('action') || 'status';
 
-    if (action === "status") {
-      const res = await fetch(`${config.url}/instance/connectionState/${config.instance}`, {
-        headers: { apikey: config.key }
+  if (action === 'status') {
+    try {
+      const res = await fetch(`${EVO_URL}/instance/connectionState/${EVO_INSTANCE}`, {
+        headers: evoHeaders,
       });
-      
       if (!res.ok) {
-        console.log(`[GET status] Connection check returned status ${res.status}. Treating as disconnected.`);
-        try {
-          const fb = await getFirebase();
-          const docRef = fb.doc(fb.db, "config", "whatsapp_bot");
-          await fb.setDoc(docRef, {
-            connectionStatus: "close",
-            lastSyncedAt: new Date().toISOString()
-          }, { merge: true });
-        } catch (dbErr) {}
-        return NextResponse.json({ state: "close", status: "disconnected" });
+        await syncStatusToFirestore('close');
+        return NextResponse.json({ status: 'disconnected', httpStatus: res.status });
       }
-
       const data = await res.json();
-      console.log("[GET status] Connection status data:", JSON.stringify(data));
-      const state = data?.instance?.state || data?.state;
-      const isConnected = state === "open" || state === "connected";
-      
-      try {
-        const fb = await getFirebase();
-        const docRef = fb.doc(fb.db, "config", "whatsapp_bot");
-        await fb.setDoc(docRef, {
-          connectionStatus: isConnected ? "open" : "close",
-          lastSyncedAt: new Date().toISOString()
-        }, { merge: true });
-      } catch (dbErr) {
-        console.warn("[GET status] Failed to save connectionStatus to Firestore:", dbErr);
-      }
-
-      return NextResponse.json({
-        state: state || "close",
-        status: isConnected ? "connected" : "disconnected",
-      });
+      const state: string = data?.instance?.state || data?.state || 'unknown';
+      const connected = state === 'open';
+      await syncStatusToFirestore(connected ? 'open' : 'close');
+      return NextResponse.json({ status: connected ? 'connected' : 'disconnected', state });
+    } catch (err: any) {
+      return NextResponse.json({ status: 'disconnected', error: err.message });
     }
-
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-  } catch (error: any) {
-    console.error("[GET Exception]:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
 }
 
+// ─── POST — connect / QR / setup_webhook ────────────────────────────────────
 export async function POST(req: Request) {
-  console.log("📥 POST Request received at /api/whatsapp/connect");
   try {
     const body = await req.json().catch(() => ({}));
-    const action = body.action || "connect";
+    const action: string = body.action || 'connect';
 
-    const config = await getEvolutionConfig();
-    const baseUrl = config.url;
-    const apiKey = config.key;
-    const instanceName = config.instance;
+    // ── setup_webhook ──────────────────────────────────────────────────────
+    if (action === 'setup_webhook') {
+      const webhookUrl = 'https://visriva.com/api/whatsapp/webhook';
+      const endpoint   = `${EVO_URL}/webhook/set/${EVO_INSTANCE}`;
+      console.log(`[connect/setup_webhook] POST ${endpoint}`);
 
-    console.log(`[POST connect] Using config: URL="${baseUrl}", Instance="${instanceName}", Action="${action}"`);
-
-    // Determine active webhook URL based on the request host
-    const host = req.headers.get("host");
-    const protocol = host?.includes("localhost") || host?.includes("127.0.0.1") ? "http" : "https";
-    const webhookUrl = host?.includes("visriva.com") 
-      ? "https://visriva.com/api/whatsapp/webhook"
-      : `${protocol}://${host}/api/whatsapp/webhook`;
-
-    if (action === "setup_webhook") {
-      const webhookSetUrl = `${baseUrl}/webhook/set/${instanceName}`;
-      console.log(`[Webhook Sync] Configuring webhook via POST ${webhookSetUrl} to URL ${webhookUrl}`);
-      
-      const webhookRes = await fetch(webhookSetUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: apiKey,
-        },
-        body: JSON.stringify({
+      const res = await fetch(endpoint, {
+        method:  'POST',
+        headers: evoHeaders,
+        body:    JSON.stringify({
           webhook: {
-            url: webhookUrl,
+            url:     webhookUrl,
             enabled: true,
-            events: ["MESSAGES_UPSERT"]
-          }
-        })
+            events:  ['MESSAGES_UPSERT', 'MESSAGES_SET', 'CONNECTION_UPDATE'],
+          },
+        }),
       });
 
-      const resStatus = webhookRes.status;
-      const resText = await webhookRes.text();
-      console.log(`[Webhook Sync] Response status: ${resStatus}, body: ${resText}`);
+      const raw = await res.text();
+      let parsed: unknown = raw;
+      try { parsed = JSON.parse(raw); } catch {}
 
-      if (!webhookRes.ok) {
-        return NextResponse.json({ 
-          error: `Evolution Webhook set failed (${resStatus}): ${resText}` 
-        }, { status: resStatus });
+      if (!res.ok) {
+        return NextResponse.json(
+          { error: `Railway ${res.status}`, details: parsed },
+          { status: res.status }
+        );
       }
-
-      return NextResponse.json({ 
-        success: true, 
-        message: "Webhook set successfully", 
-        url: webhookUrl,
-        response: resText 
-      });
+      return NextResponse.json({ success: true, url: webhookUrl, response: parsed });
     }
 
-    // STEP 1: CHECK IF INSTANCE IS ALREADY CONNECTED
-    console.log(`[1/3] Checking connection status for '${instanceName}' via GET ${baseUrl}/instance/connectionState/${instanceName}...`);
-    const statusRes = await fetch(`${baseUrl}/instance/connectionState/${instanceName}`, {
-      method: 'GET',
-      headers: { 'apikey': apiKey },
+    // ── connect (QR generation) ────────────────────────────────────────────
+    // Step 1 — check current connection state
+    console.log(`[connect/step-1] Checking connectionState for ${EVO_INSTANCE}...`);
+    const stateRes = await fetch(`${EVO_URL}/instance/connectionState/${EVO_INSTANCE}`, {
+      headers: evoHeaders,
     });
 
-    if (statusRes.ok) {
-      const statusData = await statusRes.json();
-      console.log(`[1/3] Connection status payload:`, JSON.stringify(statusData));
-      const state = statusData?.instance?.state || statusData?.state;
-      if (state === 'open' || state === 'connected') {
-        console.log('Instance is already connected and open!');
-        try {
-          const fb = await getFirebase();
-          const docRef = fb.doc(fb.db, "config", "whatsapp_bot");
-          await fb.setDoc(docRef, {
-            connectionStatus: "open",
-            lastSyncedAt: new Date().toISOString()
-          }, { merge: true });
-        } catch (dbErr) {}
+    if (stateRes.ok) {
+      const stateData = await stateRes.json();
+      const state: string = stateData?.instance?.state || stateData?.state || '';
+      console.log(`[connect/step-1] State: ${state}`);
+
+      if (state === 'open') {
+        await syncStatusToFirestore('open');
         return NextResponse.json({ connected: true, state: 'open' });
       }
-    } else {
-      console.log(`[1/3] Status check failed or instance doesn't exist yet (Status: ${statusRes.status}).`);
     }
 
-    // STEP 2: TRY CONNECTING / FETCHING EXISTING QR
-    console.log(`[2/3] Attempting to fetch existing QR code for '${instanceName}' via GET ${baseUrl}/instance/connect/${instanceName}...`);
-    const connectRes = await fetch(`${baseUrl}/instance/connect/${instanceName}`, {
-      method: 'GET',
-      headers: { 'apikey': apiKey },
+    // Step 2 — try to fetch QR from existing instance
+    console.log(`[connect/step-2] Fetching QR from existing instance...`);
+    const connectRes = await fetch(`${EVO_URL}/instance/connect/${EVO_INSTANCE}`, {
+      headers: evoHeaders,
     });
 
     if (connectRes.ok) {
       const connectData = await connectRes.json();
-      let rawBase64 = connectData.base64 || connectData.qrcode?.base64 || connectData.code || '';
-      if (typeof rawBase64 === 'string') {
-        rawBase64 = rawBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+      let raw64: string =
+        connectData?.base64 ||
+        connectData?.qrcode?.base64 ||
+        connectData?.qrcode ||
+        '';
+
+      if (raw64) {
+        raw64 = raw64.replace(/^data:image\/[a-z]+;base64,/, '');
+        await syncStatusToFirestore('connecting');
+        return NextResponse.json({ connected: false, base64: raw64 });
       }
-      if (rawBase64) {
-        console.log(`[2/3] Successfully retrieved existing QR code.`);
-        try {
-          const fb = await getFirebase();
-          const docRef = fb.doc(fb.db, "config", "whatsapp_bot");
-          await fb.setDoc(docRef, {
-            connectionStatus: "close",
-            lastSyncedAt: new Date().toISOString()
-          }, { merge: true });
-        } catch (dbErr) {}
-        return NextResponse.json({ connected: false, base64: rawBase64 });
-      }
-    } else {
-      console.log(`[2/3] Fetching existing QR code failed (Status: ${connectRes.status}).`);
     }
 
-    // STEP 3: CREATE INSTANCE ONLY IF IT DOESN'T EXIST
-    console.log(`[3/3] Creating new instance '${instanceName}' via POST ${baseUrl}/instance/create...`);
-    const createRes = await fetch(`${baseUrl}/instance/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': apiKey,
-      },
-      body: JSON.stringify({
-        instanceName: instanceName,
-        qrcode: true,
-        integration: 'WHATSAPP-BAILEYS',
+    // Step 3 — create the instance
+    console.log(`[connect/step-3] Creating instance ${EVO_INSTANCE}...`);
+    const createRes = await fetch(`${EVO_URL}/instance/create`, {
+      method:  'POST',
+      headers: evoHeaders,
+      body:    JSON.stringify({
+        instanceName: EVO_INSTANCE,
+        token:        EVO_KEY,
+        qrcode:       true,
+        integration:  'WHATSAPP-BAILEYS',
       }),
     });
 
-    const createStatus = createRes.status;
-    const createBodyText = await createRes.text();
-    console.log('[3/3] Create response status:', createStatus);
-    console.log('[3/3] Create response body:', createBodyText);
+    const createData = await createRes.json().catch(() => ({}));
+    console.log(`[connect/step-3] Create response ${createRes.status}:`, createData);
 
-    let createData: any = {};
-    try {
-      createData = JSON.parse(createBodyText);
-    } catch (e) {
-      console.warn('[3/3] Failed to parse create response body as JSON');
-    }
+    // Step 4 — re-fetch QR after creation (even on 400/403 — instance may already exist)
+    console.log(`[connect/step-4] Re-fetching connect after create...`);
+    const retryRes = await fetch(`${EVO_URL}/instance/connect/${EVO_INSTANCE}`, {
+      headers: evoHeaders,
+    });
 
-    if (createRes.ok || createStatus === 400 || createStatus === 403) {
-      // Configure Webhook since we're setting up the instance
-      const webhookSetUrl = `${baseUrl}/webhook/set/${instanceName}`;
-      console.log(`[Webhook] Configuring webhook via POST ${webhookSetUrl}`);
-      try {
-        const webhookRes = await fetch(webhookSetUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: apiKey,
-          },
-          body: JSON.stringify({
-            webhook: {
-              url: webhookUrl,
-              enabled: true,
-              events: [
-                "CONNECTION_UPDATE",
-                "MESSAGES_UPSERT"
-              ]
-            }
-          })
-        });
-        console.log(`[Webhook] Configured successfully. Status: ${webhookRes.status}`);
-      } catch (webhookErr: any) {
-        console.warn(`[Webhook] Warning: Failed to set webhook URL: ${webhookErr.message}`);
-      }
+    if (retryRes.ok) {
+      const retryData = await retryRes.json();
+      let raw64: string =
+        retryData?.base64 ||
+        retryData?.qrcode?.base64 ||
+        retryData?.qrcode ||
+        '';
 
-      // Fetch the QR code again now that it has been created/re-initialized
-      console.log(`[3/3] Re-fetching connect after create...`);
-      const retryConnectRes = await fetch(`${baseUrl}/instance/connect/${instanceName}`, {
-        method: 'GET',
-        headers: { 'apikey': apiKey },
-      });
-      if (retryConnectRes.ok) {
-        const retryConnectData = await retryConnectRes.json();
-        let rawBase64 = retryConnectData.base64 || retryConnectData.qrcode?.base64 || retryConnectData.code || '';
-        if (typeof rawBase64 === 'string') {
-          rawBase64 = rawBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-        }
-        if (rawBase64) {
-          try {
-            const fb = await getFirebase();
-            const docRef = fb.doc(fb.db, "config", "whatsapp_bot");
-            await fb.setDoc(docRef, {
-              connectionStatus: "close",
-              lastSyncedAt: new Date().toISOString()
-            }, { merge: true });
-          } catch (dbErr) {}
-          return NextResponse.json({ connected: false, base64: rawBase64 });
-        }
+      if (raw64) {
+        raw64 = raw64.replace(/^data:image\/[a-z]+;base64,/, '');
+        await syncStatusToFirestore('connecting');
+        return NextResponse.json({ connected: false, base64: raw64 });
       }
     }
 
-    let rawBase64 = createData.base64 || createData.qrcode?.base64 || '';
-    if (typeof rawBase64 === 'string') {
-      rawBase64 = rawBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-    }
-
-    if (rawBase64) {
-      try {
-        const fb = await getFirebase();
-        const docRef = fb.doc(fb.db, "config", "whatsapp_bot");
-        await fb.setDoc(docRef, {
-          connectionStatus: "close",
-          lastSyncedAt: new Date().toISOString()
-        }, { merge: true });
-      } catch (dbErr) {}
-      return NextResponse.json({ connected: false, base64: rawBase64 });
-    }
-
-    return NextResponse.json({
-      error: 'Unable to connect or create instance',
-      details: { createData }
-    }, { status: 400 });
-
-  } catch (error: any) {
-    console.error('SERVER ROUTE ERROR:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Unable to connect or create instance. Check Railway logs.' },
+      { status: 502 }
+    );
+  } catch (err: any) {
+    console.error('[connect] Fatal error:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
