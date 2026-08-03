@@ -11,36 +11,18 @@ const evoHeaders = {
   'apikey': EVO_KEY,
 };
 
-async function getFirebase() {
-  const { initializeApp, getApps, getApp } = await import('firebase/app');
-  const { getFirestore, doc, setDoc } = await import('firebase/firestore');
-  const app = getApps().length === 0
-    ? initializeApp({
-        apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-        authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-        projectId:         process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'visriva-live-station',
-        storageBucket:     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-        appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-      })
-    : getApp();
-  return { db: getFirestore(app), doc, setDoc };
-}
-
 async function syncStatusToFirestore(status: string) {
   try {
-    const fb = await getFirebase();
-    await fb.setDoc(
-      fb.doc(fb.db, 'config', 'whatsapp_bot'),
-      { connectionStatus: status, lastSyncedAt: new Date().toISOString() },
-      { merge: true }
-    );
+    const { saveBotSettings } = await import('@/lib/chatStore');
+    await saveBotSettings({
+      connectionStatus: status,
+      lastSyncedAt: new Date().toISOString(),
+    });
   } catch (e) {
-    console.warn('[connect] Firestore status sync skipped:', e);
+    console.warn('[connect] Status sync skipped:', e);
   }
 }
 
-// ─── GET: Check status ────────────────────────────────────────────────────────
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -50,6 +32,7 @@ export async function GET(req: Request) {
       try {
         const res = await fetch(`${EVO_URL}/instance/connectionState/${EVO_INSTANCE}`, {
           headers: evoHeaders,
+          signal: AbortSignal.timeout(8000),
         });
 
         if (!res.ok) {
@@ -70,17 +53,16 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'GET connect error' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'GET /api/whatsapp/connect error' }, { status: 500 });
   }
 }
 
-// ─── POST: Instance Connection & QR Creator ────────────────────────────────────
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
     const action: string = body.action || 'connect';
 
-    // ── Setup Webhook Action ──────────────────────────────────────────────────
+    // ── setup_webhook ────────────────────────────────────────────────────────
     if (action === 'setup_webhook') {
       const webhookUrl = 'https://visriva.com/api/whatsapp/webhook';
       const endpoint   = `${EVO_URL}/webhook/set/${EVO_INSTANCE}`;
@@ -97,6 +79,7 @@ export async function POST(req: Request) {
               events:  ['MESSAGES_UPSERT', 'CONNECTION_UPDATE'],
             },
           }),
+          signal: AbortSignal.timeout(8000),
         });
 
         const raw = await res.text();
@@ -115,12 +98,13 @@ export async function POST(req: Request) {
       }
     }
 
-    // ── Connect / QR Code Generation Action ──────────────────────────────────
+    // ── connect (QR Generation & Connect) ────────────────────────────────────
     // Step 1: Check connection state
     console.log(`[connect/step-1] Checking connectionState for '${EVO_INSTANCE}'...`);
     try {
       const stateRes = await fetch(`${EVO_URL}/instance/connectionState/${EVO_INSTANCE}`, {
         headers: evoHeaders,
+        signal: AbortSignal.timeout(6000),
       });
 
       if (stateRes.ok) {
@@ -142,6 +126,7 @@ export async function POST(req: Request) {
     try {
       const connectRes = await fetch(`${EVO_URL}/instance/connect/${EVO_INSTANCE}`, {
         headers: evoHeaders,
+        signal: AbortSignal.timeout(6000),
       });
 
       if (connectRes.ok) {
@@ -174,6 +159,7 @@ export async function POST(req: Request) {
           qrcode:       true,
           integration:  'WHATSAPP-BAILEYS',
         }),
+        signal: AbortSignal.timeout(8000),
       });
 
       const createData = await createRes.json().catch(() => ({}));
@@ -187,6 +173,7 @@ export async function POST(req: Request) {
     try {
       const retryRes = await fetch(`${EVO_URL}/instance/connect/${EVO_INSTANCE}`, {
         headers: evoHeaders,
+        signal: AbortSignal.timeout(8000),
       });
 
       if (retryRes.ok) {

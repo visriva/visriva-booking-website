@@ -10,11 +10,11 @@ const WEBHOOK_URL  = 'https://visriva.com/api/whatsapp/webhook';
 export async function POST() {
   const endpoint = `${EVO_URL}/webhook/set/${EVO_INSTANCE}`;
 
-  console.log(`[sync-webhook] Registering webhook for '${EVO_INSTANCE}' → '${WEBHOOK_URL}'`);
+  console.log(`[sync-webhook] Setting webhook for '${EVO_INSTANCE}' → '${WEBHOOK_URL}'`);
   console.log(`[sync-webhook] Endpoint: ${endpoint}`);
 
   if (!EVO_URL || !EVO_KEY) {
-    return NextResponse.json({ error: 'Missing EVOLUTION_API_URL or EVOLUTION_API_KEY environment variables' }, { status: 500 });
+    return NextResponse.json({ error: 'Missing EVOLUTION_API_URL or EVOLUTION_API_KEY env vars' }, { status: 500 });
   }
 
   try {
@@ -29,9 +29,10 @@ export async function POST() {
         webhook: {
           url:     WEBHOOK_URL,
           enabled: true,
-          events:  ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
+          events:  ["MESSAGES_UPSERT", "MESSAGES_SET", "CONNECTION_UPDATE"],
         },
       }),
+      signal: AbortSignal.timeout(8000),
     });
 
     const responseText = await res.text();
@@ -65,7 +66,7 @@ export async function POST() {
     });
 
   } catch (error: any) {
-    console.error('[sync-webhook] Top-level error:', error);
+    console.error('[sync-webhook] Top-level sync-webhook error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }

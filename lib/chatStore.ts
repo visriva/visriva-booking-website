@@ -1,10 +1,7 @@
 /**
  * lib/chatStore.ts
- * Firestore storage helper for the WhatsApp CRM Live Inbox.
- * Collections:
- *   chats/{phoneNum}               — thread metadata (lastMessage, lastTimestamp, displayName)
- *   chats/{phoneNum}/messages/{id} — individual chat messages
- *   config/whatsapp_bot            — bot settings
+ * Self-healing Firestore storage helper with a robust Global Memory fallback.
+ * Prevents system crashes if Firestore configuration is missing or uninitialized.
  */
 
 import {
@@ -29,14 +26,14 @@ export interface ChatMessage {
   id?: string;
   sender: "user" | "bot" | "admin";
   text: string;
-  timestamp: Date | Timestamp | string | null;
+  timestamp: string | Date | Timestamp | null;
 }
 
 export interface ChatThread {
   phoneNum: string;
   displayName?: string;
   lastMessage: string;
-  lastTimestamp: Date | Timestamp | string | null;
+  lastTimestamp: string | Date | Timestamp | null;
   unread?: number;
 }
 
@@ -48,191 +45,251 @@ export interface BotSettings {
   instanceName?: string;
 }
 
-// ─── Save an incoming or outgoing message ─────────────────────────────────────
+// ─── Global Memory Fallback Structure ─────────────────────────────────────────
+interface GlobalMemoryStore {
+  threads: Record<string, ChatThread>;
+  messages: Record<string, ChatMessage[]>;
+  botSettings: BotSettings;
+}
+
+const memoryStore: GlobalMemoryStore = (globalThis as any)._whatsappChatStore || {
+  threads: {},
+  messages: {},
+  botSettings: {
+    isActive: true,
+    autoReplyText: "Hi! I am currently operating a live printing station for an event and will get back to you shortly!",
+    connectionStatus: "close",
+    instanceName: "visriva-live",
+  }
+};
+
+if (!(globalThis as any)._whatsappChatStore) {
+  (globalThis as any)._whatsappChatStore = memoryStore;
+}
+
+// Helper to determine if Firestore is active and safe
+function isFirestoreReady(): boolean {
+  try {
+    return !!db;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Save Message ─────────────────────────────────────────────────────────────
 export async function saveChatMessage(
   phoneNum: string,
   message: { sender: "user" | "bot" | "admin"; text: string; timestamp?: Date | null },
   displayName?: string
 ): Promise<void> {
-  try {
-    const cleanPhone = phoneNum.replace(/[^0-9]/g, "");
-    if (!cleanPhone) return;
+  const cleanPhone = phoneNum.replace(/[^0-9]/g, "");
+  if (!cleanPhone) return;
 
-    const threadRef = doc(db, "chats", cleanPhone);
-    const messagesRef = collection(db, "chats", cleanPhone, "messages");
+  const timestamp = message.timestamp || new Date();
 
-    await addDoc(messagesRef, {
-      sender: message.sender,
-      text: message.text,
-      timestamp: serverTimestamp(),
-    });
+  // 1. Always save to Global Memory first
+  const newMsg: ChatMessage = {
+    id: Math.random().toString(36).substring(2, 9),
+    sender: message.sender,
+    text: message.text,
+    timestamp: timestamp.toISOString(),
+  };
 
-    await setDoc(
-      threadRef,
-      {
-        phoneNum: cleanPhone,
-        displayName: displayName || cleanPhone,
-        lastMessage: message.text.slice(0, 120),
-        lastTimestamp: serverTimestamp(),
-      },
-      { merge: true }
-    );
-  } catch (err) {
-    console.error("[chatStore] saveChatMessage error:", err);
+  if (!memoryStore.messages[cleanPhone]) {
+    memoryStore.messages[cleanPhone] = [];
+  }
+  memoryStore.messages[cleanPhone].push(newMsg);
+
+  const updatedThread: ChatThread = {
+    phoneNum: cleanPhone,
+    displayName: displayName || cleanPhone,
+    lastMessage: message.text.slice(0, 120),
+    lastTimestamp: timestamp.toISOString(),
+  };
+  memoryStore.threads[cleanPhone] = updatedThread;
+
+  // 2. Try Firestore saving (non-blocking, crash-proof)
+  if (isFirestoreReady()) {
+    try {
+      const threadRef = doc(db, "chats", cleanPhone);
+      const messagesRef = collection(db, "chats", cleanPhone, "messages");
+
+      await addDoc(messagesRef, {
+        sender: message.sender,
+        text: message.text,
+        timestamp: serverTimestamp(),
+      });
+
+      await setDoc(
+        threadRef,
+        {
+          phoneNum: cleanPhone,
+          displayName: displayName || cleanPhone,
+          lastMessage: message.text.slice(0, 120),
+          lastTimestamp: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn("[chatStore] Firestore write failed, using memory store fallback:", err);
+    }
   }
 }
 
-// ─── Fetch all chat threads ───────────────────────────────────────────────────
+// ─── Fetch All Threads ────────────────────────────────────────────────────────
 export async function getAllChatThreads(): Promise<ChatThread[]> {
-  try {
-    const threadsRef = collection(db, "chats");
-    const snap = await getDocs(threadsRef);
-    const threads: ChatThread[] = snap.docs.map((d) => ({
-      phoneNum: d.id,
-      ...(d.data() as Omit<ChatThread, "phoneNum">),
-    }));
+  // 1. Try Firestore first
+  if (isFirestoreReady()) {
+    try {
+      const threadsRef = collection(db, "chats");
+      const snap = await getDocs(threadsRef);
+      if (!snap.empty) {
+        const threads: ChatThread[] = snap.docs.map((d) => {
+          const data = d.data();
+          let tsStr: string | null = null;
+          if (data.lastTimestamp instanceof Timestamp) {
+            tsStr = data.lastTimestamp.toDate().toISOString();
+          } else if (data.lastTimestamp) {
+            tsStr = new Date(data.lastTimestamp).toISOString();
+          }
 
-    threads.sort((a, b) => {
-      const ta = a.lastTimestamp instanceof Timestamp ? a.lastTimestamp.toMillis() : (a.lastTimestamp ? new Date(a.lastTimestamp as string).getTime() : 0);
-      const tb = b.lastTimestamp instanceof Timestamp ? b.lastTimestamp.toMillis() : (b.lastTimestamp ? new Date(b.lastTimestamp as string).getTime() : 0);
-      return tb - ta;
-    });
+          return {
+            phoneNum: d.id,
+            displayName: data.displayName || d.id,
+            lastMessage: data.lastMessage || "",
+            lastTimestamp: tsStr,
+          };
+        });
 
-    return threads;
-  } catch (err) {
-    console.error("[chatStore] getAllChatThreads error:", err);
-    return [];
+        // Sync local memory store with latest Firestore data
+        threads.forEach((t) => {
+          memoryStore.threads[t.phoneNum] = t;
+        });
+      }
+    } catch (err) {
+      console.warn("[chatStore] Firestore fetch threads failed, returning local memory store:", err);
+    }
   }
+
+  // 2. Format & sort from memoryStore
+  const allThreads = Object.values(memoryStore.threads);
+  allThreads.sort((a, b) => {
+    const ta = a.lastTimestamp ? new Date(a.lastTimestamp as string).getTime() : 0;
+    const tb = b.lastTimestamp ? new Date(b.lastTimestamp as string).getTime() : 0;
+    return tb - ta;
+  });
+
+  return allThreads;
 }
 
-// ─── Fetch messages for a single thread ──────────────────────────────────────
+// ─── Fetch Thread Messages ───────────────────────────────────────────────────
 export async function getChatMessages(
   phoneNum: string,
-  maxMessages = 100
+  maxMessages = 150
 ): Promise<ChatMessage[]> {
-  try {
-    const cleanPhone = phoneNum.replace(/[^0-9]/g, "");
-    if (!cleanPhone) return [];
-    const messagesRef = collection(db, "chats", cleanPhone, "messages");
-    let snap;
+  const cleanPhone = phoneNum.replace(/[^0-9]/g, "");
+  if (!cleanPhone) return [];
+
+  // 1. Try Firestore first
+  if (isFirestoreReady()) {
     try {
-      const q = query(messagesRef, orderBy("timestamp", "asc"), limit(maxMessages));
-      snap = await getDocs(q);
-    } catch {
-      snap = await getDocs(messagesRef);
+      const messagesRef = collection(db, "chats", cleanPhone, "messages");
+      let snap;
+      try {
+        const q = query(messagesRef, orderBy("timestamp", "asc"), limit(maxMessages));
+        snap = await getDocs(q);
+      } catch {
+        snap = await getDocs(messagesRef);
+      }
+
+      if (!snap.empty) {
+        const messages: ChatMessage[] = snap.docs.map((d) => {
+          const data = d.data();
+          let tsStr: string | null = null;
+          if (data.timestamp instanceof Timestamp) {
+            tsStr = data.timestamp.toDate().toISOString();
+          } else if (data.timestamp) {
+            tsStr = new Date(data.timestamp).toISOString();
+          }
+
+          return {
+            id: d.id,
+            sender: data.sender || "user",
+            text: data.text || "",
+            timestamp: tsStr,
+          };
+        });
+
+        messages.sort((a, b) => {
+          const ta = a.timestamp ? new Date(a.timestamp as string).getTime() : 0;
+          const tb = b.timestamp ? new Date(b.timestamp as string).getTime() : 0;
+          return ta - tb;
+        });
+
+        // Sync local memory store
+        memoryStore.messages[cleanPhone] = messages;
+        return messages;
+      }
+    } catch (err) {
+      console.warn("[chatStore] Firestore fetch messages failed, returning local memory store:", err);
     }
-
-    const msgs: ChatMessage[] = snap.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as Omit<ChatMessage, "id">),
-    }));
-
-    msgs.sort((a, b) => {
-      const ta = a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : (a.timestamp ? new Date(a.timestamp as string).getTime() : 0);
-      const tb = b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : (b.timestamp ? new Date(b.timestamp as string).getTime() : 0);
-      return ta - tb;
-    });
-
-    return msgs;
-  } catch (err) {
-    console.error("[chatStore] getChatMessages error:", err);
-    return [];
   }
+
+  // 2. Return from Memory fallback
+  const localMsgs = memoryStore.messages[cleanPhone] || [];
+  return localMsgs.slice(-maxMessages);
 }
 
-// ─── Bot Settings ─────────────────────────────────────────────────────────────
+// ─── Bot Settings management ──────────────────────────────────────────────────
 export async function getBotSettings(): Promise<BotSettings> {
-  const defaults: BotSettings = {
-    isActive: true,
-    autoReplyText: "Hi! I am currently operating a live printing station for an event and will get back to you shortly!",
-    connectionStatus: "close",
-    instanceName: "visriva-live",
-  };
-  try {
-    const docRef = doc(db, "config", "whatsapp_bot");
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      return {
-        isActive: data.isActive ?? data.botActive ?? true,
-        autoReplyText: data.autoReplyText || defaults.autoReplyText,
-        connectionStatus: data.connectionStatus || defaults.connectionStatus,
-        lastSyncedAt: data.lastSyncedAt,
-        instanceName: data.instanceName || defaults.instanceName,
-      };
+  // 1. Try Firestore
+  if (isFirestoreReady()) {
+    try {
+      const docRef = doc(db, "config", "whatsapp_bot");
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        const settings = {
+          isActive: data.isActive ?? data.botActive ?? true,
+          autoReplyText: data.autoReplyText || memoryStore.botSettings.autoReplyText,
+          connectionStatus: data.connectionStatus || "close",
+          lastSyncedAt: data.lastSyncedAt,
+          instanceName: data.instanceName || "visriva-live",
+        };
+        memoryStore.botSettings = settings;
+        return settings;
+      }
+    } catch (err) {
+      console.warn("[chatStore] Firestore getBotSettings failed, using memory store:", err);
     }
-  } catch (err) {
-    console.error("[chatStore] getBotSettings error:", err);
   }
-  return defaults;
+  return memoryStore.botSettings;
 }
 
 export async function saveBotSettings(settings: Partial<BotSettings>): Promise<void> {
-  try {
-    const docRef = doc(db, "config", "whatsapp_bot");
-    const updateData: Record<string, unknown> = {};
-    if (settings.isActive !== undefined) {
-      updateData.isActive = settings.isActive;
-      updateData.botActive = settings.isActive;
-    }
-    if (settings.autoReplyText !== undefined) updateData.autoReplyText = settings.autoReplyText;
-    if (settings.connectionStatus !== undefined) updateData.connectionStatus = settings.connectionStatus;
-    if (settings.lastSyncedAt !== undefined) updateData.lastSyncedAt = settings.lastSyncedAt;
-    if (settings.instanceName !== undefined) updateData.instanceName = settings.instanceName;
+  // 1. Always update Memory store
+  memoryStore.botSettings = {
+    ...memoryStore.botSettings,
+    ...settings,
+  };
 
-    await setDoc(docRef, updateData, { merge: true });
-  } catch (err) {
-    console.error("[chatStore] saveBotSettings error:", err);
+  // 2. Try Firestore
+  if (isFirestoreReady()) {
+    try {
+      const docRef = doc(db, "config", "whatsapp_bot");
+      const updateData: Record<string, unknown> = {};
+      if (settings.isActive !== undefined) {
+        updateData.isActive = settings.isActive;
+        updateData.botActive = settings.isActive;
+      }
+      if (settings.autoReplyText !== undefined) updateData.autoReplyText = settings.autoReplyText;
+      if (settings.connectionStatus !== undefined) updateData.connectionStatus = settings.connectionStatus;
+      if (settings.lastSyncedAt !== undefined) updateData.lastSyncedAt = settings.lastSyncedAt;
+      if (settings.instanceName !== undefined) updateData.instanceName = settings.instanceName;
+
+      await setDoc(docRef, updateData, { merge: true });
+    } catch (err) {
+      console.warn("[chatStore] Firestore saveBotSettings failed:", err);
+    }
   }
-}
-
-// ─── Real-Time Subscriptions ──────────────────────────────────────────────────
-export function subscribeToChatMessages(
-  phoneNum: string,
-  callback: (messages: ChatMessage[]) => void
-): () => void {
-  const cleanPhone = phoneNum.replace(/[^0-9]/g, "");
-  if (!cleanPhone) return () => {};
-  const messagesRef = collection(db, "chats", cleanPhone, "messages");
-  const q = query(messagesRef, orderBy("timestamp", "asc"), limit(100));
-
-  return onSnapshot(
-    q,
-    (snap) => {
-      const msgs: ChatMessage[] = snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<ChatMessage, "id">),
-      }));
-      callback(msgs);
-    },
-    (err) => {
-      console.warn("[chatStore] subscribeToChatMessages error:", err);
-    }
-  );
-}
-
-export function subscribeToChatThreads(
-  callback: (threads: ChatThread[]) => void
-): () => void {
-  const threadsRef = collection(db, "chats");
-  return onSnapshot(
-    threadsRef,
-    (snap) => {
-      const threads: ChatThread[] = snap.docs.map((d) => ({
-        phoneNum: d.id,
-        ...(d.data() as Omit<ChatThread, "phoneNum">),
-      }));
-
-      threads.sort((a, b) => {
-        const ta = a.lastTimestamp instanceof Timestamp ? a.lastTimestamp.toMillis() : (a.lastTimestamp ? new Date(a.lastTimestamp as string).getTime() : 0);
-        const tb = b.lastTimestamp instanceof Timestamp ? b.lastTimestamp.toMillis() : (b.lastTimestamp ? new Date(b.lastTimestamp as string).getTime() : 0);
-        return tb - ta;
-      });
-
-      callback(threads);
-    },
-    (err) => {
-      console.warn("[chatStore] subscribeToChatThreads error:", err);
-    }
-  );
 }

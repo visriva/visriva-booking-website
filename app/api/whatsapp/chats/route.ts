@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getAllChatThreads, getChatMessages, saveChatMessage } from '@/lib/chatStore';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -6,38 +7,11 @@ const EVO_URL      = (process.env.EVOLUTION_API_URL      || 'https://evolution-a
 const EVO_KEY      = process.env.EVOLUTION_API_KEY       || 'VisrivaSecretKey2026_SecureKey';
 const EVO_INSTANCE = process.env.EVOLUTION_INSTANCE_NAME || 'visriva-live';
 
-// ─── Firebase init (Server-Safe Dynamic Import) ──────────────────────────────
-async function getFirebase() {
-  const { initializeApp, getApps, getApp } = await import('firebase/app');
-  const {
-    getFirestore, doc, getDoc, collection,
-    getDocs, addDoc, setDoc, query, orderBy, limit, serverTimestamp,
-  } = await import('firebase/firestore');
-
-  const app = getApps().length === 0
-    ? initializeApp({
-        apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-        authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-        projectId:         process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'visriva-live-station',
-        storageBucket:     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-        appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-      })
-    : getApp();
-
-  return {
-    db: getFirestore(app),
-    doc, getDoc, collection, getDocs, addDoc,
-    setDoc, query, orderBy, limit, serverTimestamp,
-  };
-}
-
-// ─── GET: Fetch all threads OR messages for a specific phone number ───────────
+// ─── GET: Fetch all chat threads OR message history ──────────────────────────
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const phone = searchParams.get('phone');
-    const fb = await getFirebase();
 
     // ── 1. Fetch messages for a specific phone number thread ──────────────────
     if (phone) {
@@ -46,60 +20,12 @@ export async function GET(req: Request) {
         return NextResponse.json({ messages: [] });
       }
 
-      const messagesRef = fb.collection(fb.db, 'chats', cleanPhone, 'messages');
-      let snap;
-      try {
-        const q = fb.query(messagesRef, fb.orderBy('timestamp', 'asc'), fb.limit(200));
-        snap = await fb.getDocs(q);
-      } catch {
-        // Fallback for unindexed or new collections
-        snap = await fb.getDocs(messagesRef);
-      }
-
-      const messages = snap.docs.map((d) => {
-        const data = d.data();
-        return {
-          id:        d.id,
-          sender:    data.sender   || 'user',
-          text:      data.text     || '',
-          timestamp: data.timestamp?.toDate?.()?.toISOString?.() || null,
-        };
-      });
-
-      messages.sort((a, b) => {
-        const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-        const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-        return ta - tb;
-      });
-
+      const messages = await getChatMessages(cleanPhone);
       return NextResponse.json({ messages });
     }
 
     // ── 2. List all active chat threads ───────────────────────────────────────
-    const threadsRef = fb.collection(fb.db, 'chats');
-    let snap;
-    try {
-      snap = await fb.getDocs(threadsRef);
-    } catch {
-      return NextResponse.json({ threads: [] });
-    }
-
-    const threads = snap.docs.map((d) => {
-      const data = d.data();
-      return {
-        phoneNum:      d.id,
-        displayName:   data.displayName   || d.id,
-        lastMessage:   data.lastMessage   || '',
-        lastTimestamp: data.lastTimestamp?.toDate?.()?.toISOString?.() || null,
-      };
-    });
-
-    threads.sort((a, b) => {
-      const ta = a.lastTimestamp ? new Date(a.lastTimestamp).getTime() : 0;
-      const tb = b.lastTimestamp ? new Date(b.lastTimestamp).getTime() : 0;
-      return tb - ta;
-    });
-
+    const threads = await getAllChatThreads();
     return NextResponse.json({ threads });
 
   } catch (error: any) {
@@ -129,7 +55,7 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         number: cleanPhone,
-        text: text.trim(),
+        text:   text.trim(),
       }),
     });
 
@@ -139,23 +65,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Evolution API error: ${err}` }, { status: sendRes.status });
     }
 
-    // Save admin reply to Firestore chat thread
-    const fb = await getFirebase();
-    await fb.addDoc(fb.collection(fb.db, 'chats', cleanPhone, 'messages'), {
-      sender:    'admin',
-      text:      text.trim(),
-      timestamp: fb.serverTimestamp(),
+    // Save admin reply to resilient chatStore
+    await saveChatMessage(cleanPhone, {
+      sender: 'admin',
+      text: text.trim(),
+      timestamp: new Date()
     });
-
-    await fb.setDoc(
-      fb.doc(fb.db, 'chats', cleanPhone),
-      {
-        phoneNum:      cleanPhone,
-        lastMessage:   text.trim().slice(0, 120),
-        lastTimestamp: fb.serverTimestamp(),
-      },
-      { merge: true }
-    );
 
     return NextResponse.json({ success: true });
 

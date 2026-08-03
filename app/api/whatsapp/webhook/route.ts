@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { saveChatMessage, getBotSettings } from '@/lib/chatStore';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -6,65 +7,12 @@ const EVO_URL      = (process.env.EVOLUTION_API_URL      || 'https://evolution-a
 const EVO_KEY      = process.env.EVOLUTION_API_KEY       || 'VisrivaSecretKey2026_SecureKey';
 const EVO_INSTANCE = process.env.EVOLUTION_INSTANCE_NAME || 'visriva-live';
 
-// ─── Firebase init (Server-Safe Dynamic Import) ──────────────────────────────
-async function getFirebase() {
-  const { initializeApp, getApps, getApp } = await import('firebase/app');
-  const { getFirestore, doc, getDoc, collection, addDoc, setDoc, serverTimestamp } =
-    await import('firebase/firestore');
-
-  const app = getApps().length === 0
-    ? initializeApp({
-        apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-        authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-        projectId:         process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'visriva-live-station',
-        storageBucket:     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-        appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-      })
-    : getApp();
-
-  return { db: getFirestore(app), doc, getDoc, collection, addDoc, setDoc, serverTimestamp };
-}
-
-// ─── Save message to Firestore ────────────────────────────────────────────────
-async function saveChatMessage(
-  phone: string,
-  sender: 'user' | 'bot' | 'admin',
-  text: string,
-  displayName?: string
-) {
-  try {
-    const fb = await getFirebase();
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
-    if (!cleanPhone) return;
-
-    await fb.addDoc(fb.collection(fb.db, 'chats', cleanPhone, 'messages'), {
-      sender,
-      text,
-      timestamp: fb.serverTimestamp(),
-    });
-
-    await fb.setDoc(
-      fb.doc(fb.db, 'chats', cleanPhone),
-      {
-        phoneNum:      cleanPhone,
-        displayName:   displayName || cleanPhone,
-        lastMessage:   text.slice(0, 120),
-        lastTimestamp: fb.serverTimestamp(),
-      },
-      { merge: true }
-    );
-  } catch (err) {
-    console.error('[webhook] Failed to save message to Firestore:', err);
-  }
-}
-
-// ─── GET: Health Check Endpoint for Webhook Verification ──────────────────────
+// ─── GET: Health Check for Webhook Verification ──────────────────────────────
 export async function GET() {
-  return NextResponse.json({ status: 'active' });
+  return NextResponse.json({ status: 'online' });
 }
 
-// ─── POST: Incoming Webhook Receiver ──────────────────────────────────────────
+// ─── POST: Webhook Receiver & Processor ───────────────────────────────────────
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null);
@@ -72,9 +20,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: 'success', note: 'empty or non-JSON body' });
     }
 
-    console.log('🔥 WEBHOOK RECEIVED RAW PAYLOAD:', JSON.stringify(body, null, 2));
+    console.log('🔥 WEBHOOK PAYLOAD:', JSON.stringify(body, null, 2));
 
-    // Safely extract payload data
+    // Safely extract payload data — Evolution API v2 nests payload under body.data
     const data = body?.data || body;
 
     const remoteJid: string  = data?.key?.remoteJid  || data?.sender      || data?.remoteJid || '';
@@ -90,40 +38,32 @@ export async function POST(request: Request) {
 
     // Ignore group chats (@g.us), self-sent messages (fromMe === true), or empty text
     if (!remoteJid || fromMe || remoteJid.endsWith('@g.us') || !messageContent.trim()) {
-      console.log('[webhook] Ignored — sent by self, group, or no text body.');
+      console.log('[webhook] Ignored — sent by self, group chat, or empty message text.');
       return NextResponse.json({ status: 'success', note: 'ignored message' });
     }
 
-    // Clean phone number
+    // Clean phone number (strip JID suffixes, keep digits only)
     const phoneNumber = remoteJid.replace(/@s\.whatsapp\.net|@g\.us/g, '').replace(/[^0-9]/g, '');
-    console.log(`[webhook] ✉️ Message from ${phoneNumber} (${pushName}): "${messageContent}"`);
+    console.log(`[webhook] ✉️ Incoming message from ${phoneNumber} (${pushName}): "${messageContent}"`);
 
-    // 1. Save incoming user message to Firestore
-    await saveChatMessage(phoneNumber, 'user', messageContent, pushName || phoneNumber);
+    // 1. Save incoming user message to database/memory store
+    await saveChatMessage(phoneNumber, {
+      sender: 'user',
+      text: messageContent,
+      timestamp: new Date()
+    }, pushName || phoneNumber);
 
-    // 2. Check bot settings
-    let isBotActive = true;
-    let customFallback = 'Hi! I am currently operating a live printing station for an event and will get back to you shortly!';
-
-    try {
-      const fb = await getFirebase();
-      const botSnap = await fb.getDoc(fb.doc(fb.db, 'config', 'whatsapp_bot'));
-      if (botSnap.exists()) {
-        const botData = botSnap.data();
-        isBotActive = botData?.isActive === true || botData?.botActive === true;
-        if (botData?.autoReplyText) customFallback = botData.autoReplyText;
-      }
-    } catch (e) {
-      console.warn('[webhook] Could not read bot config from Firestore, using defaults:', e);
-    }
+    // 2. Fetch bot config from resilient chatStore settings
+    const botSettings = await getBotSettings();
+    const isBotActive = botSettings.isActive === true;
 
     if (!isBotActive) {
-      console.log('[webhook] Bot disabled — message saved, auto-reply skipped.');
+      console.log('[webhook] Bot is currently disabled — user message saved, auto-reply skipped.');
       return NextResponse.json({ status: 'success', note: 'bot_disabled' });
     }
 
     // 3. Build smart response based on keywords
-    let replyText = customFallback;
+    let replyText = botSettings.autoReplyText;
     const lower = messageContent.toLowerCase();
 
     if (/\bhi\b|\bhello\b|\bhey\b|namaste|hii/.test(lower)) {
@@ -193,15 +133,19 @@ export async function POST(request: Request) {
       console.error('[webhook] Error sending text message:', sendErr);
     }
 
-    // 5. Save bot reply to Firestore
-    await saveChatMessage(phoneNumber, 'bot', replyText, pushName || phoneNumber);
+    // 5. Save outgoing bot reply to database/memory store
+    await saveChatMessage(phoneNumber, {
+      sender: 'bot',
+      text: replyText,
+      timestamp: new Date()
+    }, pushName || phoneNumber);
 
     // Always return success JSON to prevent Railway packet retries
     return NextResponse.json({ status: 'success' });
 
   } catch (error: any) {
     console.error('❌ WEBHOOK TOP-LEVEL ERROR:', error);
-    // Always return valid JSON status 200/500
+    // Return status: success even on error to stop Railway retry loops
     return NextResponse.json({ status: 'success', error: error.message });
   }
 }
