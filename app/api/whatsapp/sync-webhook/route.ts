@@ -15,15 +15,14 @@ export async function POST() {
   console.log(`[sync-webhook] API Key prefix: ${EVO_KEY.slice(0, 8)}...`);
 
   if (!EVO_URL || !EVO_KEY) {
-    return NextResponse.json({ error: 'Missing EVOLUTION_API_URL or EVOLUTION_API_KEY env vars' }, { status: 500 });
+    return NextResponse.json({ error: 'Missing EVOLUTION_API_URL or EVOLUTION_API_KEY environment variables' }, { status: 500 });
   }
 
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        // Evolution API v2 accepts both header formats
+        'Content-Type':  'application/json',
         'apikey':        EVO_KEY,
         'Authorization': `Bearer ${EVO_KEY}`,
       },
@@ -31,7 +30,11 @@ export async function POST() {
         webhook: {
           url:     WEBHOOK_URL,
           enabled: true,
-          events:  ['MESSAGES_UPSERT', 'MESSAGES_SET', 'CONNECTION_UPDATE'],
+          events:  [
+            'MESSAGES_UPSERT',
+            'MESSAGES_SET',
+            'CONNECTION_UPDATE',
+          ],
         },
       }),
     });
@@ -40,7 +43,7 @@ export async function POST() {
     let data: unknown;
     try { data = JSON.parse(responseText); } catch { data = { message: responseText }; }
 
-    console.log(`[sync-webhook] Railway responded ${res.status}:`, responseText);
+    console.log(`[sync-webhook] Railway responded HTTP ${res.status}:`, responseText);
 
     if (!res.ok) {
       return NextResponse.json(
@@ -64,7 +67,7 @@ export async function POST() {
     });
 
   } catch (error: any) {
-    console.error('[sync-webhook] Fetch threw:', error);
+    console.error('[sync-webhook] Fetch error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

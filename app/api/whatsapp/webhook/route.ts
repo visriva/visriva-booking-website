@@ -6,7 +6,7 @@ const EVO_URL      = (process.env.EVOLUTION_API_URL      || 'https://evolution-a
 const EVO_KEY      = process.env.EVOLUTION_API_KEY       || 'VisrivaSecretKey2026_SecureKey';
 const EVO_INSTANCE = process.env.EVOLUTION_INSTANCE_NAME || 'visriva-live';
 
-// ─── Firebase init (server-safe) ────────────────────────────────────────────
+// ─── Firebase init (Server-Safe Dynamic Import) ──────────────────────────────
 async function getFirebase() {
   const { initializeApp, getApps, getApp } = await import('firebase/app');
   const { getFirestore, doc, getDoc, collection, addDoc, setDoc, serverTimestamp } =
@@ -26,7 +26,7 @@ async function getFirebase() {
   return { db: getFirestore(app), doc, getDoc, collection, addDoc, setDoc, serverTimestamp };
 }
 
-// ─── Save a message to chats/{phone}/messages ─────────────────────────────
+// ─── Save message to Firestore chats ──────────────────────────────────────────
 async function saveChatMessage(
   phone: string,
   sender: 'user' | 'bot' | 'admin',
@@ -36,6 +36,7 @@ async function saveChatMessage(
   try {
     const fb = await getFirebase();
     const cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (!cleanPhone) return;
 
     await fb.addDoc(fb.collection(fb.db, 'chats', cleanPhone, 'messages'), {
       sender,
@@ -58,18 +59,22 @@ async function saveChatMessage(
   }
 }
 
-// ─── GET — health check (Evolution API verifies the endpoint exists) ─────────
+// ─── GET — Health Check Endpoint for Webhook Setup ────────────────────────────
 export async function GET() {
-  return NextResponse.json({ status: 'Webhook endpoint is active ✅' });
+  return NextResponse.json({ status: 'online' });
 }
 
-// ─── POST — incoming Evolution API webhook event ─────────────────────────────
+// ─── POST — Incoming Evolution API Webhook Event Receiver ─────────────────────
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    console.log('🔥 WEBHOOK RECEIVED:', JSON.stringify(body, null, 2));
+    const body = await request.json().catch(() => null);
+    if (!body) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
 
-    // Safely extract event data — Evolution API v2 nests under body.data
+    console.log('🔥 INCOMING WEBHOOK PAYLOAD:', JSON.stringify(body, null, 2));
+
+    // Safely extract event data — Evolution API v2 nests payload under body.data
     const data = body?.data || body;
 
     const remoteJid: string  = data?.key?.remoteJid  || data?.sender      || data?.remoteJid || '';
@@ -83,37 +88,37 @@ export async function POST(request: Request) {
       data?.body                                    ||
       '';
 
-    // ── Reject: group chats, self-sent, or no text ──────────────────────────
+    // Ignore group messages (@g.us), self-sent messages (fromMe === true), or empty text
     if (!remoteJid || fromMe || remoteJid.endsWith('@g.us') || !messageContent.trim()) {
-      console.log('[webhook] Ignored — fromMe, group, or no text body.', { remoteJid, fromMe, messageContent });
+      console.log('[webhook] Ignored — fromMe, group chat, or empty message text.', { remoteJid, fromMe });
       return NextResponse.json({ status: 'ignored', reason: 'Missing JID, sent by self, group, or empty text' });
     }
 
-    // Clean phone number — digits only
+    // Clean phone number (strip JID suffixes, keep digits only)
     const phoneNumber = remoteJid.replace(/@s\.whatsapp\.net|@g\.us/g, '').replace(/[^0-9]/g, '');
-    console.log(`[webhook] ✉️  Message from ${phoneNumber} (${pushName}): "${messageContent}"`);
+    console.log(`[webhook] ✉️ Incoming message from ${phoneNumber} (${pushName}): "${messageContent}"`);
 
-    // ── 1. Save incoming user message ───────────────────────────────────────
+    // 1. Save incoming user message to database
     await saveChatMessage(phoneNumber, 'user', messageContent, pushName || phoneNumber);
 
-    // ── 2. Load bot config from Firestore ───────────────────────────────────
+    // 2. Fetch bot active status & custom auto-reply text from Firestore
     const fb = await getFirebase();
     const botSnap = await fb.getDoc(fb.doc(fb.db, 'config', 'whatsapp_bot'));
-    const botData  = botSnap.exists() ? botSnap.data() : {};
+    const botData = botSnap.exists() ? botSnap.data() : {};
     const isBotActive = botData?.isActive === true || botData?.botActive === true;
 
     if (!isBotActive) {
-      console.log('[webhook] Bot disabled — message saved, no reply.');
+      console.log('[webhook] Bot is currently disabled — user message saved, auto-reply skipped.');
       return NextResponse.json({ status: 'saved', replied: false, reason: 'bot_disabled' });
     }
 
-    // ── 3. Build smart reply ────────────────────────────────────────────────
+    // 3. Build smart response based on keywords or fallback to custom reply text
     const customFallback: string =
       botData?.autoReplyText ||
       'Hi! I am currently operating a live printing station for an event and will get back to you shortly!';
 
     let replyText = customFallback;
-    const lower   = messageContent.toLowerCase();
+    const lower = messageContent.toLowerCase();
 
     if (/\bhi\b|\bhello\b|\bhey\b|namaste|hii/.test(lower)) {
       replyText =
@@ -161,50 +166,30 @@ export async function POST(request: Request) {
         '*Visriva Live Station* — Creating memories, one print at a time! ✨';
     }
 
-    // ── 4. Send reply via Evolution API ────────────────────────────────────
-    console.log(`[webhook] 🤖 Sending reply to ${phoneNumber}...`);
+    // 4. Send automated text response back via Evolution API
+    console.log(`[webhook] 🤖 Sending auto-reply to ${phoneNumber}...`);
     const sendRes = await fetch(`${EVO_URL}/message/sendText/${EVO_INSTANCE}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apikey: EVO_KEY,
+        'apikey': EVO_KEY,
       },
-      // Flat Evolution API v2 format
       body: JSON.stringify({
         number: phoneNumber,
-        text:   replyText,
+        text: replyText,
       }),
     });
 
     const sendResult = await sendRes.json().catch(() => ({}));
     console.log('🤖 BOT AUTO-REPLY SENT RESULT:', sendResult);
 
-    // ── 5. Save bot reply to Firestore ──────────────────────────────────────
+    // 5. Save outgoing bot reply to database chat thread
     await saveChatMessage(phoneNumber, 'bot', replyText, pushName || phoneNumber);
 
     return NextResponse.json({ status: 'success', replied: true, phone: phoneNumber });
 
   } catch (error: any) {
     console.error('❌ WEBHOOK CRASH ERROR:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-
-// ─── PUT — update bot settings ───────────────────────────────────────────────
-export async function PUT(req: Request) {
-  try {
-    const body = await req.json();
-    const fb   = await getFirebase();
-    const update: Record<string, unknown> = {};
-
-    if (body.isActive       !== undefined) { update.isActive = body.isActive; update.botActive = body.isActive; }
-    if (body.botActive      !== undefined) { update.isActive = body.botActive; update.botActive = body.botActive; }
-    if (body.autoReplyText  !== undefined)   update.autoReplyText  = body.autoReplyText;
-    if (body.connectionStatus !== undefined) update.connectionStatus = body.connectionStatus;
-
-    await fb.setDoc(fb.doc(fb.db, 'config', 'whatsapp_bot'), update, { merge: true });
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

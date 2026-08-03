@@ -6,7 +6,7 @@ const EVO_URL      = (process.env.EVOLUTION_API_URL      || 'https://evolution-a
 const EVO_KEY      = process.env.EVOLUTION_API_KEY       || 'VisrivaSecretKey2026_SecureKey';
 const EVO_INSTANCE = process.env.EVOLUTION_INSTANCE_NAME || 'visriva-live';
 
-// ─── Firebase init ───────────────────────────────────────────────────────────
+// ─── Firebase init (Server-Safe Dynamic Import) ──────────────────────────────
 async function getFirebase() {
   const { initializeApp, getApps, getApp } = await import('firebase/app');
   const {
@@ -32,25 +32,27 @@ async function getFirebase() {
   };
 }
 
-// ─── GET — list threads or fetch messages for one phone ──────────────────────
+// ─── GET: Fetch all threads OR messages for a specific phone number ───────────
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const phone = searchParams.get('phone');
     const fb = await getFirebase();
 
-    // ── Fetch messages for a specific thread ─────────────────────────────────
+    // ── 1. Fetch messages for a specific phone number thread ──────────────────
     if (phone) {
       const cleanPhone = phone.replace(/[^0-9]/g, '');
+      if (!cleanPhone) {
+        return NextResponse.json({ messages: [] });
+      }
 
-      // Gracefully return empty array if the thread doesn't exist yet
       const messagesRef = fb.collection(fb.db, 'chats', cleanPhone, 'messages');
       let snap;
       try {
         const q = fb.query(messagesRef, fb.orderBy('timestamp', 'asc'), fb.limit(200));
         snap = await fb.getDocs(q);
       } catch {
-        // Index not ready yet — fall back to unordered fetch
+        // Fallback for unindexed or new collections
         snap = await fb.getDocs(messagesRef);
       }
 
@@ -58,13 +60,12 @@ export async function GET(req: Request) {
         const data = d.data();
         return {
           id:        d.id,
-          sender:    data.sender   ?? 'user',
-          text:      data.text     ?? '',
-          timestamp: data.timestamp?.toDate?.()?.toISOString?.() ?? null,
+          sender:    data.sender   || 'user',
+          text:      data.text     || '',
+          timestamp: data.timestamp?.toDate?.()?.toISOString?.() || null,
         };
       });
 
-      // Sort client-side as fallback
       messages.sort((a, b) => {
         const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
         const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
@@ -74,13 +75,12 @@ export async function GET(req: Request) {
       return NextResponse.json({ messages });
     }
 
-    // ── List all chat threads ────────────────────────────────────────────────
+    // ── 2. List all active chat threads ───────────────────────────────────────
     const threadsRef = fb.collection(fb.db, 'chats');
     let snap;
     try {
       snap = await fb.getDocs(threadsRef);
     } catch {
-      // Firestore not initialised or empty collection — return empty gracefully
       return NextResponse.json({ threads: [] });
     }
 
@@ -90,11 +90,10 @@ export async function GET(req: Request) {
         phoneNum:      d.id,
         displayName:   data.displayName   || d.id,
         lastMessage:   data.lastMessage   || '',
-        lastTimestamp: data.lastTimestamp?.toDate?.()?.toISOString?.() ?? null,
+        lastTimestamp: data.lastTimestamp?.toDate?.()?.toISOString?.() || null,
       };
     });
 
-    // Sort by most recent
     threads.sort((a, b) => {
       const ta = a.lastTimestamp ? new Date(a.lastTimestamp).getTime() : 0;
       const tb = b.lastTimestamp ? new Date(b.lastTimestamp).getTime() : 0;
@@ -105,12 +104,12 @@ export async function GET(req: Request) {
 
   } catch (error: any) {
     console.error('[chats GET] Error:', error);
-    // Never crash the frontend — return empty arrays
+    // Never crash the client UI — return empty arrays
     return NextResponse.json({ threads: [], messages: [], error: error.message });
   }
 }
 
-// ─── POST — send a manual admin message ──────────────────────────────────────
+// ─── POST: Send a manual admin message ────────────────────────────────────────
 export async function POST(req: Request) {
   try {
     const { phone, text } = await req.json();
@@ -121,11 +120,17 @@ export async function POST(req: Request) {
 
     const cleanPhone = phone.replace(/[^0-9]/g, '');
 
-    // Send via Evolution API
+    // Send text message via Evolution API
     const sendRes = await fetch(`${EVO_URL}/message/sendText/${EVO_INSTANCE}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: EVO_KEY },
-      body: JSON.stringify({ number: cleanPhone, text: text.trim() }),
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVO_KEY,
+      },
+      body: JSON.stringify({
+        number: cleanPhone,
+        text: text.trim(),
+      }),
     });
 
     if (!sendRes.ok) {
@@ -134,7 +139,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Evolution API error: ${err}` }, { status: sendRes.status });
     }
 
-    // Save admin message to Firestore
+    // Save admin reply to Firestore chat thread
     const fb = await getFirebase();
     await fb.addDoc(fb.collection(fb.db, 'chats', cleanPhone, 'messages'), {
       sender:    'admin',
@@ -145,6 +150,7 @@ export async function POST(req: Request) {
     await fb.setDoc(
       fb.doc(fb.db, 'chats', cleanPhone),
       {
+        phoneNum:      cleanPhone,
         lastMessage:   text.trim().slice(0, 120),
         lastTimestamp: fb.serverTimestamp(),
       },

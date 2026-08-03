@@ -11,10 +11,9 @@ const evoHeaders = {
   'apikey': EVO_KEY,
 };
 
-// ─── Shared Firebase init ────────────────────────────────────────────────────
 async function getFirebase() {
   const { initializeApp, getApps, getApp } = await import('firebase/app');
-  const { getFirestore, doc, getDoc, setDoc } = await import('firebase/firestore');
+  const { getFirestore, doc, setDoc } = await import('firebase/firestore');
   const app = getApps().length === 0
     ? initializeApp({
         apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -25,7 +24,7 @@ async function getFirebase() {
         appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
       })
     : getApp();
-  return { db: getFirestore(app), doc, getDoc, setDoc };
+  return { db: getFirestore(app), doc, setDoc };
 }
 
 async function syncStatusToFirestore(status: string) {
@@ -37,11 +36,11 @@ async function syncStatusToFirestore(status: string) {
       { merge: true }
     );
   } catch (e) {
-    console.warn('[connect] Firestore sync skipped:', e);
+    console.warn('[connect] Firestore status sync skipped:', e);
   }
 }
 
-// ─── GET — connection status check ──────────────────────────────────────────
+// ─── GET: Check instance connection status ────────────────────────────────────
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const action = searchParams.get('action') || 'status';
@@ -51,14 +50,17 @@ export async function GET(req: Request) {
       const res = await fetch(`${EVO_URL}/instance/connectionState/${EVO_INSTANCE}`, {
         headers: evoHeaders,
       });
+
       if (!res.ok) {
         await syncStatusToFirestore('close');
         return NextResponse.json({ status: 'disconnected', httpStatus: res.status });
       }
+
       const data = await res.json();
       const state: string = data?.instance?.state || data?.state || 'unknown';
       const connected = state === 'open';
       await syncStatusToFirestore(connected ? 'open' : 'close');
+
       return NextResponse.json({ status: connected ? 'connected' : 'disconnected', state });
     } catch (err: any) {
       return NextResponse.json({ status: 'disconnected', error: err.message });
@@ -68,13 +70,13 @@ export async function GET(req: Request) {
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
 }
 
-// ─── POST — connect / QR / setup_webhook ────────────────────────────────────
+// ─── POST: Connect / Generate QR / Create Instance / Setup Webhook ─────────────
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
     const action: string = body.action || 'connect';
 
-    // ── setup_webhook ──────────────────────────────────────────────────────
+    // ── Setup Webhook Action ──────────────────────────────────────────────────
     if (action === 'setup_webhook') {
       const webhookUrl = 'https://visriva.com/api/whatsapp/webhook';
       const endpoint   = `${EVO_URL}/webhook/set/${EVO_INSTANCE}`;
@@ -98,16 +100,16 @@ export async function POST(req: Request) {
 
       if (!res.ok) {
         return NextResponse.json(
-          { error: `Railway ${res.status}`, details: parsed },
+          { error: `Railway HTTP ${res.status}`, details: parsed },
           { status: res.status }
         );
       }
       return NextResponse.json({ success: true, url: webhookUrl, response: parsed });
     }
 
-    // ── connect (QR generation) ────────────────────────────────────────────
-    // Step 1 — check current connection state
-    console.log(`[connect/step-1] Checking connectionState for ${EVO_INSTANCE}...`);
+    // ── Connect / QR Code Action ──────────────────────────────────────────────
+    // Step 1: Check connection state
+    console.log(`[connect/step-1] Checking connectionState for '${EVO_INSTANCE}'...`);
     const stateRes = await fetch(`${EVO_URL}/instance/connectionState/${EVO_INSTANCE}`, {
       headers: evoHeaders,
     });
@@ -115,7 +117,7 @@ export async function POST(req: Request) {
     if (stateRes.ok) {
       const stateData = await stateRes.json();
       const state: string = stateData?.instance?.state || stateData?.state || '';
-      console.log(`[connect/step-1] State: ${state}`);
+      console.log(`[connect/step-1] Connection state: ${state}`);
 
       if (state === 'open') {
         await syncStatusToFirestore('open');
@@ -123,8 +125,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // Step 2 — try to fetch QR from existing instance
-    console.log(`[connect/step-2] Fetching QR from existing instance...`);
+    // Step 2: Fetch QR code from existing instance
+    console.log(`[connect/step-2] Fetching QR code from instance '${EVO_INSTANCE}'...`);
     const connectRes = await fetch(`${EVO_URL}/instance/connect/${EVO_INSTANCE}`, {
       headers: evoHeaders,
     });
@@ -144,8 +146,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // Step 3 — create the instance
-    console.log(`[connect/step-3] Creating instance ${EVO_INSTANCE}...`);
+    // Step 3: Create the instance if missing or wiped by Railway
+    console.log(`[connect/step-3] Creating instance '${EVO_INSTANCE}' on Railway...`);
     const createRes = await fetch(`${EVO_URL}/instance/create`, {
       method:  'POST',
       headers: evoHeaders,
@@ -158,10 +160,10 @@ export async function POST(req: Request) {
     });
 
     const createData = await createRes.json().catch(() => ({}));
-    console.log(`[connect/step-3] Create response ${createRes.status}:`, createData);
+    console.log(`[connect/step-3] Create response status ${createRes.status}:`, createData);
 
-    // Step 4 — re-fetch QR after creation (even on 400/403 — instance may already exist)
-    console.log(`[connect/step-4] Re-fetching connect after create...`);
+    // Step 4: Re-fetch QR code after creation
+    console.log(`[connect/step-4] Re-fetching QR code after creation...`);
     const retryRes = await fetch(`${EVO_URL}/instance/connect/${EVO_INSTANCE}`, {
       headers: evoHeaders,
     });
