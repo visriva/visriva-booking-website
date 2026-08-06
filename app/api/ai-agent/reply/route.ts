@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import type { WAMessage, AgentSettings } from "@/types/whatsapp-agent";
 import { DEFAULT_AGENT_SETTINGS } from "@/types/whatsapp-agent";
+import { configureEvolutionTls, getEvolutionConfig, getEvolutionHeaders } from "@/lib/evolutionApi";
+
+configureEvolutionTls();
 
 // ─── Firebase helpers (server-side) ──────────────────────────────────────────
 
@@ -25,46 +28,6 @@ async function getFirebase() {
     db: getFirestore(app),
     collection, doc, getDoc, getDocs, addDoc, updateDoc,
     query, orderBy, limit, serverTimestamp,
-  };
-}
-
-async function getEvolutionConfig() {
-  try {
-    const fb = await getFirebase();
-    const docRef = fb.doc(fb.db, "config", "operator");
-    const snap = await fb.getDoc(docRef);
-    
-    if (snap.exists()) {
-      const data = snap.data();
-      let url = data.backupEvoApiUrl || process.env.EVOLUTION_API_URL || "https://api.visriva.com";
-      const key = data.backupEvoApiKey || process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey";
-      const instance = data.backupInstanceName || process.env.EVOLUTION_INSTANCE_NAME || "visriva-live";
-      
-      // Prepend https:// if protocol is missing
-      if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        url = "https://" + url;
-      }
-      // Strip trailing slash
-      if (url.endsWith("/")) {
-        url = url.slice(0, -1);
-      }
-      return { url, key, instance };
-    }
-  } catch (err) {
-    console.warn("Failed to load Evolution config from Firestore, falling back to env:", err);
-  }
-  
-  let url = process.env.EVOLUTION_API_URL || "https://api.visriva.com";
-  if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    url = "https://" + url;
-  }
-  if (url.endsWith("/")) {
-    url = url.slice(0, -1);
-  }
-  return {
-    url,
-    key: process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey",
-    instance: process.env.EVOLUTION_INSTANCE_NAME || "visriva-live",
   };
 }
 
@@ -310,10 +273,7 @@ export async function POST(req: Request) {
           `${evoConfig.url}/message/sendText/${evoConfig.instance}`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: evoConfig.key,
-            },
+            headers: getEvolutionHeaders(evoConfig.key),
             body: JSON.stringify({
               number: phone,
               options: {

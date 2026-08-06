@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { configureEvolutionTls, getEvolutionConfig, getEvolutionHeaders } from "@/lib/evolutionApi";
 
-// Ignore SSL certificate checks for self-hosted Evolution VPS servers
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+configureEvolutionTls();
 
 async function getFirebase() {
   const { initializeApp, getApps, getApp } = await import("firebase/app");
@@ -20,51 +20,10 @@ async function getFirebase() {
   return { db: getFirestore(app), doc, getDoc, setDoc };
 }
 
-async function getEvolutionConfig() {
-  try {
-    const fb = await getFirebase();
-    const docRef = fb.doc(fb.db, "config", "operator");
-    const snap = await fb.getDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      let url = data.backupEvoApiUrl || process.env.EVOLUTION_API_URL || "https://api.visriva.com";
-      const key = data.backupEvoApiKey || process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey";
-      const instance = data.backupInstanceName || process.env.EVOLUTION_INSTANCE_NAME || "visriva-live";
-      
-      // Prepend https:// if protocol is missing
-      if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        url = "https://" + url;
-      }
-      // Strip trailing slash
-      if (url.endsWith("/")) {
-        url = url.slice(0, -1);
-      }
-      return { url, key, instance };
-    }
-  } catch (e) {
-    console.error("Failed to load Evolution config:", e);
-  }
-  
-  let url = process.env.EVOLUTION_API_URL || "https://api.visriva.com";
-  if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    url = "https://" + url;
-  }
-  if (url.endsWith("/")) {
-    url = url.slice(0, -1);
-  }
-  return {
-    url,
-    key: process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey",
-    instance: process.env.EVOLUTION_INSTANCE_NAME || "visriva-live"
-  };
-}
-
-// ─── POST: Auto-Responder Event Handler ──────────────────────────────────────
 export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // Verify webhook message upsert event
     if (body.event !== "messages.upsert") {
       return NextResponse.json({ status: "IGNORED_EVENT" });
     }
@@ -79,13 +38,12 @@ export async function POST(req: Request) {
 
     const phone = remoteJid.split("@")[0];
 
-    // Check if auto-responder bot toggle is active in database
     const fb = await getFirebase();
     const botRef = fb.doc(fb.db, "config", "whatsapp_bot");
     const botSnap = await fb.getDoc(botRef);
-    
+
     const isBotActive = botSnap.exists() ? botSnap.data()?.botActive === true : false;
-    
+
     if (!isBotActive) {
       return NextResponse.json({ status: "BOT_DISABLED" });
     }
@@ -97,20 +55,17 @@ export async function POST(req: Request) {
 
     const response = await fetch(`${config.url}/message/sendText/${config.instance}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: config.key
-      },
+      headers: getEvolutionHeaders(config.key),
       body: JSON.stringify({
         number: phone,
         options: {
           delay: 1000,
-          presence: "composing"
+          presence: "composing",
         },
         textMessage: {
-          text: replyText
-        }
-      })
+          text: replyText,
+        },
+      }),
     });
 
     if (!response.ok) {
@@ -120,20 +75,18 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ success: true, message: "Auto-reply sent successfully" });
-
   } catch (error: any) {
     console.error("WhatsApp Webhook Error:", error);
     return NextResponse.json({ error: error.message || "Webhook processing error" }, { status: 500 });
   }
 }
 
-// ─── PUT: Sync Bot Setting State ─────────────────────────────────────────────
 export async function PUT(req: Request) {
   try {
     const { botActive } = await req.json();
     const fb = await getFirebase();
     const botRef = fb.doc(fb.db, "config", "whatsapp_bot");
-    
+
     await fb.setDoc(botRef, { botActive }, { merge: true });
     return NextResponse.json({ success: true });
   } catch (error: any) {

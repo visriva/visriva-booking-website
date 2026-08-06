@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { getOperatorConfigServer } from "@/lib/firebase";
+import { configureEvolutionTls, getEvolutionConfig, getEvolutionHeaders } from "@/lib/evolutionApi";
+
+configureEvolutionTls();
 
 export async function POST(req: Request) {
   try {
@@ -115,22 +118,17 @@ export async function POST(req: Request) {
     }
 
     // ─── 2. EVOLUTION API / SECONDARY DISPATCH ───────────────────────────────
-    const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || "https://api.visriva.com";
-    const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || "VisrivaSecretKey2026_SecureKey";
-    const INSTANCE_NAME = process.env.EVOLUTION_INSTANCE_NAME || "visriva-live";
-
     let evolutionSuccess = false;
-    let evoData = null;
+    let evoData: unknown = null;
 
     try {
+      const { url, key, instance } = await getEvolutionConfig();
+
       const response = await fetch(
-        `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`,
+        `${url}/message/sendText/${instance}`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: EVOLUTION_API_KEY,
-          },
+          headers: getEvolutionHeaders(key),
           body: JSON.stringify({
             number: cleanPhone,
             options: {
@@ -157,7 +155,7 @@ export async function POST(req: Request) {
     // ─── 2.5. BACKUP EVOLUTION VPS FAILOVER DISPATCH ─────────────────────────
     const BACKUP_EVOLUTION_API_URL = opConfig.backupEvoApiUrl || process.env.BACKUP_EVOLUTION_API_URL;
     const BACKUP_EVOLUTION_API_KEY = opConfig.backupEvoApiKey || process.env.BACKUP_EVOLUTION_API_KEY;
-    const BACKUP_INSTANCE_NAME = opConfig.backupInstanceName || process.env.BACKUP_EVOLUTION_INSTANCE_NAME || INSTANCE_NAME;
+    const BACKUP_INSTANCE_NAME = opConfig.backupInstanceName || process.env.BACKUP_EVOLUTION_INSTANCE_NAME || process.env.EVOLUTION_INSTANCE_NAME || "visriva-live";
 
     if (!evolutionSuccess && BACKUP_EVOLUTION_API_URL && BACKUP_EVOLUTION_API_KEY) {
       try {
