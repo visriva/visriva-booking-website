@@ -6,17 +6,12 @@ import {
   isSupabaseAdminConfigured,
   PHOTOBOOTH_PRINT_BUCKET,
 } from "@/lib/supabaseAdmin";
+import type { LocalPrintQueueJob } from "@/lib/printQueue";
 
 export const runtime = "nodejs";
 
-const inMemoryQueue: Array<{
-  id: string;
-  imageUrl: string;
-  status: string;
-  source: string;
-  createdAt: string;
-  size?: string;
-}> = [];
+/** In-memory local event print buffer (iPad booth → laptop print node on same server). */
+let printQueue: LocalPrintQueueJob[] = [];
 
 function dataUrlToBuffer(dataUrl: string): { buffer: Buffer; mime: string } {
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
@@ -27,110 +22,69 @@ function dataUrlToBuffer(dataUrl: string): { buffer: Buffer; mime: string } {
   };
 }
 
-async function enqueuePrintJob(
-  buffer: Buffer,
-  mime: string,
-  meta: { captureId: string; source: string; size?: string }
-): Promise<{ jobId: string; backend: string }> {
-  const jobId = `print-${Date.now()}`;
-  const createdAt = new Date().toISOString();
-  const { captureId, source, size } = meta;
+async function persistToCloud(
+  jobId: string,
+  imageUrl: string,
+  meta: { captureId: string; source: string; size: string; createdAt: string }
+): Promise<string | null> {
+  const { captureId, source, size, createdAt } = meta;
 
   if (isSupabaseAdminConfigured()) {
     const supabase = getSupabaseAdmin();
     if (supabase) {
-      const storagePath = `jobs/${jobId}.jpg`;
-      const { error: uploadErr } = await supabase.storage
-        .from(PHOTOBOOTH_PRINT_BUCKET)
-        .upload(storagePath, buffer, {
-          contentType: mime,
-          upsert: false,
-        });
-
-      let imageUrl = `data:${mime};base64,${buffer.toString("base64")}`;
-      if (!uploadErr) {
-        const { data: publicData } = supabase.storage
+      try {
+        const { buffer, mime } = dataUrlToBuffer(imageUrl);
+        const storagePath = `jobs/${jobId}.jpg`;
+        const { error: uploadErr } = await supabase.storage
           .from(PHOTOBOOTH_PRINT_BUCKET)
-          .getPublicUrl(storagePath);
-        if (publicData?.publicUrl) imageUrl = publicData.publicUrl;
-      }
+          .upload(storagePath, buffer, { contentType: mime, upsert: false });
 
-      const { error: insertErr } = await supabase.from("print_jobs").insert({
-        id: jobId,
-        image_url: imageUrl,
-        storage_path: uploadErr ? null : storagePath,
-        status: "pending",
-        source,
-        capture_id: captureId,
-        created_at: createdAt,
-      });
+        let url = imageUrl;
+        if (!uploadErr) {
+          const { data } = supabase.storage.from(PHOTOBOOTH_PRINT_BUCKET).getPublicUrl(storagePath);
+          if (data?.publicUrl) url = data.publicUrl;
+        }
 
-      if (!insertErr) {
-        return { jobId, backend: "supabase" };
+        const { error } = await supabase.from("print_jobs").insert({
+          id: jobId,
+          image_url: url,
+          storage_path: uploadErr ? null : storagePath,
+          status: "pending",
+          source,
+          capture_id: captureId,
+          created_at: createdAt,
+        });
+        if (!error) return "supabase";
+      } catch (e) {
+        console.warn("Supabase persist note:", e);
       }
-      console.warn("Supabase print_jobs insert note:", insertErr.message);
     }
   }
 
-  const imageUrl = `data:${mime};base64,${buffer.toString("base64")}`;
-
   if (adminDb) {
-    await adminDb.collection("print_jobs").doc(jobId).set({
-      imageUrl,
-      status: "pending",
-      source,
-      captureId,
-      size: size || null,
-      createdAt,
-      serverCreatedAt: FieldValue.serverTimestamp(),
-    });
-    return { jobId, backend: "firebase" };
+    try {
+      await adminDb.collection("print_jobs").doc(jobId).set({
+        imageUrl,
+        status: "pending",
+        source,
+        captureId,
+        size,
+        createdAt,
+        serverCreatedAt: FieldValue.serverTimestamp(),
+      });
+      return "firebase";
+    } catch (e) {
+      console.warn("Firebase persist note:", e);
+    }
   }
 
-  inMemoryQueue.unshift({
-    id: jobId,
-    imageUrl,
-    status: "pending",
-    source,
-    createdAt,
-    size,
-  });
-
-  return { jobId, backend: "memory" };
+  return null;
 }
 
 export async function GET() {
-  if (isSupabaseAdminConfigured()) {
-    const supabase = getSupabaseAdmin();
-    if (supabase) {
-      const { data, error } = await supabase
-        .from("print_jobs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(20);
-      if (!error && data) {
-        const jobs = data.map((row) => ({
-          id: row.id,
-          imageUrl: row.image_url,
-          status: row.status,
-          source: row.source || "webbooth",
-          createdAt: row.created_at,
-        }));
-        return NextResponse.json({
-          ok: true,
-          backend: "supabase",
-          queueSize: jobs.filter((j) => j.status === "pending").length,
-          jobs,
-        });
-      }
-    }
-  }
-
   return NextResponse.json({
-    ok: true,
-    backend: "memory",
-    queueSize: inMemoryQueue.filter((j) => j.status === "pending").length,
-    jobs: inMemoryQueue.slice(0, 20),
+    jobs: printQueue,
+    queueSize: printQueue.filter((j) => j.status === "pending").length,
   });
 }
 
@@ -138,49 +92,109 @@ export async function POST(request: NextRequest) {
   try {
     const contentType = request.headers.get("content-type") || "";
 
-    // JSON body: { images: dataUrl[], size: "2x6" } — first image used if strip pre-composed client-side
     if (contentType.includes("application/json")) {
       const body = await request.json();
       const images = body?.images as string[] | undefined;
       const size = (body?.size as string) || "2x6";
-      const captureId = (body?.captureId as string) || `job-${Date.now()}`;
       const source = (body?.source as string) || "webbooth";
+      const captureId = (body?.captureId as string) || `job-${Date.now()}`;
 
       if (!images?.length) {
-        return NextResponse.json({ error: "Missing images array" }, { status: 400 });
+        return NextResponse.json({ success: false, error: "Invalid payload" }, { status: 400 });
       }
 
-      const { buffer, mime } = dataUrlToBuffer(images[0]);
-      const { jobId, backend } = await enqueuePrintJob(buffer, mime, {
+      const id = Date.now();
+      const timestamp = new Date().toISOString();
+      const newJob: LocalPrintQueueJob = {
+        id,
+        images,
+        size,
+        timestamp,
+        status: "pending",
+        source,
+        captureId,
+        imageUrl: images[0],
+      };
+
+      printQueue.push(newJob);
+
+      void persistToCloud(String(id), images[0], {
         captureId,
         source,
         size,
+        createdAt: timestamp,
       });
-      return NextResponse.json({ ok: true, jobId, captureId, size, backend });
+
+      return NextResponse.json({ success: true, jobId: id });
     }
 
+    // Multipart: single composed strip JPEG from webbooth
     const formData = await request.formData();
     const image = formData.get("image");
-    const captureId =
-      (formData.get("captureId") as string) || `job-${Date.now()}`;
+    const captureId = (formData.get("captureId") as string) || `job-${Date.now()}`;
     const source = (formData.get("source") as string) || "webbooth";
-    const size = (formData.get("size") as string) || undefined;
+    const size = (formData.get("size") as string) || "2x6";
 
     if (!image || !(image instanceof Blob)) {
-      return NextResponse.json({ error: "Missing image file" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Missing image file" }, { status: 400 });
     }
 
     const buffer = Buffer.from(await image.arrayBuffer());
     const mime = image.type || "image/jpeg";
-    const { jobId, backend } = await enqueuePrintJob(buffer, mime, {
+    const dataUrl = `data:${mime};base64,${buffer.toString("base64")}`;
+
+    const id = Date.now();
+    const timestamp = new Date().toISOString();
+    const newJob: LocalPrintQueueJob = {
+      id,
+      images: [dataUrl],
+      size,
+      timestamp,
+      status: "pending",
+      source,
+      captureId,
+      imageUrl: dataUrl,
+    };
+
+    printQueue.push(newJob);
+
+    void persistToCloud(String(id), dataUrl, {
       captureId,
       source,
       size,
+      createdAt: timestamp,
     });
 
-    return NextResponse.json({ ok: true, jobId, captureId, backend });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Print queue failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ success: true, jobId: id });
+  } catch (err) {
+    console.error("Print POST error:", err);
+    return NextResponse.json({ success: false, error: "Invalid payload" }, { status: 400 });
+  }
+}
+
+/** Update job status in the local buffer (used by /webprinter). */
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const jobId = body?.jobId;
+    const status = body?.status as LocalPrintQueueJob["status"] | undefined;
+    const error = body?.error as string | undefined;
+
+    if (!jobId || !status) {
+      return NextResponse.json({ success: false, error: "Missing jobId or status" }, { status: 400 });
+    }
+
+    const job = printQueue.find((j) => j.id === Number(jobId) || String(j.id) === String(jobId));
+    if (!job) {
+      return NextResponse.json({ success: false, error: "Job not found" }, { status: 404 });
+    }
+
+    job.status = status;
+    if (error) job.error = error;
+    if (status === "printed") job.printedAt = new Date().toISOString();
+
+    return NextResponse.json({ success: true, jobId: job.id });
+  } catch {
+    return NextResponse.json({ success: false, error: "Invalid payload" }, { status: 400 });
   }
 }

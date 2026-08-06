@@ -79,12 +79,12 @@ export default function WebPrinterPage() {
       try {
         await markPrintJobStatus(job.id, "printing");
 
-        const blob = await resolvePrintJobBlob(job.imageUrl);
+        const blob = await resolvePrintJobBlob(job);
 
         if (printerOk) {
           await sendToLocalPrintServer(blob, job.id);
         } else {
-          await printImageViaBrowser(job.imageUrl);
+          await printImageViaBrowser(job.imageUrl || job.images?.[0] || "");
         }
 
         await markPrintJobStatus(job.id, "printed");

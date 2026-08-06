@@ -12,18 +12,10 @@ import {
   isSupabaseConfigured,
   SupabasePrintJobRow,
 } from "@/lib/supabase";
+import { localJobToPrintJob, PrintJob, PrintJobStatus } from "@/lib/printQueue";
+import { compose2x6Strip } from "@/lib/composeStrip";
 
-export type PrintJobStatus = "pending" | "printing" | "printed" | "failed";
-
-export interface PrintJob {
-  id: string;
-  imageUrl: string;
-  status: PrintJobStatus;
-  source: string;
-  createdAt?: string;
-  printedAt?: string;
-  error?: string;
-}
+export type { PrintJob, PrintJobStatus };
 
 function mapSupabaseRow(row: SupabasePrintJobRow): PrintJob {
   return {
@@ -53,10 +45,59 @@ export function subscribePrintJobs(
   callback: (jobs: PrintJob[]) => void,
   statusFilter?: PrintJobStatus
 ): () => void {
+  let active = true;
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let cloudUnsub: (() => void) | null = null;
+
+  const applyFilter = (jobs: PrintJob[]) => {
+    if (statusFilter) return jobs.filter((j) => j.status === statusFilter);
+    return jobs;
+  };
+
+  const pollLocalQueue = async () => {
+    try {
+      const base = getPrintApiBase();
+      const url = base ? `${base}/api/print` : "/api/print";
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json();
+      const raw = data.jobs as Array<{
+        id: number;
+        images: string[];
+        size: string;
+        timestamp: string;
+        status: PrintJobStatus;
+        source: string;
+        imageUrl?: string;
+        error?: string;
+        printedAt?: string;
+      }>;
+      if (!active || !Array.isArray(raw)) return;
+      const jobs = applyFilter(raw.map((j) => localJobToPrintJob(j)));
+      callback(jobs);
+    } catch {
+      // local queue poll is best-effort
+    }
+  };
+
+  void pollLocalQueue();
+  pollTimer = setInterval(() => void pollLocalQueue(), 2500);
+
   if (isSupabaseConfigured()) {
-    return subscribePrintJobsSupabase(callback, statusFilter);
+    cloudUnsub = subscribePrintJobsSupabase((jobs) => {
+      if (active) callback(applyFilter(jobs));
+    }, statusFilter);
+  } else {
+    cloudUnsub = subscribePrintJobsFirebase((jobs) => {
+      if (active && jobs.length > 0) callback(applyFilter(jobs));
+    }, statusFilter);
   }
-  return subscribePrintJobsFirebase(callback, statusFilter);
+
+  return () => {
+    active = false;
+    if (pollTimer) clearInterval(pollTimer);
+    if (cloudUnsub) cloudUnsub();
+  };
 }
 
 function subscribePrintJobsSupabase(
@@ -143,6 +184,19 @@ export async function markPrintJobStatus(
   status: PrintJobStatus,
   extra?: { error?: string }
 ): Promise<void> {
+  try {
+    const base = getPrintApiBase();
+    const url = base ? `${base}/api/print` : "/api/print";
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobId, status, error: extra?.error }),
+    });
+    if (res.ok) return;
+  } catch {
+    // fall through to cloud backends
+  }
+
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseBrowser();
     if (supabase) {
@@ -178,7 +232,50 @@ export async function sendImageToPrintEndpoint(blob: Blob, captureId: string): P
     throw new Error(text || `Print request failed (${res.status})`);
   }
   const data = await res.json();
-  return data.jobId || captureId;
+  return String(data.jobId || data.captureId || captureId);
+}
+
+/** POST raw shot array as JSON to the local print router (iPad → print node). */
+export async function sendImagesToPrintEndpoint(
+  images: string[],
+  size = "2x6"
+): Promise<string> {
+  const base = getPrintApiBase();
+  const url = base ? `${base}/api/print` : "/api/print";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ images, size, source: "webbooth" }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Print request failed (${res.status})`);
+  }
+  const data = await res.json();
+  return String(data.jobId || Date.now());
+}
+
+/** Resolve print blob — composes 2x6 strip when job has multiple shots. */
+export async function resolvePrintJobBlob(job: PrintJob): Promise<Blob> {
+  if (job.images && job.images.length > 1 && job.size === "2x6") {
+    return compose2x6Strip(job.images);
+  }
+  return resolveImageUrlBlob(job.imageUrl);
+}
+
+async function resolveImageUrlBlob(imageUrl: string): Promise<Blob> {
+  if (imageUrl.startsWith("data:")) {
+    const [header, base64] = imageUrl.split(",");
+    const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  }
+
+  const res = await fetch(imageUrl);
+  if (!res.ok) throw new Error(`Failed to load print image (${res.status})`);
+  return res.blob();
 }
 
 export async function sendToLocalPrintServer(blob: Blob, captureId: string): Promise<void> {
@@ -212,7 +309,7 @@ export async function printImageViaBrowser(imageUrl: string): Promise<void> {
   const printUrl = imageUrl.startsWith("data:")
     ? imageUrl
     : await (async () => {
-        const blob = await resolvePrintJobBlob(imageUrl);
+        const blob = await resolveImageUrlBlob(imageUrl);
         return URL.createObjectURL(blob);
       })();
 
@@ -256,18 +353,4 @@ export async function printImageViaBrowser(imageUrl: string): Promise<void> {
   }, 2000);
 }
 
-/** Resolve a print job image URL (data URL or remote) to a Blob for USB print server. */
-export async function resolvePrintJobBlob(imageUrl: string): Promise<Blob> {
-  if (imageUrl.startsWith("data:")) {
-    const [header, base64] = imageUrl.split(",");
-    const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return new Blob([bytes], { type: mime });
-  }
-
-  const res = await fetch(imageUrl);
-  if (!res.ok) throw new Error(`Failed to load print image (${res.status})`);
-  return res.blob();
-}
+export { resolveImageUrlBlob };
