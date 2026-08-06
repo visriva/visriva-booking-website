@@ -215,7 +215,12 @@ export async function markPrintJobStatus(
     ...(status === "printed" ? { printedAt: new Date().toISOString() } : {}),
     ...(extra?.error ? { error: extra.error } : {}),
   };
-  await updateDoc(doc(db, "print_jobs", jobId), payload);
+
+  try {
+    await updateDoc(doc(db, "print_jobs", jobId), payload);
+  } catch (e) {
+    console.warn("Firebase markPrintJobStatus note:", e);
+  }
 }
 
 export async function sendImageToPrintEndpoint(blob: Blob, captureId: string): Promise<string> {

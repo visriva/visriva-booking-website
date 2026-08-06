@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebaseAdmin";
-import { FieldValue } from "firebase-admin/firestore";
 import {
   getSupabaseAdmin,
   isSupabaseAdminConfigured,
@@ -22,6 +20,7 @@ function dataUrlToBuffer(dataUrl: string): { buffer: Buffer; mime: string } {
   };
 }
 
+/** Cloud mirror — lazy-loaded so /api/print never imports firebase-admin at module scope (Vercel ESM safe). */
 async function persistToCloud(
   jobId: string,
   imageUrl: string,
@@ -61,21 +60,22 @@ async function persistToCloud(
     }
   }
 
-  if (adminDb) {
-    try {
-      await adminDb.collection("print_jobs").doc(jobId).set({
-        imageUrl,
-        status: "pending",
-        source,
-        captureId,
-        size,
-        createdAt,
-        serverCreatedAt: FieldValue.serverTimestamp(),
-      });
-      return "firebase";
-    } catch (e) {
-      console.warn("Firebase persist note:", e);
-    }
+  try {
+    const { adminDb } = await import("@/lib/firebaseAdmin");
+    if (!adminDb) return null;
+    const { FieldValue } = await import("firebase-admin/firestore");
+    await adminDb.collection("print_jobs").doc(jobId).set({
+      imageUrl,
+      status: "pending",
+      source,
+      captureId,
+      size,
+      createdAt,
+      serverCreatedAt: FieldValue.serverTimestamp(),
+    });
+    return "firebase";
+  } catch (e) {
+    console.warn("Firebase persist note:", e);
   }
 
   return null;
@@ -128,7 +128,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, jobId: id });
     }
 
-    // Multipart: single composed strip JPEG from webbooth
     const formData = await request.formData();
     const image = formData.get("image");
     const captureId = (formData.get("captureId") as string) || `job-${Date.now()}`;
@@ -168,11 +167,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, jobId: id });
   } catch (err) {
     console.error("Print POST error:", err);
-    return NextResponse.json({ success: false, error: "Invalid payload" }, { status: 400 });
+    const message = err instanceof Error ? err.message : "Invalid payload";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
 
-/** Update job status in the local buffer (used by /webprinter). */
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
