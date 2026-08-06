@@ -38,8 +38,7 @@ import {
   subscribeWhatsAppBotConfig,
 } from "@/lib/firebase";
 import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
-
-const AUTHORIZED_ADMIN_PASSWORDS = ["jeevan", "drupitha", "punith", "arpitha", "4848", "0315"];
+import { hasAdminPasswordsConfigured, isAuthorizedAdminPassword } from "@/lib/adminAuth";
 
 const DEFAULT_TOKENS: TokenItem[] = [];
 
@@ -243,7 +242,9 @@ export default function OperatorCommandCenterPage() {
     const isMatch =
       entered === targetPin ||
       entered === "visriva2026" ||
-      (opConfig.allowAdminPass !== false && AUTHORIZED_ADMIN_PASSWORDS.includes(entered));
+      (opConfig.allowAdminPass !== false &&
+        hasAdminPasswordsConfigured() &&
+        isAuthorizedAdminPassword(entered));
 
     if (isMatch) {
       setAuthenticated(true);

@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
 import { saveChatMessage, getBotSettings } from '@/lib/chatStore';
+import { configureEvolutionTls, getEvolutionConfig, getEvolutionHeaders } from '@/lib/evolutionApi';
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
-const EVO_URL      = (process.env.EVOLUTION_API_URL      || 'https://evolution-api-production-d446.up.railway.app').replace(/\/$/, '');
-const EVO_KEY      = process.env.EVOLUTION_API_KEY       || 'VisrivaSecretKey2026_SecureKey';
-const EVO_INSTANCE = process.env.EVOLUTION_INSTANCE_NAME || 'visriva-live';
+configureEvolutionTls();
 
 // ─── GET: Health Check for Webhook Verification ──────────────────────────────
 export async function GET() {
@@ -22,7 +19,6 @@ export async function POST(request: Request) {
 
     console.log('🔥 WEBHOOK PAYLOAD:', JSON.stringify(body, null, 2));
 
-    // Safely extract payload data — Evolution API v2 nests payload under body.data
     const data = body?.data || body;
 
     const remoteJid: string  = data?.key?.remoteJid  || data?.sender      || data?.remoteJid || '';
@@ -36,24 +32,20 @@ export async function POST(request: Request) {
       data?.body                                    ||
       '';
 
-    // Ignore group chats (@g.us), self-sent messages (fromMe === true), or empty text
     if (!remoteJid || fromMe || remoteJid.endsWith('@g.us') || !messageContent.trim()) {
       console.log('[webhook] Ignored — sent by self, group chat, or empty message text.');
       return NextResponse.json({ status: 'success', note: 'ignored message' });
     }
 
-    // Clean phone number (strip JID suffixes, keep digits only)
     const phoneNumber = remoteJid.replace(/@s\.whatsapp\.net|@g\.us/g, '').replace(/[^0-9]/g, '');
     console.log(`[webhook] ✉️ Incoming message from ${phoneNumber} (${pushName}): "${messageContent}"`);
 
-    // 1. Save incoming user message to database/memory store
     await saveChatMessage(phoneNumber, {
       sender: 'user',
       text: messageContent,
       timestamp: new Date()
     }, pushName || phoneNumber);
 
-    // 2. Fetch bot config from resilient chatStore settings
     const botSettings = await getBotSettings();
     const isBotActive = botSettings.isActive === true;
 
@@ -62,7 +54,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: 'success', note: 'bot_disabled' });
     }
 
-    // 3. Build smart response based on keywords
     let replyText = botSettings.autoReplyText;
     const lower = messageContent.toLowerCase();
 
@@ -112,15 +103,12 @@ export async function POST(request: Request) {
         '*Visriva Live Station* — Creating memories, one print at a time! ✨';
     }
 
-    // 4. Send flat JSON reply { number, text } to Evolution API
     console.log(`[webhook] 🤖 Sending auto-reply to ${phoneNumber}...`);
     try {
-      const sendRes = await fetch(`${EVO_URL}/message/sendText/${EVO_INSTANCE}`, {
+      const { url, key, instance } = await getEvolutionConfig();
+      const sendRes = await fetch(`${url}/message/sendText/${instance}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': EVO_KEY,
-        },
+        headers: getEvolutionHeaders(key),
         body: JSON.stringify({
           number: phoneNumber,
           text:   replyText,
@@ -133,19 +121,16 @@ export async function POST(request: Request) {
       console.error('[webhook] Error sending text message:', sendErr);
     }
 
-    // 5. Save outgoing bot reply to database/memory store
     await saveChatMessage(phoneNumber, {
       sender: 'bot',
       text: replyText,
       timestamp: new Date()
     }, pushName || phoneNumber);
 
-    // Always return success JSON to prevent Railway packet retries
     return NextResponse.json({ status: 'success' });
 
   } catch (error: any) {
     console.error('❌ WEBHOOK TOP-LEVEL ERROR:', error);
-    // Return status: success even on error to stop Railway retry loops
     return NextResponse.json({ status: 'success', error: error.message });
   }
 }

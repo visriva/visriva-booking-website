@@ -2,38 +2,41 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── Admin config collections — public READ, nobody can write from the web ───
-    // The admin panel writes via the SDK with the API key, which is fine for a
-    // private admin panel (you control who has the URL).
+    // ─── CMS config — public read, no client-side deletes ───────────────────
     match /config/{docId} {
       allow read: if true;
-      allow write: if true;  // Secured by keeping admin URL private
+      allow create, update: if true;
+      allow delete: if false;
     }
 
     match /services/{serviceId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if true;
+      allow delete: if false;
     }
 
     match /site_content/{docId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if true;
+      allow delete: if false;
     }
 
-    // ─── Gallery — public READ, admin can add/delete ──────────────────────────
+    // ─── Gallery — public read, admin can add/update (delete via admin only) ─
     match /galleries/{itemId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if true;
+      allow delete: if false;
     }
 
-    // ─── Bookings — public CREATE, READ & UPDATE for contracts & admin management ─────
+    // ─── Bookings — public create with validation, no client deletes ─────────
     match /bookings/{bookingId} {
-      allow create: if true;
+      allow create: if isValidBookingCreate();
       allow read, update: if true;
-      allow delete: if true;
+      allow delete: if false;
     }
 
-    // ─── WhatsApp AI Agent ────────────────────────────────────────────────────
+    // ─── WhatsApp AI Agent ───────────────────────────────────────────────────
+    // TODO: require request.auth != null once all API routes use firebase-admin
     match /wa_conversations/{document=**} {
       allow read, write: if true;
     }
@@ -43,5 +46,13 @@ service cloud.firestore {
     match /wa_kb_documents/{document=**} {
       allow read, write: if true;
     }
+  }
+
+  function isValidBookingCreate() {
+    return request.resource.data.keys().hasAll(['eventDate', 'venue', 'pax', 'services'])
+      && request.resource.data.pax is int
+      && request.resource.data.pax > 0
+      && request.resource.data.pax < 100000
+      && request.resource.data.services is list;
   }
 }

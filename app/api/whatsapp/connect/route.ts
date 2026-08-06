@@ -1,15 +1,7 @@
 import { NextResponse } from 'next/server';
+import { configureEvolutionTls, getEvolutionConfig, getEvolutionHeaders } from '@/lib/evolutionApi';
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
-const EVO_URL      = (process.env.EVOLUTION_API_URL      || 'https://evolution-api-production-d446.up.railway.app').replace(/\/$/, '');
-const EVO_KEY      = process.env.EVOLUTION_API_KEY       || 'VisrivaSecretKey2026_SecureKey';
-const EVO_INSTANCE = process.env.EVOLUTION_INSTANCE_NAME || 'visriva-live';
-
-const evoHeaders = {
-  'Content-Type': 'application/json',
-  'apikey': EVO_KEY,
-};
+configureEvolutionTls();
 
 async function syncStatusToFirestore(status: string) {
   try {
@@ -30,8 +22,9 @@ export async function GET(req: Request) {
 
     if (action === 'status') {
       try {
-        const res = await fetch(`${EVO_URL}/instance/connectionState/${EVO_INSTANCE}`, {
-          headers: evoHeaders,
+        const { url, key, instance } = await getEvolutionConfig();
+        const res = await fetch(`${url}/instance/connectionState/${instance}`, {
+          headers: getEvolutionHeaders(key),
           signal: AbortSignal.timeout(8000),
         });
 
@@ -59,13 +52,15 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const { url, key, instance } = await getEvolutionConfig();
+    const evoHeaders = getEvolutionHeaders(key);
+
     const body = await req.json().catch(() => ({}));
     const action: string = body.action || 'connect';
 
-    // ── setup_webhook ────────────────────────────────────────────────────────
     if (action === 'setup_webhook') {
-      const webhookUrl = 'https://visriva.com/api/whatsapp/webhook';
-      const endpoint   = `${EVO_URL}/webhook/set/${EVO_INSTANCE}`;
+      const webhookUrl = 'https://www.visriva.com/api/whatsapp/webhook';
+      const endpoint   = `${url}/webhook/set/${instance}`;
       console.log(`[connect/setup_webhook] POST ${endpoint}`);
 
       try {
@@ -88,7 +83,7 @@ export async function POST(req: Request) {
 
         if (!res.ok) {
           return NextResponse.json(
-            { error: `Railway HTTP ${res.status}`, details: parsed },
+            { error: `Evolution API HTTP ${res.status}`, details: parsed },
             { status: res.status }
           );
         }
@@ -98,11 +93,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // ── connect (QR Generation & Connect) ────────────────────────────────────
-    // Step 1: Check connection state
-    console.log(`[connect/step-1] Checking connectionState for '${EVO_INSTANCE}'...`);
+    console.log(`[connect/step-1] Checking connectionState for '${instance}'...`);
     try {
-      const stateRes = await fetch(`${EVO_URL}/instance/connectionState/${EVO_INSTANCE}`, {
+      const stateRes = await fetch(`${url}/instance/connectionState/${instance}`, {
         headers: evoHeaders,
         signal: AbortSignal.timeout(6000),
       });
@@ -121,10 +114,9 @@ export async function POST(req: Request) {
       console.warn('[connect/step-1] Warning checking state:', step1Err);
     }
 
-    // Step 2: Fetch QR code from existing instance
-    console.log(`[connect/step-2] Fetching QR code from instance '${EVO_INSTANCE}'...`);
+    console.log(`[connect/step-2] Fetching QR code from instance '${instance}'...`);
     try {
-      const connectRes = await fetch(`${EVO_URL}/instance/connect/${EVO_INSTANCE}`, {
+      const connectRes = await fetch(`${url}/instance/connect/${instance}`, {
         headers: evoHeaders,
         signal: AbortSignal.timeout(6000),
       });
@@ -147,15 +139,14 @@ export async function POST(req: Request) {
       console.warn('[connect/step-2] Warning fetching QR:', step2Err);
     }
 
-    // Step 3: Create instance if missing or wiped by Railway
-    console.log(`[connect/step-3] Creating instance '${EVO_INSTANCE}' on Railway...`);
+    console.log(`[connect/step-3] Creating instance '${instance}'...`);
     try {
-      const createRes = await fetch(`${EVO_URL}/instance/create`, {
+      const createRes = await fetch(`${url}/instance/create`, {
         method:  'POST',
         headers: evoHeaders,
         body:    JSON.stringify({
-          instanceName: EVO_INSTANCE,
-          token:        EVO_KEY,
+          instanceName: instance,
+          token:        key,
           qrcode:       true,
           integration:  'WHATSAPP-BAILEYS',
         }),
@@ -168,10 +159,9 @@ export async function POST(req: Request) {
       console.warn('[connect/step-3] Warning creating instance:', step3Err);
     }
 
-    // Step 4: Re-fetch QR code after creation
     console.log(`[connect/step-4] Re-fetching QR code after creation...`);
     try {
-      const retryRes = await fetch(`${EVO_URL}/instance/connect/${EVO_INSTANCE}`, {
+      const retryRes = await fetch(`${url}/instance/connect/${instance}`, {
         headers: evoHeaders,
         signal: AbortSignal.timeout(8000),
       });
@@ -195,7 +185,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      { error: 'Unable to connect or create instance. Check Railway status.' },
+      { error: 'Unable to connect or create instance. Check Evolution API status.' },
       { status: 500 }
     );
   } catch (error: any) {

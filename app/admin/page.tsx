@@ -43,6 +43,7 @@ import { FaInstagram, FaLinkedin } from "react-icons/fa";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
+import { hasAdminPasswordsConfigured, isAuthorizedAdminPassword } from "@/lib/adminAuth";
 import { doc, setDoc } from "firebase/firestore";
 import {
   subscribePricingMatrix,
@@ -128,7 +129,6 @@ export default function AdminDashboardPage() {
   const [dbStatus, setDbStatus] = useState<"testing" | "connected" | "disconnected">("connected");
 
   // Authorized Admin Passwords
-  const AUTHORIZED_PASSWORDS = ["jeevan", "drupitha", "punith", "arpitha", "4848", "0315"];
 
   // Admin Dashboard Tabs: 1. Global Settings | 2. Website Text | 3. Print Previewer | 4. Golden Wheel | 5. Pricing & Services | 6. Gallery Manager | 7. Booking CRM | 8. Feature Toggles | 9. Bento Grid CMS | 10. Service Toggles | 11. Hero Card Studio | 12. AI Concierge CMS | 13. AI WhatsApp CMS | 14. Real Impact Stats CMS | 15. Planners CMS
   const [activeTab, setActiveTab] = useState<
@@ -407,8 +407,11 @@ export default function AdminDashboardPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const entered = pin.trim().toLowerCase();
-    if (AUTHORIZED_PASSWORDS.includes(entered)) {
+    if (!hasAdminPasswordsConfigured()) {
+      setPinError("Admin access is not configured. Set NEXT_PUBLIC_ADMIN_PASSWORDS in your environment.");
+      return;
+    }
+    if (isAuthorizedAdminPassword(pin)) {
       setAuthenticated(true);
       setPinError("");
     } else {
@@ -2711,7 +2714,7 @@ export default function AdminDashboardPage() {
                       className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
                     />
                     <label htmlFor="allowAdminPassTab" className="text-xs font-semibold text-white cursor-pointer leading-tight">
-                      Allow Master Admin Passwords to unlock /operator (jeevan, drupitha, punith, arpitha, 4848, 0315)
+                      Allow master admin passwords (from NEXT_PUBLIC_ADMIN_PASSWORDS) to unlock /operator
                     </label>
                   </div>
                 </div>
