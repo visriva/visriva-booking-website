@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
+import { configureEvolutionTls, getEvolutionConfig, verifyCronSecret } from '@/lib/evolutionApi';
 
-// Allow self-signed certs for self-hosted Evolution VPS connections
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+configureEvolutionTls();
 
 async function getFirebase() {
   const { initializeApp, getApps, getApp } = await import("firebase/app");
-  const { getFirestore, doc, getDoc, setDoc } = await import("firebase/firestore");
+  const { getFirestore, doc, setDoc } = await import("firebase/firestore");
 
   const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,51 +17,23 @@ async function getFirebase() {
   };
 
   const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  return { db: getFirestore(app), doc, getDoc, setDoc };
-}
-
-async function getEvolutionConfig() {
-  const defaultUrl = "https://evolution-api-production-d446.up.railway.app";
-  const defaultKey = "VisrivaSecretKey2026_SecureKey";
-  const defaultInstance = "visriva-live";
-
-  let url = process.env.EVOLUTION_API_URL || defaultUrl;
-  let key = process.env.EVOLUTION_API_KEY || defaultKey;
-  let instance = process.env.EVOLUTION_INSTANCE_NAME || defaultInstance;
-
-  try {
-    const fb = await getFirebase();
-    const docRef = fb.doc(fb.db, "config", "operator");
-    const snap = await fb.getDoc(docRef);
-    
-    if (snap.exists()) {
-      const data = snap.data();
-      if (data.backupEvoApiUrl) url = data.backupEvoApiUrl;
-      if (data.backupEvoApiKey) key = data.backupEvoApiKey;
-      if (data.backupInstanceName) instance = data.backupInstanceName;
-    }
-  } catch (err) {
-    console.warn("[Config Loader] Firestore config load bypassed, using env/default config:", err);
-  }
-
-  url = url.replace(/\/$/, '');
-  if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    url = "https://" + url;
-  }
-
-  return { url, key, instance };
+  return { db: getFirestore(app), doc, setDoc };
 }
 
 export async function GET(req: Request) {
+  if (!verifyCronSecret(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   console.log("⏰ WhatsApp Keep-Alive Cron job triggered");
   try {
     const config = await getEvolutionConfig();
     const checkUrl = `${config.url}/instance/connectionState/${config.instance}`;
-    
+
     console.log(`[Cron] Fetching state from: ${checkUrl}`);
     const res = await fetch(checkUrl, {
       headers: { apikey: config.key },
-      next: { revalidate: 0 } // Bypass Next.js cache
+      next: { revalidate: 0 },
     });
 
     const isOk = res.ok;
@@ -76,15 +48,12 @@ export async function GET(req: Request) {
     const connectionStatus = isConnected ? "open" : "close";
     const lastSyncedAt = new Date().toISOString();
 
-    console.log(`[Cron] Status determined: status=${connectionStatus}, state=${state}`);
-
-    // Update the central database state
     const fb = await getFirebase();
     const docRef = fb.doc(fb.db, "config", "whatsapp_bot");
     await fb.setDoc(docRef, {
       connectionStatus,
       lastSyncedAt,
-      instanceName: config.instance
+      instanceName: config.instance,
     }, { merge: true });
 
     return NextResponse.json({
@@ -92,7 +61,7 @@ export async function GET(req: Request) {
       instanceName: config.instance,
       connectionStatus,
       state,
-      lastSyncedAt
+      lastSyncedAt,
     });
   } catch (error: any) {
     console.error("[Cron Exception]:", error);
