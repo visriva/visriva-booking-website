@@ -1,5 +1,9 @@
 User-agent: *
 Allow: /
 Disallow: /admin
+Disallow: /admin/whatsapp
+Disallow: /operator
+Disallow: /webbooth
+Disallow: /webprinter
 
 Sitemap: https://www.visriva.com/sitemap.xml

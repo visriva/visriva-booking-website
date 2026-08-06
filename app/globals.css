@@ -14,12 +14,34 @@
     background-color: transparent;
     color: #FFFFFF;
     font-family: var(--font-inter), sans-serif;
+    overflow-x: hidden;
+    overflow-x: clip;
+    max-width: 100%;
+    width: 100%;
   }
 
   body {
     background-color: transparent;
     overflow-x: hidden;
+    overflow-x: clip;
+    max-width: 100%;
+    width: 100%;
     min-height: 100vh;
+    position: relative;
+  }
+
+  #__next,
+  main {
+    overflow-x: hidden;
+    overflow-x: clip;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
   }
 
   /* Custom luxury scrollbar */

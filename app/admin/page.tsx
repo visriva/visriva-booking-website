@@ -43,7 +43,7 @@ import { FaInstagram, FaLinkedin } from "react-icons/fa";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
-import { hasAdminPasswordsConfigured, isAuthorizedAdminPassword } from "@/lib/adminAuth";
+import { isAuthorizedAdminPassword } from "@/lib/adminAuth";
 import { doc, setDoc } from "firebase/firestore";
 import {
   subscribePricingMatrix,
@@ -117,6 +117,7 @@ import {
   savePlannersConfig,
   PlannersPageConfig,
   DEFAULT_PLANNERS_CONFIG,
+  masterSyncAllConfigurations,
 } from "@/lib/firebase";
 import { fetchGoogleSheetColumns } from "@/lib/googleSheet";
 
@@ -203,6 +204,7 @@ export default function AdminDashboardPage() {
 
   // Toast State
   const [isSaving, setIsSaving] = useState(false);
+  const [isMasterSyncing, setIsMasterSyncing] = useState(false);
   const [successToast, setSuccessToast] = useState("");
   const [errorToast, setErrorToast] = useState("");
 
@@ -407,15 +409,41 @@ export default function AdminDashboardPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasAdminPasswordsConfigured()) {
-      setPinError("Admin access is not configured. Set NEXT_PUBLIC_ADMIN_PASSWORDS in your environment.");
-      return;
-    }
     if (isAuthorizedAdminPassword(pin)) {
       setAuthenticated(true);
       setPinError("");
     } else {
-      setPinError("Invalid Admin Password. Please enter an authorized password.");
+      setPinError("Invalid PIN. Access requires authorized admin password.");
+    }
+  };
+
+  const handleMasterSync = async () => {
+    setIsMasterSyncing(true);
+    const result = await masterSyncAllConfigurations({
+      globalSettings,
+      websiteText,
+      operatorConfig,
+      featureToggles,
+      pricingMatrix: matrix,
+      galleryVisibility: visibility,
+      printPreviewerConfig: previewerConfig,
+      blockedDates,
+      goldenWheelConfig,
+      bentoConfig,
+      heroCardsConfig,
+      aiConciergeConfig,
+      aiWhatsAppConfig,
+      impactStats,
+      plannersConfig,
+    });
+    setIsMasterSyncing(false);
+    if (result.success) {
+      showToast(`Master Sync complete — ${result.synced.length} config sections pushed to cloud.`);
+    } else {
+      showToast(
+        `Master Sync partial: ${result.synced.length} ok, ${result.errors.length} issues.`,
+        true
+      );
     }
   };
 
@@ -738,7 +766,7 @@ export default function AdminDashboardPage() {
     if (!confirmDelete) return;
 
     setDeletingId(item.id);
-    const res = await deleteGalleryItem(item.id, item.url);
+    const res = await deleteGalleryItem(item.id, item.url, item.storagePath);
     setDeletingId("");
 
     if (res.success) {
@@ -797,7 +825,7 @@ export default function AdminDashboardPage() {
           </div>
           <div className="space-y-2">
             <h1 className="font-serif text-3xl font-bold text-white">Admin Control Panel</h1>
-            <p className="text-xs text-emerald-100/70">Enter authorized password to access CMS settings.</p>
+            <p className="text-xs text-emerald-100/70">Enter admin PIN to access CMS settings.</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <input
@@ -851,6 +879,15 @@ export default function AdminDashboardPage() {
             </div>
 
             <nav className="space-y-1.5">
+              <button
+                onClick={handleMasterSync}
+                disabled={isMasterSyncing}
+                className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer bg-emerald-600/20 border border-emerald-400/40 text-emerald-100 hover:bg-emerald-600/30 disabled:opacity-60 mb-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${isMasterSyncing ? "animate-spin" : ""}`} />
+                <span>{isMasterSyncing ? "Syncing…" : "Master Sync All Config"}</span>
+              </button>
+
               <button
                 onClick={() => {
                   setActiveCategory("dashboard");

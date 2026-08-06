@@ -21,10 +21,15 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ─── Gallery — public read, admin can add/update (delete via admin only) ─
+    // ─── Gallery — public read; admin CMS add/update/delete ───────────────────
     match /galleries/{itemId} {
       allow read: if true;
-      allow create, update: if true;
+      allow create, update, delete: if true;
+    }
+
+    // ─── Live print queue (webbooth → webprinter) ────────────────────────────
+    match /print_jobs/{jobId} {
+      allow read, create, update: if true;
       allow delete: if false;
     }
 

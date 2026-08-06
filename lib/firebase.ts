@@ -10,7 +10,7 @@ import {
   onSnapshot,
   serverTimestamp,
 } from "firebase/firestore";
-import { getStorage, ref, deleteObject } from "firebase/storage";
+import { getStorage, ref, deleteObject, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getAuth } from "firebase/auth";
 
 const isDummyKey = !process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY === "AIzaSyDummyKeyForDevelopment";
@@ -179,7 +179,45 @@ export interface GalleryItem {
   category: "photo-booth" | "magnet-station" | "keychain-station" | "mug-printing";
   url: string;
   tagline: string;
+  storagePath?: string;
   createdAt?: unknown;
+}
+
+export interface MasterSyncPayload {
+  globalSettings?: GlobalSettingsConfig;
+  websiteText?: WebsiteTextConfig;
+  operatorConfig?: OperatorConfig;
+  featureToggles?: FeatureTogglesConfig;
+  pricingMatrix?: GlobalPricingMatrix;
+  galleryVisibility?: GalleryVisibilityConfig;
+  printPreviewerConfig?: PrintPreviewerConfig;
+  blockedDates?: BlockedDatesConfig;
+  goldenWheelConfig?: GoldenWheelConfig;
+  bentoConfig?: BentoGridConfig;
+  heroCardsConfig?: HeroCardStackConfig;
+  aiConciergeConfig?: AIConciergeConfig;
+  aiWhatsAppConfig?: AIWhatsAppConfig;
+  impactStats?: LiveImpactStatsConfig;
+  plannersConfig?: PlannersPageConfig;
+}
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [header, base64] = dataUrl.split(",");
+  const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+function storagePathFromDownloadUrl(url: string): string | null {
+  try {
+    const firebaseMatch = url.match(/\/o\/([^?]+)/);
+    if (firebaseMatch) return decodeURIComponent(firebaseMatch[1]);
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export interface GalleryVisibilityConfig {
@@ -2690,76 +2728,258 @@ export function subscribeGalleries(
   }
 }
 
+/**
+ * Upload gallery image to Firebase Storage (data URLs or external http URLs).
+ */
+export async function uploadGalleryImage(
+  sourceUrl: string,
+  category: GalleryItem["category"]
+): Promise<{ success: boolean; url?: string; storagePath?: string; error?: string }> {
+  if (!sourceUrl.trim()) {
+    return { success: false, error: "No image provided" };
+  }
+
+  if (sourceUrl.startsWith("http") && !sourceUrl.startsWith("data:")) {
+    return { success: true, url: sourceUrl.trim() };
+  }
+
+  if (isDummyKey) {
+    return { success: true, url: sourceUrl };
+  }
+
+  try {
+    const storagePath = `galleries/${category}/${Date.now()}.jpg`;
+    const storageRef = ref(storage, storagePath);
+    const blob = sourceUrl.startsWith("data:")
+      ? dataUrlToBlob(sourceUrl)
+      : new Blob([sourceUrl], { type: "image/jpeg" });
+    await uploadBytes(storageRef, blob, { contentType: "image/jpeg" });
+    const downloadUrl = await getDownloadURL(storageRef);
+    return { success: true, url: downloadUrl, storagePath };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Storage upload failed";
+    console.error("uploadGalleryImage error:", message);
+    return { success: false, error: message };
+  }
+}
+
 export async function addGalleryItem(
   item: Omit<GalleryItem, "id">
 ): Promise<{ success: boolean; id?: string; error?: string }> {
-  const id = "gal-" + Date.now();
-  const newItem: GalleryItem = { ...item, id, createdAt: new Date().toISOString() };
+  let finalUrl = item.url;
+  let storagePath = item.storagePath;
+
+  if (item.url.startsWith("data:") || (item.url.startsWith("http") && !item.storagePath)) {
+    const uploaded = await uploadGalleryImage(item.url, item.category);
+    if (!uploaded.success) {
+      return { success: false, error: uploaded.error || "Failed to upload image" };
+    }
+    finalUrl = uploaded.url || item.url;
+    storagePath = uploaded.storagePath || storagePath;
+  }
+
+  const firestorePayload = {
+    category: item.category,
+    url: finalUrl,
+    tagline: item.tagline,
+    storagePath: storagePath || null,
+    createdAt: serverTimestamp(),
+  };
+
+  let firestoreId = "gal-" + Date.now();
+
+  try {
+    const docRef = await addDoc(collection(db, "galleries"), firestorePayload);
+    firestoreId = docRef.id;
+  } catch (e) {
+    console.warn("Firestore addGalleryItem note:", e);
+    if (!isDummyKey && storagePath) {
+      try {
+        await deleteObject(ref(storage, storagePath));
+      } catch (rollbackErr) {
+        console.warn("Gallery upload rollback note:", rollbackErr);
+      }
+    }
+    return {
+      success: false,
+      error: "Failed to save gallery record to Firestore. Upload was rolled back.",
+    };
+  }
+
+  const newItem: GalleryItem = {
+    ...item,
+    id: firestoreId,
+    url: finalUrl,
+    storagePath,
+    createdAt: new Date().toISOString(),
+  };
 
   if (typeof window !== "undefined") {
     const existing = localStorage.getItem("visriva_galleries_list");
     const current: GalleryItem[] = existing ? JSON.parse(existing) : DEFAULT_INITIAL_GALLERY;
-    const updated = [newItem, ...current];
+    const updated = [newItem, ...current.filter((g) => g.id !== firestoreId)];
     localStorage.setItem("visriva_galleries_list", JSON.stringify(updated));
     window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("galleries_updated"));
   }
 
-  try {
-    const docRef = await addDoc(collection(db, "galleries"), {
-      ...item,
-      createdAt: serverTimestamp(),
-    });
-    return { success: true, id: docRef.id };
-  } catch (e) {
-    console.warn("Firestore addGalleryItem fallback to storage active:", e);
-    return { success: true, id };
-  }
+  return { success: true, id: firestoreId };
 }
 
 /**
- * REWRITTEN deleteGalleryItem: Two-Step Deletion (Storage + Firestore)
+ * Multi-step gallery deletion: server API (Storage + Firestore) → client fallbacks → local cache.
  */
 export async function deleteGalleryItem(
   id: string,
-  storageUrl?: string
+  storageUrl?: string,
+  storagePath?: string
 ): Promise<{ success: boolean; error?: string }> {
-  try {
-    // 1. Firebase Storage file deletion (if storageUrl is provided)
-    if (storageUrl && storageUrl.startsWith("http")) {
-      try {
-        const storageRef = ref(storage, storageUrl);
-        await deleteObject(storageRef);
-      } catch (storageErr: any) {
-        console.warn("Storage object deletion note:", storageErr?.message || storageErr);
-      }
-    }
+  const resolvedPath =
+    storagePath ||
+    (storageUrl?.startsWith("http") ? storagePathFromDownloadUrl(storageUrl) : null);
 
-    // 2. Local Storage cache cleanup
-    if (typeof window !== "undefined") {
-      const existing = localStorage.getItem("visriva_galleries_list");
-      if (existing) {
-        const current: GalleryItem[] = JSON.parse(existing);
-        const updated = current.filter((item) => item.id !== id);
-        localStorage.setItem("visriva_galleries_list", JSON.stringify(updated));
-        window.dispatchEvent(new Event("storage"));
-        window.dispatchEvent(new Event("galleries_updated"));
-      }
-    }
+  const completedSteps: string[] = [];
+  const warnings: string[] = [];
 
-    // 3. Firestore document deletion
+  if (typeof window !== "undefined" && !isDummyKey) {
     try {
-      const docRef = doc(db, "galleries", id);
-      await deleteDoc(docRef);
-    } catch (firestoreErr: any) {
-      console.warn("Firestore deleteDoc note:", firestoreErr?.message || firestoreErr);
+      const res = await fetch("/api/gallery/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, storagePath: resolvedPath, storageUrl }),
+      });
+      if (res.ok) {
+        completedSteps.push("server");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        warnings.push(data.error || `Server delete failed (${res.status})`);
+      }
+    } catch (apiErr: unknown) {
+      warnings.push(apiErr instanceof Error ? apiErr.message : "Gallery API unreachable");
+    }
+  }
+
+  if (!completedSteps.includes("server")) {
+    if (!isDummyKey && resolvedPath) {
+      try {
+        await deleteObject(ref(storage, resolvedPath));
+        completedSteps.push("storage");
+      } catch (storageErr: unknown) {
+        const msg = storageErr instanceof Error ? storageErr.message : String(storageErr);
+        warnings.push(`storage: ${msg}`);
+      }
     }
 
-    return { success: true };
-  } catch (err: any) {
-    console.error("deleteGalleryItem error:", err);
-    return { success: false, error: err?.message || "Failed to delete photo" };
+    try {
+      await deleteDoc(doc(db, "galleries", id));
+      completedSteps.push("firestore");
+    } catch (firestoreErr: unknown) {
+      const msg = firestoreErr instanceof Error ? firestoreErr.message : String(firestoreErr);
+      warnings.push(`firestore: ${msg}`);
+    }
   }
+
+  if (typeof window !== "undefined") {
+    const existing = localStorage.getItem("visriva_galleries_list");
+    if (existing) {
+      const current: GalleryItem[] = JSON.parse(existing);
+      const updated = current.filter((item) => item.id !== id);
+      localStorage.setItem("visriva_galleries_list", JSON.stringify(updated));
+      window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new Event("galleries_updated"));
+    }
+    completedSteps.push("local");
+  }
+
+  const recordRemoved =
+    completedSteps.includes("server") ||
+    completedSteps.includes("firestore") ||
+    completedSteps.includes("local");
+
+  if (!recordRemoved) {
+    const message = warnings.join("; ") || "Failed to delete photo";
+    console.error("deleteGalleryItem error:", message);
+    return { success: false, error: message };
+  }
+
+  if (warnings.length > 0) {
+    console.warn("deleteGalleryItem partial warnings:", warnings.join("; "));
+  }
+
+  return { success: true };
+}
+
+/**
+ * Push all CMS configuration documents to Firestore in one coordinated sync.
+ */
+export async function masterSyncAllConfigurations(
+  payload: MasterSyncPayload
+): Promise<{ success: boolean; synced: string[]; errors: string[] }> {
+  const synced: string[] = [];
+  const errors: string[] = [];
+
+  const tasks: Array<{ key: string; run: () => Promise<{ success: boolean; error?: string }> }> = [];
+
+  if (payload.globalSettings) {
+    tasks.push({ key: "global_settings", run: () => saveGlobalContactSettings(payload.globalSettings!) });
+  }
+  if (payload.websiteText) {
+    tasks.push({ key: "website_text", run: () => saveWebsiteText(payload.websiteText!) });
+  }
+  if (payload.operatorConfig) {
+    tasks.push({ key: "operator", run: () => saveOperatorConfig(payload.operatorConfig!) });
+  }
+  if (payload.featureToggles) {
+    tasks.push({ key: "feature_toggles", run: () => saveFeatureToggles(payload.featureToggles!) });
+  }
+  if (payload.pricingMatrix) {
+    tasks.push({ key: "pricing_matrix", run: () => savePricingMatrix(payload.pricingMatrix!) });
+  }
+  if (payload.galleryVisibility) {
+    tasks.push({ key: "gallery_visibility", run: () => saveGalleryVisibility(payload.galleryVisibility!) });
+  }
+  if (payload.printPreviewerConfig) {
+    tasks.push({ key: "print_previewer", run: () => savePrintPreviewerConfig(payload.printPreviewerConfig!) });
+  }
+  if (payload.blockedDates) {
+    tasks.push({ key: "blocked_dates", run: () => saveBlockedDates(payload.blockedDates!) });
+  }
+  if (payload.goldenWheelConfig) {
+    tasks.push({ key: "golden_wheel", run: () => saveGoldenWheelConfig(payload.goldenWheelConfig!) });
+  }
+  if (payload.bentoConfig) {
+    tasks.push({ key: "bento_grid", run: () => saveBentoGridConfig(payload.bentoConfig!) });
+  }
+  if (payload.heroCardsConfig) {
+    tasks.push({ key: "hero_cards", run: () => saveHeroCardStackConfig(payload.heroCardsConfig!) });
+  }
+  if (payload.aiConciergeConfig) {
+    tasks.push({ key: "ai_concierge", run: () => saveAIConciergeConfig(payload.aiConciergeConfig!) });
+  }
+  if (payload.aiWhatsAppConfig) {
+    tasks.push({ key: "ai_whatsapp", run: () => saveAIWhatsAppConfig(payload.aiWhatsAppConfig!) });
+  }
+  if (payload.impactStats) {
+    tasks.push({ key: "impact_stats", run: () => saveLiveImpactStats(payload.impactStats!) });
+  }
+  if (payload.plannersConfig) {
+    tasks.push({ key: "planners", run: () => savePlannersConfig(payload.plannersConfig!) });
+  }
+
+  for (const task of tasks) {
+    const result = await task.run();
+    if (result.success) {
+      synced.push(task.key);
+    } else {
+      errors.push(`${task.key}: ${result.error || "failed"}`);
+    }
+  }
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("master_sync_complete"));
+  }
+
+  return { success: errors.length === 0, synced, errors };
 }
 
 // ─── LIVE IMPACT & EVENT TRACK RECORD CMS ────────────────────────────────────

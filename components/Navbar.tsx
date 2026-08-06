@@ -81,18 +81,18 @@ export default function Navbar({ onWhatsAppIconClick }: NavbarProps = {}) {
   return (
     <header
       ref={menuRef}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 overflow-x-hidden w-full max-w-full ${
         scrolled ? "glass-nav py-3 shadow-2xl" : "bg-transparent py-4"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between relative">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 w-full">
+        <div className="flex items-center justify-between relative min-w-0 gap-2">
           
-          {/* LEFT SIDE: Menu Toggle */}
-          <div className="flex items-center space-x-3">
+          {/* LEFT SIDE: Menu Toggle — fixed width prevents logo overlap */}
+          <div className="flex items-center flex-shrink-0 z-10 w-[72px] sm:w-auto min-w-0">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-black/40 border border-[#D4AF37]/40 text-[#D4AF37] hover:border-[#D4AF37] hover:bg-black/60 hover:text-white transition-all backdrop-blur-md focus:outline-none cursor-pointer shadow-gold-sm"
+              className="flex items-center space-x-2 px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl bg-black/40 border border-[#D4AF37]/40 text-[#D4AF37] hover:border-[#D4AF37] hover:bg-black/60 hover:text-white transition-all backdrop-blur-md focus:outline-none cursor-pointer shadow-gold-sm"
               aria-label="Toggle Menu"
             >
               {menuOpen ? <X className="w-5 h-5 text-[#D4AF37]" /> : <Menu className="w-5 h-5 text-[#D4AF37]" />}
@@ -100,29 +100,30 @@ export default function Navbar({ onWhatsAppIconClick }: NavbarProps = {}) {
             </button>
           </div>
 
-          {/* CENTER: VISRIVA LOGO */}
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
-            <a href="/" className="group inline-block">
+          {/* CENTER: Falcon logo from app/icon.png — transparent, responsive, no overlap */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none max-w-[28vw] sm:max-w-[100px] md:max-w-[120px]">
+            <a href="/" className="group inline-block pointer-events-auto" aria-label="Visriva Home">
               <motion.div
                 animate={{ y: [0, -4, 0] }}
                 transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
                 whileHover={{ scale: 1.06 }}
-                className="cursor-pointer"
+                className="cursor-pointer flex items-center justify-center"
               >
                 <Image
-                  src="/mycomapnylogo.png"
+                  src="/icon.png"
                   alt="Visriva Falcon Logo"
-                  width={260}
-                  height={90}
+                  width={72}
+                  height={72}
                   priority
-                  className="h-12 sm:h-16 md:h-20 w-auto object-contain drop-shadow-[0_0_20px_rgba(212,175,55,0.6)] group-hover:drop-shadow-[0_0_30px_rgba(212,175,55,0.9)] transition-all duration-300"
+                  unoptimized
+                  className="h-7 w-7 sm:h-9 sm:w-9 md:h-12 md:w-12 object-contain bg-transparent mix-blend-normal opacity-95 drop-shadow-[0_0_14px_rgba(212,175,55,0.5)] group-hover:drop-shadow-[0_0_22px_rgba(212,175,55,0.85)] transition-all duration-300"
                 />
               </motion.div>
             </a>
           </div>
 
-          {/* RIGHT SIDE: Mobile Compact Check Availability or WhatsApp Bot Linker */}
-          <div className="flex items-center">
+          {/* RIGHT SIDE: CTA — fixed min-width prevents logo overlap */}
+          <div className="flex items-center flex-shrink-0 z-10 justify-end w-[72px] sm:w-auto sm:min-w-[140px] min-w-0">
             {onWhatsAppIconClick ? (
               <button 
                 onClick={onWhatsAppIconClick}
