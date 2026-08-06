@@ -7,6 +7,11 @@ import {
   limit,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import {
+  getSupabaseBrowser,
+  isSupabaseConfigured,
+  SupabasePrintJobRow,
+} from "@/lib/supabase";
 
 export type PrintJobStatus = "pending" | "printing" | "printed" | "failed";
 
@@ -18,6 +23,18 @@ export interface PrintJob {
   createdAt?: string;
   printedAt?: string;
   error?: string;
+}
+
+function mapSupabaseRow(row: SupabasePrintJobRow): PrintJob {
+  return {
+    id: row.id,
+    imageUrl: row.image_url,
+    status: row.status,
+    source: row.source || "webbooth",
+    createdAt: row.created_at,
+    printedAt: row.printed_at || undefined,
+    error: row.error || undefined,
+  };
 }
 
 export function getPrintApiBase(): string {
@@ -33,6 +50,59 @@ export function getPrintServerUrl(): string {
 }
 
 export function subscribePrintJobs(
+  callback: (jobs: PrintJob[]) => void,
+  statusFilter?: PrintJobStatus
+): () => void {
+  if (isSupabaseConfigured()) {
+    return subscribePrintJobsSupabase(callback, statusFilter);
+  }
+  return subscribePrintJobsFirebase(callback, statusFilter);
+}
+
+function subscribePrintJobsSupabase(
+  callback: (jobs: PrintJob[]) => void,
+  statusFilter?: PrintJobStatus
+): () => void {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return () => {};
+
+  let active = true;
+
+  const load = async () => {
+    const { data, error } = await supabase
+      .from("print_jobs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (!active || error) {
+      if (error) console.warn("Supabase print_jobs fetch:", error.message);
+      return;
+    }
+
+    let jobs = (data as SupabasePrintJobRow[]).map(mapSupabaseRow);
+    if (statusFilter) jobs = jobs.filter((j) => j.status === statusFilter);
+    callback(jobs);
+  };
+
+  void load();
+
+  const channel = supabase
+    .channel("visriva-print-jobs")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "print_jobs" },
+      () => void load()
+    )
+    .subscribe();
+
+  return () => {
+    active = false;
+    void supabase.removeChannel(channel);
+  };
+}
+
+function subscribePrintJobsFirebase(
   callback: (jobs: PrintJob[]) => void,
   statusFilter?: PrintJobStatus
 ): () => void {
@@ -73,6 +143,19 @@ export async function markPrintJobStatus(
   status: PrintJobStatus,
   extra?: { error?: string }
 ): Promise<void> {
+  if (isSupabaseConfigured()) {
+    const supabase = getSupabaseBrowser();
+    if (supabase) {
+      const payload: Record<string, string> = { status };
+      if (status === "printed") payload.printed_at = new Date().toISOString();
+      if (extra?.error) payload.error = extra.error;
+
+      const { error } = await supabase.from("print_jobs").update(payload).eq("id", jobId);
+      if (!error) return;
+      console.warn("Supabase markPrintJobStatus note:", error.message);
+    }
+  }
+
   const payload = {
     status,
     ...(status === "printed" ? { printedAt: new Date().toISOString() } : {}),
