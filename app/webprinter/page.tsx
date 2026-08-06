@@ -63,12 +63,11 @@ export default function WebPrinterPage() {
   }, [autoPrint]);
 
   useEffect(() => {
-    const unsubPending = subscribePrintJobs((jobs) => setQueue(jobs), "pending");
-    const unsubAll = subscribePrintJobs((jobs) => setRecentJobs(jobs));
-    return () => {
-      unsubPending();
-      unsubAll();
-    };
+    const unsub = subscribePrintJobs((jobs) => {
+      setRecentJobs(jobs);
+      setQueue(jobs.filter((j) => j.status === "pending"));
+    });
+    return unsub;
   }, []);
 
   const processJob = useCallback(

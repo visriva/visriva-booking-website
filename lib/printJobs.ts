@@ -109,37 +109,68 @@ function subscribePrintJobsSupabase(
 
   let active = true;
 
-  const load = async () => {
+  type SharedRealtime = {
+    channel: ReturnType<NonNullable<ReturnType<typeof getSupabaseBrowser>>["channel"]>;
+    listeners: Set<(jobs: PrintJob[]) => void>;
+    jobs: PrintJob[];
+  };
+
+  const sharedKey = "__visrivaSupabasePrintRealtime";
+  const win = typeof window !== "undefined" ? window : null;
+  let shared = win
+    ? ((win as unknown as Record<string, SharedRealtime | undefined>)[sharedKey] ?? null)
+    : null;
+
+  const deliver = (allJobs: PrintJob[]) => {
+    if (!active) return;
+    callback(statusFilter ? allJobs.filter((j) => j.status === statusFilter) : allJobs);
+  };
+
+  const refresh = async () => {
     const { data, error } = await supabase
       .from("print_jobs")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(50);
 
-    if (!active || error) {
-      if (error) console.warn("Supabase print_jobs fetch:", error.message);
+    if (error) {
+      console.warn("Supabase print_jobs fetch:", error.message);
       return;
     }
 
-    let jobs = (data as SupabasePrintJobRow[]).map(mapSupabaseRow);
-    if (statusFilter) jobs = jobs.filter((j) => j.status === statusFilter);
-    callback(jobs);
+    const jobs = (data as SupabasePrintJobRow[]).map(mapSupabaseRow);
+    if (shared) {
+      shared.jobs = jobs;
+      shared.listeners.forEach((listener) => listener(jobs));
+    }
   };
 
-  void load();
+  if (!shared) {
+    const channel = supabase
+      .channel(`visriva-print-jobs-${Date.now()}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "print_jobs" },
+        () => void refresh()
+      )
+      .subscribe();
 
-  const channel = supabase
-    .channel("visriva-print-jobs")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "print_jobs" },
-      () => void load()
-    )
-    .subscribe();
+    shared = { channel, listeners: new Set(), jobs: [] };
+    if (win) (win as unknown as Record<string, SharedRealtime>)[sharedKey] = shared;
+    void refresh();
+  }
+
+  shared.listeners.add(deliver);
+  deliver(shared.jobs);
 
   return () => {
     active = false;
-    void supabase.removeChannel(channel);
+    if (!shared) return;
+    shared.listeners.delete(deliver);
+    if (shared.listeners.size === 0) {
+      void supabase.removeChannel(shared.channel);
+      if (win) delete (win as unknown as Record<string, SharedRealtime | undefined>)[sharedKey];
+    }
   };
 }
 
