@@ -1,35 +1,27 @@
 import { NextResponse } from 'next/server';
+import { configureEvolutionTls, getEvolutionConfig, getEvolutionHeaders, getWebhookUrl } from '@/lib/evolutionApi';
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
-const EVO_URL      = (process.env.EVOLUTION_API_URL      || 'https://evolution-api-production-d446.up.railway.app').replace(/\/$/, '');
-const EVO_KEY      = process.env.EVOLUTION_API_KEY       || 'VisrivaSecretKey2026_SecureKey';
-const EVO_INSTANCE = process.env.EVOLUTION_INSTANCE_NAME || 'visriva-live';
-const WEBHOOK_URL  = 'https://visriva.com/api/whatsapp/webhook';
+configureEvolutionTls();
 
 export async function POST() {
-  const endpoint = `${EVO_URL}/webhook/set/${EVO_INSTANCE}`;
-
-  console.log(`[sync-webhook] Setting webhook for '${EVO_INSTANCE}' → '${WEBHOOK_URL}'`);
-  console.log(`[sync-webhook] Endpoint: ${endpoint}`);
-
-  if (!EVO_URL || !EVO_KEY) {
-    return NextResponse.json({ error: 'Missing EVOLUTION_API_URL or EVOLUTION_API_KEY env vars' }, { status: 500 });
-  }
-
   try {
+    const { url, key, instance } = await getEvolutionConfig();
+    const webhookUrl = getWebhookUrl();
+    const endpoint = `${url}/webhook/set/${instance}`;
+
+    console.log(`[sync-webhook] Setting webhook for '${instance}' → '${webhookUrl}'`);
+
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'Content-Type':  'application/json',
-        'apikey':        EVO_KEY,
-        'Authorization': `Bearer ${EVO_KEY}`,
+        ...getEvolutionHeaders(key),
+        Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
         webhook: {
-          url:     WEBHOOK_URL,
+          url:     webhookUrl,
           enabled: true,
-          events:  ["MESSAGES_UPSERT", "MESSAGES_SET", "CONNECTION_UPDATE"],
+          events:  ['MESSAGES_UPSERT', 'MESSAGES_SET', 'CONNECTION_UPDATE'],
         },
       }),
       signal: AbortSignal.timeout(8000),
@@ -43,16 +35,13 @@ export async function POST() {
       data = { message: responseText };
     }
 
-    console.log(`[sync-webhook] Railway response HTTP ${res.status}:`, responseText);
-
     if (!res.ok) {
       return NextResponse.json(
         {
-          error:      `Railway returned HTTP ${res.status}`,
-          details:    data,
-          status:     res.status,
+          error:   `Evolution API returned HTTP ${res.status}`,
+          details: data,
+          status:  res.status,
           endpoint,
-          apiKeyHint: `${EVO_KEY.slice(0, 8)}...`,
         },
         { status: res.status }
       );
@@ -61,7 +50,7 @@ export async function POST() {
     return NextResponse.json({
       success:  true,
       response: data,
-      url:      WEBHOOK_URL,
+      url:      webhookUrl,
       endpoint,
     });
 
