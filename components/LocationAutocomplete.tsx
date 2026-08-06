@@ -5,6 +5,7 @@ import { MapPin, Navigation, AlertCircle } from "lucide-react";
 import { useJsApiLoader } from "@react-google-maps/api";
 
 const LIBRARIES: ("places")[] = ["places"];
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
 interface LocationAutocompleteProps {
   value: string;
@@ -29,11 +30,12 @@ export default function LocationAutocomplete({ value, onChange, placeholder }: L
   const [googlePredictions, setGooglePredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Load Google Maps Places API Script
+  // Load Google Maps Places API Script (falls back to curated venue list if key is missing)
   const { isLoaded, loadError } = useJsApiLoader({
     id: "google-map-script",
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyAgR6pMr0Lkr3NMu0omarXbB-JPoh3EIW0",
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries: LIBRARIES,
+    preventGoogleFontsLoading: true,
   });
 
   const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
