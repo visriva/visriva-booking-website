@@ -1,6 +1,5 @@
 import { saveChatMessage, getBotSettings } from "@/lib/chatStore";
 import { parseEvolutionInbound } from "@/lib/whatsappWebhookParse";
-import { runAiAutoReply, storeCustomerMessage, loadAgentSettings } from "@/lib/whatsappAiEngine";
 import { sendEvolutionText } from "@/lib/evolutionSend";
 
 function keywordAutoReply(message: string, fallback: string): string {
@@ -49,7 +48,15 @@ export async function processInboundWhatsApp(
   console.log(`[Message Received] ${phone} (${pushName}): "${text.slice(0, 80)}"`);
 
   await saveChatMessage(phone, { sender: "user", text, timestamp: new Date() }, pushName);
-  await storeCustomerMessage(phone, pushName, text);
+
+  if (!options?.skipAi) {
+    try {
+      const { storeCustomerMessage } = await import("@/lib/whatsappAiEngine");
+      await storeCustomerMessage(phone, pushName, text);
+    } catch (e) {
+      console.warn("[Inbound] wa_conversations sync skipped:", e);
+    }
+  }
 
   const botSettings = await getBotSettings();
   if (botSettings.isActive === false) {
@@ -57,12 +64,18 @@ export async function processInboundWhatsApp(
     return { handled: true, phone, reason: "bot_disabled" };
   }
 
-  const agentSettings = await loadAgentSettings();
+  const agentSettings = options?.skipAi
+    ? { aiEnabled: false }
+    : await (async () => {
+        const { loadAgentSettings } = await import("@/lib/whatsappAiEngine");
+        return loadAgentSettings();
+      })();
 
   const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
   const geminiUsable = !!geminiKey && !geminiKey.startsWith("AQ.");
 
   if (!options?.skipAi && agentSettings.aiEnabled && geminiUsable) {
+    const { runAiAutoReply } = await import("@/lib/whatsappAiEngine");
     const aiResult = await runAiAutoReply(phone, text, pushName);
     if (aiResult.replied && aiResult.replyText) {
       await saveChatMessage(

@@ -125,7 +125,7 @@ export async function saveChatMessage(
         text: message.text,
         timestamp: new Date(),
       });
-      await adminDb!.doc(`chats/${cleanPhone}`).set(
+      await adminDb.doc(`chats/${cleanPhone}`).set(
         {
           phoneNum: cleanPhone,
           displayName: displayName || cleanPhone,
