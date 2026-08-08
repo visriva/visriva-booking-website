@@ -36,7 +36,10 @@ export interface InboundProcessResult {
 }
 
 /** Full inbound pipeline: parse → store → AI or keyword reply. */
-export async function processInboundWhatsApp(body: unknown): Promise<InboundProcessResult> {
+export async function processInboundWhatsApp(
+  body: unknown,
+  options?: { skipAi?: boolean }
+): Promise<InboundProcessResult> {
   const parsed = parseEvolutionInbound(body);
   if (!parsed) {
     return { handled: false, reason: "ignored_event" };
@@ -56,7 +59,10 @@ export async function processInboundWhatsApp(body: unknown): Promise<InboundProc
 
   const agentSettings = await loadAgentSettings();
 
-  if (agentSettings.aiEnabled) {
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  const geminiUsable = !!geminiKey && !geminiKey.startsWith("AQ.");
+
+  if (!options?.skipAi && agentSettings.aiEnabled && geminiUsable) {
     const aiResult = await runAiAutoReply(phone, text, pushName);
     if (aiResult.replied && aiResult.replyText) {
       await saveChatMessage(

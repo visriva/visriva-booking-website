@@ -10,7 +10,8 @@ export interface EvolutionSendResult {
 export async function sendEvolutionText(
   phone: string,
   text: string,
-  logPrefix = "[Evolution]"
+  logPrefix = "[Evolution]",
+  timeoutMs = 8000
 ): Promise<EvolutionSendResult> {
   const cleanPhone = phone.replace(/[^0-9]/g, "");
   if (!cleanPhone || !text.trim()) {
@@ -39,7 +40,7 @@ export async function sendEvolutionText(
         method: "POST",
         headers,
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {

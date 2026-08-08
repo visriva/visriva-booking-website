@@ -5,6 +5,8 @@ import { saveBotSettings } from "@/lib/chatStore";
 
 configureEvolutionTls();
 
+export const maxDuration = 60;
+
 export async function GET() {
   return NextResponse.json({ status: "online", webhook: "/api/whatsapp/webhook" });
 }
@@ -16,7 +18,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: "success", note: "empty body" });
     }
 
-    const event = String(body?.event || body?.type || "").toUpperCase();
+    const event = String(body?.event || body?.type || "").toUpperCase().replace(/\./g, "_");
     if (event.includes("CONNECTION")) {
       const state = body?.data?.state || body?.data?.instance?.state || body?.state;
       console.log(`[Client Connected] connection event — state=${state}`);
@@ -28,7 +30,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: "success", note: "connection_event" });
     }
 
-    const result = await processInboundWhatsApp(body);
+    // Keyword replies only in webhook — keeps under Vercel Hobby 10s limit. AI runs via /api/ai-agent/reply.
+    const result = await processInboundWhatsApp(body, { skipAi: true });
     return NextResponse.json({ status: "success", ...result });
   } catch (error: any) {
     console.error("[Error] webhook:", error?.message || error);
