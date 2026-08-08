@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { configureEvolutionTls, getEvolutionConfig, getEvolutionHeaders, getWebhookUrl } from "@/lib/evolutionApi";
+import { configureEvolutionTls, getEvolutionConfig, getEvolutionHeaders } from "@/lib/evolutionApi";
+import { registerEvolutionWebhook } from "@/lib/registerEvolutionWebhook";
 
 configureEvolutionTls();
 
@@ -61,21 +62,9 @@ export async function GET(req: Request) {
     }
 
     if (action === "connect") {
-      const webhookUrl = getWebhookUrl(req.headers.get("host"));
-
-      try {
-        console.log(`🔌 Registering Evolution Webhook for ${config.instance} ➡️ ${webhookUrl}`);
-        await fetch(`${config.url}/webhook/set/${config.instance}`, {
-          method: "POST",
-          headers: getEvolutionHeaders(config.key),
-          body: JSON.stringify({
-            enabled: true,
-            url: webhookUrl,
-            events: ["CONNECTION_UPDATE", "MESSAGES_UPSERT"],
-          }),
-        });
-      } catch (webhookErr) {
-        console.warn("Failed to set Evolution webhook URL:", webhookErr);
+      const webhookResult = await registerEvolutionWebhook(req.headers.get("host"));
+      if (!webhookResult.ok) {
+        console.warn("Webhook registration warning:", webhookResult.error);
       }
 
       const res = await fetch(`${config.url}/instance/connect/${config.instance}`, {

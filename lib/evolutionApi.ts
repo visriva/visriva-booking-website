@@ -37,6 +37,12 @@ function configFromEnv(): EvolutionConfig | null {
 }
 
 async function loadFirestoreOperatorOverrides(): Promise<Partial<EvolutionConfig>> {
+  // Backup Evolution fields are used only for explicit failover in send-whatsapp — never override primary config.
+  return {};
+}
+
+/** Optional backup Evolution VPS — for send failover only. */
+export async function getBackupEvolutionConfig(): Promise<EvolutionConfig | null> {
   try {
     const { initializeApp, getApps, getApp } = await import("firebase/app");
     const { getFirestore, doc, getDoc } = await import("firebase/firestore");
@@ -53,17 +59,16 @@ async function loadFirestoreOperatorOverrides(): Promise<Partial<EvolutionConfig
     const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
     const db = getFirestore(app);
     const snap = await getDoc(doc(db, "config", "operator"));
-    if (!snap.exists()) return {};
+    if (!snap.exists()) return null;
 
     const data = snap.data();
-    const overrides: Partial<EvolutionConfig> = {};
-    if (data.backupEvoApiUrl) overrides.url = normalizeUrl(String(data.backupEvoApiUrl));
-    if (data.backupEvoApiKey) overrides.key = String(data.backupEvoApiKey);
-    if (data.backupInstanceName) overrides.instance = String(data.backupInstanceName);
-    return overrides;
-  } catch (err) {
-    console.warn("[evolutionApi] Firestore operator config unavailable:", err);
-    return {};
+    const url = data.backupEvoApiUrl ? normalizeUrl(String(data.backupEvoApiUrl)) : null;
+    const key = data.backupEvoApiKey ? String(data.backupEvoApiKey) : null;
+    const instance = data.backupInstanceName ? String(data.backupInstanceName) : "visriva-live";
+    if (!url || !key) return null;
+    return { url, key, instance };
+  } catch {
+    return null;
   }
 }
 

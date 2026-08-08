@@ -51,6 +51,14 @@ service cloud.firestore {
     match /wa_kb_documents/{document=**} {
       allow read, write: if true;
     }
+
+    // ─── Legacy WhatsApp CRM (admin/whatsapp inbox) ───────────────────────────
+    match /chats/{phone} {
+      allow read, write: if true;
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
   }
 
   function isValidBookingCreate() {

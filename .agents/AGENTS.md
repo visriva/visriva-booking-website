@@ -1,5 +1,7 @@
 # Visriva Booking Website - Agent Rules & Core Settings
 
+> **Primary agent**: Cursor (Composer). This agent owns development, fixes, deploys, and improvements for this repo.
+
 ## Business Contact Information
 - **Phone & WhatsApp Number**: `+91 88844 84828` (Raw format for WhatsApp links: `918884484828`)
 - **Official Contact Email**: `visriva.work@gmail.com`

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { configureEvolutionTls, getEvolutionConfig, getEvolutionHeaders } from '@/lib/evolutionApi';
+import { registerEvolutionWebhook } from '@/lib/registerEvolutionWebhook';
 
 configureEvolutionTls();
 
@@ -59,38 +60,11 @@ export async function POST(req: Request) {
     const action: string = body.action || 'connect';
 
     if (action === 'setup_webhook') {
-      const webhookUrl = 'https://www.visriva.com/api/whatsapp/webhook';
-      const endpoint   = `${url}/webhook/set/${instance}`;
-      console.log(`[connect/setup_webhook] POST ${endpoint}`);
-
-      try {
-        const res = await fetch(endpoint, {
-          method:  'POST',
-          headers: evoHeaders,
-          body:    JSON.stringify({
-            webhook: {
-              url:     webhookUrl,
-              enabled: true,
-              events:  ['MESSAGES_UPSERT', 'CONNECTION_UPDATE'],
-            },
-          }),
-          signal: AbortSignal.timeout(8000),
-        });
-
-        const raw = await res.text();
-        let parsed: unknown = raw;
-        try { parsed = JSON.parse(raw); } catch { parsed = { message: raw }; }
-
-        if (!res.ok) {
-          return NextResponse.json(
-            { error: `Evolution API HTTP ${res.status}`, details: parsed },
-            { status: res.status }
-          );
-        }
-        return NextResponse.json({ success: true, url: webhookUrl, response: parsed });
-      } catch (webErr: any) {
-        return NextResponse.json({ error: webErr.message || 'Failed to setup webhook' }, { status: 500 });
+      const result = await registerEvolutionWebhook();
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error, url: result.url }, { status: 500 });
       }
+      return NextResponse.json({ success: true, url: result.url });
     }
 
     console.log(`[connect/step-1] Checking connectionState for '${instance}'...`);

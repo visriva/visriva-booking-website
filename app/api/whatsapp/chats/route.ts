@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAllChatThreads, getChatMessages, saveChatMessage } from '@/lib/chatStore';
-import { configureEvolutionTls, getEvolutionConfig, getEvolutionHeaders } from '@/lib/evolutionApi';
+import { configureEvolutionTls } from '@/lib/evolutionApi';
+import { sendEvolutionText } from '@/lib/evolutionSend';
 
 configureEvolutionTls();
 
@@ -37,21 +38,10 @@ export async function POST(req: Request) {
     }
 
     const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const { url, key, instance } = await getEvolutionConfig();
+    const sendResult = await sendEvolutionText(cleanPhone, text.trim(), '[Admin]');
 
-    const sendRes = await fetch(`${url}/message/sendText/${instance}`, {
-      method: 'POST',
-      headers: getEvolutionHeaders(key),
-      body: JSON.stringify({
-        number: cleanPhone,
-        text:   text.trim(),
-      }),
-    });
-
-    if (!sendRes.ok) {
-      const err = await sendRes.text();
-      console.error('[chats POST] sendText failed:', err);
-      return NextResponse.json({ error: `Evolution API error: ${err}` }, { status: sendRes.status });
+    if (!sendResult.ok) {
+      return NextResponse.json({ error: sendResult.error || 'Send failed' }, { status: 502 });
     }
 
     await saveChatMessage(cleanPhone, {
