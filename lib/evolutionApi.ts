@@ -97,6 +97,16 @@ export function getEvolutionHeaders(apiKey: string): Record<string, string> {
 }
 
 export function getWebhookUrl(requestHost?: string | null): string {
+  const explicit = process.env.WEBHOOK_BASE_URL?.replace(/\/$/, "");
+  if (explicit) {
+    return `${explicit}/api/whatsapp/webhook`;
+  }
+
+  // Custom domain (visriva.com) is unreachable from Railway — use stable Vercel alias in production
+  if (process.env.VERCEL_ENV === "production") {
+    return "https://visriva-booking-website-visriva.vercel.app/api/whatsapp/webhook";
+  }
+
   let siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
 
   if (!siteUrl && process.env.VERCEL_URL) {
@@ -112,10 +122,16 @@ export function getWebhookUrl(requestHost?: string | null): string {
   }
 
   if (!siteUrl) {
-    siteUrl = "https://www.visriva.com";
+    siteUrl = "https://visriva-booking-website-visriva.vercel.app";
   }
 
   return `${siteUrl.replace(/\/$/, "")}/api/whatsapp/webhook`;
+}
+
+export function getWebhookHeaders(): Record<string, string> | undefined {
+  const bypass = process.env.VERCEL_PROTECTION_BYPASS;
+  if (!bypass) return undefined;
+  return { "x-vercel-protection-bypass": bypass };
 }
 
 export function verifyCronSecret(req: Request): boolean {

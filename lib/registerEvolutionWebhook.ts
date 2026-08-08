@@ -1,4 +1,4 @@
-import { getEvolutionConfig, getEvolutionHeaders, getWebhookUrl } from "@/lib/evolutionApi";
+import { getEvolutionConfig, getEvolutionHeaders, getWebhookUrl, getWebhookHeaders } from "@/lib/evolutionApi";
 
 /** Register inbound webhook on Evolution instance (nested payload — v1.8.x). */
 export async function registerEvolutionWebhook(requestHost?: string | null): Promise<{
@@ -12,6 +12,7 @@ export async function registerEvolutionWebhook(requestHost?: string | null): Pro
     const endpoint = `${url}/webhook/set/${instance}`;
     console.log(`[Webhook Register] ${instance} → ${webhookUrl}`);
 
+    const webhookHeaders = getWebhookHeaders();
     const res = await fetch(endpoint, {
       method: "POST",
       headers: getEvolutionHeaders(key),
@@ -19,7 +20,8 @@ export async function registerEvolutionWebhook(requestHost?: string | null): Pro
         webhook: {
           url: webhookUrl,
           enabled: true,
-          events: ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
+          events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE"],
+          headers: webhookHeaders || {},
         },
       }),
       signal: AbortSignal.timeout(10000),

@@ -1,7 +1,6 @@
 /**
  * lib/chatStore.ts
- * Self-healing Firestore storage helper with a robust Global Memory fallback.
- * Prevents system crashes if Firestore configuration is missing or uninitialized.
+ * WhatsApp CRM storage — Firebase Admin on server, client SDK in browser.
  */
 
 import {
@@ -14,11 +13,11 @@ import {
   query,
   orderBy,
   limit,
-  onSnapshot,
   serverTimestamp,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { adminDb } from "@/lib/firebaseAdmin";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,7 +44,7 @@ export interface BotSettings {
   instanceName?: string;
 }
 
-// ─── Global Memory Fallback Structure ─────────────────────────────────────────
+// ─── Global Memory Fallback (per serverless instance) ─────────────────────────
 interface GlobalMemoryStore {
   threads: Record<string, ChatThread>;
   messages: Record<string, ChatMessage[]>;
@@ -57,23 +56,28 @@ const memoryStore: GlobalMemoryStore = (globalThis as any)._whatsappChatStore ||
   messages: {},
   botSettings: {
     isActive: true,
-    autoReplyText: "Hi! I am currently operating a live printing station for an event and will get back to you shortly!",
+    autoReplyText:
+      "Hi! I am currently operating a live printing station for an event and will get back to you shortly!",
     connectionStatus: "close",
     instanceName: "visriva-live",
-  }
+  },
 };
 
 if (!(globalThis as any)._whatsappChatStore) {
   (globalThis as any)._whatsappChatStore = memoryStore;
 }
 
-// Helper to determine if Firestore is active and safe
-function isFirestoreReady(): boolean {
-  try {
-    return !!db;
-  } catch {
-    return false;
+const isServer = typeof window === "undefined";
+const useAdmin = () => isServer && !!adminDb;
+
+function toIso(ts: unknown): string | null {
+  if (!ts) return null;
+  if (ts instanceof Timestamp) return ts.toDate().toISOString();
+  if (ts instanceof Date) return ts.toISOString();
+  if (typeof (ts as { toDate?: () => Date }).toDate === "function") {
+    return (ts as { toDate: () => Date }).toDate().toISOString();
   }
+  return new Date(String(ts)).toISOString();
 }
 
 // ─── Save Message ─────────────────────────────────────────────────────────────
@@ -86,42 +90,55 @@ export async function saveChatMessage(
   if (!cleanPhone) return;
 
   const timestamp = message.timestamp || new Date();
+  const tsIso = timestamp.toISOString();
 
-  // 1. Always save to Global Memory first
   const newMsg: ChatMessage = {
     id: Math.random().toString(36).substring(2, 9),
     sender: message.sender,
     text: message.text,
-    timestamp: timestamp.toISOString(),
+    timestamp: tsIso,
   };
 
-  if (!memoryStore.messages[cleanPhone]) {
-    memoryStore.messages[cleanPhone] = [];
-  }
+  if (!memoryStore.messages[cleanPhone]) memoryStore.messages[cleanPhone] = [];
   memoryStore.messages[cleanPhone].push(newMsg);
-
-  const updatedThread: ChatThread = {
+  memoryStore.threads[cleanPhone] = {
     phoneNum: cleanPhone,
     displayName: displayName || cleanPhone,
     lastMessage: message.text.slice(0, 120),
-    lastTimestamp: timestamp.toISOString(),
+    lastTimestamp: tsIso,
   };
-  memoryStore.threads[cleanPhone] = updatedThread;
 
-  // 2. Try Firestore saving (non-blocking, crash-proof)
-  if (isFirestoreReady()) {
+  if (useAdmin()) {
     try {
-      const threadRef = doc(db, "chats", cleanPhone);
-      const messagesRef = collection(db, "chats", cleanPhone, "messages");
+      await adminDb!.collection(`chats/${cleanPhone}/messages`).add({
+        sender: message.sender,
+        text: message.text,
+        timestamp: new Date(),
+      });
+      await adminDb!.doc(`chats/${cleanPhone}`).set(
+        {
+          phoneNum: cleanPhone,
+          displayName: displayName || cleanPhone,
+          lastMessage: message.text.slice(0, 120),
+          lastTimestamp: new Date(),
+        },
+        { merge: true }
+      );
+      return;
+    } catch (err) {
+      console.error("[chatStore] Admin write failed:", err);
+    }
+  }
 
-      await addDoc(messagesRef, {
+  if (db) {
+    try {
+      await addDoc(collection(db, "chats", cleanPhone, "messages"), {
         sender: message.sender,
         text: message.text,
         timestamp: serverTimestamp(),
       });
-
       await setDoc(
-        threadRef,
+        doc(db, "chats", cleanPhone),
         {
           phoneNum: cleanPhone,
           displayName: displayName || cleanPhone,
@@ -131,125 +148,160 @@ export async function saveChatMessage(
         { merge: true }
       );
     } catch (err) {
-      console.warn("[chatStore] Firestore write failed, using memory store fallback:", err);
+      console.warn("[chatStore] Client Firestore write failed:", err);
     }
   }
 }
 
 // ─── Fetch All Threads ────────────────────────────────────────────────────────
 export async function getAllChatThreads(): Promise<ChatThread[]> {
-  // 1. Try Firestore first
-  if (isFirestoreReady()) {
+  if (useAdmin()) {
     try {
-      const threadsRef = collection(db, "chats");
-      const snap = await getDocs(threadsRef);
+      const snap = await adminDb!.collection("chats").get();
+      const threads: ChatThread[] = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          phoneNum: d.id,
+          displayName: String(data.displayName || d.id),
+          lastMessage: String(data.lastMessage || ""),
+          lastTimestamp: toIso(data.lastTimestamp),
+        };
+      });
+      threads.forEach((t) => {
+        memoryStore.threads[t.phoneNum] = t;
+      });
+      threads.sort((a, b) => {
+        const ta = a.lastTimestamp ? new Date(a.lastTimestamp as string).getTime() : 0;
+        const tb = b.lastTimestamp ? new Date(b.lastTimestamp as string).getTime() : 0;
+        return tb - ta;
+      });
+      return threads;
+    } catch (err) {
+      console.error("[chatStore] Admin fetch threads failed:", err);
+    }
+  }
+
+  if (db) {
+    try {
+      const snap = await getDocs(collection(db, "chats"));
       if (!snap.empty) {
         const threads: ChatThread[] = snap.docs.map((d) => {
           const data = d.data();
-          let tsStr: string | null = null;
-          if (data.lastTimestamp instanceof Timestamp) {
-            tsStr = data.lastTimestamp.toDate().toISOString();
-          } else if (data.lastTimestamp) {
-            tsStr = new Date(data.lastTimestamp).toISOString();
-          }
-
           return {
             phoneNum: d.id,
             displayName: data.displayName || d.id,
             lastMessage: data.lastMessage || "",
-            lastTimestamp: tsStr,
+            lastTimestamp: toIso(data.lastTimestamp),
           };
         });
-
-        // Sync local memory store with latest Firestore data
         threads.forEach((t) => {
           memoryStore.threads[t.phoneNum] = t;
         });
+        threads.sort((a, b) => {
+          const ta = a.lastTimestamp ? new Date(a.lastTimestamp as string).getTime() : 0;
+          const tb = b.lastTimestamp ? new Date(b.lastTimestamp as string).getTime() : 0;
+          return tb - ta;
+        });
+        return threads;
       }
     } catch (err) {
-      console.warn("[chatStore] Firestore fetch threads failed, returning local memory store:", err);
+      console.warn("[chatStore] Client fetch threads failed:", err);
     }
   }
 
-  // 2. Format & sort from memoryStore
-  const allThreads = Object.values(memoryStore.threads);
-  allThreads.sort((a, b) => {
+  return Object.values(memoryStore.threads).sort((a, b) => {
     const ta = a.lastTimestamp ? new Date(a.lastTimestamp as string).getTime() : 0;
     const tb = b.lastTimestamp ? new Date(b.lastTimestamp as string).getTime() : 0;
     return tb - ta;
   });
-
-  return allThreads;
 }
 
-// ─── Fetch Thread Messages ───────────────────────────────────────────────────
-export async function getChatMessages(
-  phoneNum: string,
-  maxMessages = 150
-): Promise<ChatMessage[]> {
+// ─── Fetch Thread Messages ────────────────────────────────────────────────────
+export async function getChatMessages(phoneNum: string, maxMessages = 150): Promise<ChatMessage[]> {
   const cleanPhone = phoneNum.replace(/[^0-9]/g, "");
   if (!cleanPhone) return [];
 
-  // 1. Try Firestore first
-  if (isFirestoreReady()) {
+  if (useAdmin()) {
+    try {
+      const snap = await adminDb!
+        .collection(`chats/${cleanPhone}/messages`)
+        .orderBy("timestamp", "asc")
+        .limit(maxMessages)
+        .get();
+      const messages: ChatMessage[] = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          sender: (data.sender as ChatMessage["sender"]) || "user",
+          text: String(data.text || ""),
+          timestamp: toIso(data.timestamp),
+        };
+      });
+      memoryStore.messages[cleanPhone] = messages;
+      return messages;
+    } catch (err) {
+      console.error("[chatStore] Admin fetch messages failed:", err);
+    }
+  }
+
+  if (db) {
     try {
       const messagesRef = collection(db, "chats", cleanPhone, "messages");
       let snap;
       try {
-        const q = query(messagesRef, orderBy("timestamp", "asc"), limit(maxMessages));
-        snap = await getDocs(q);
+        snap = await getDocs(query(messagesRef, orderBy("timestamp", "asc"), limit(maxMessages)));
       } catch {
         snap = await getDocs(messagesRef);
       }
-
       if (!snap.empty) {
         const messages: ChatMessage[] = snap.docs.map((d) => {
           const data = d.data();
-          let tsStr: string | null = null;
-          if (data.timestamp instanceof Timestamp) {
-            tsStr = data.timestamp.toDate().toISOString();
-          } else if (data.timestamp) {
-            tsStr = new Date(data.timestamp).toISOString();
-          }
-
           return {
             id: d.id,
             sender: data.sender || "user",
             text: data.text || "",
-            timestamp: tsStr,
+            timestamp: toIso(data.timestamp),
           };
         });
-
-        messages.sort((a, b) => {
-          const ta = a.timestamp ? new Date(a.timestamp as string).getTime() : 0;
-          const tb = b.timestamp ? new Date(b.timestamp as string).getTime() : 0;
-          return ta - tb;
-        });
-
-        // Sync local memory store
         memoryStore.messages[cleanPhone] = messages;
         return messages;
       }
     } catch (err) {
-      console.warn("[chatStore] Firestore fetch messages failed, returning local memory store:", err);
+      console.warn("[chatStore] Client fetch messages failed:", err);
     }
   }
 
-  // 2. Return from Memory fallback
-  const localMsgs = memoryStore.messages[cleanPhone] || [];
-  return localMsgs.slice(-maxMessages);
+  return (memoryStore.messages[cleanPhone] || []).slice(-maxMessages);
 }
 
-// ─── Bot Settings management ──────────────────────────────────────────────────
+// ─── Bot Settings ─────────────────────────────────────────────────────────────
 export async function getBotSettings(): Promise<BotSettings> {
-  // 1. Try Firestore
-  if (isFirestoreReady()) {
+  if (useAdmin()) {
     try {
-      const docRef = doc(db, "config", "whatsapp_bot");
-      const snap = await getDoc(docRef);
+      const snap = await adminDb!.doc("config/whatsapp_bot").get();
+      if (snap.exists) {
+        const data = snap.data()!;
+        const settings: BotSettings = {
+          isActive: data.isActive ?? data.botActive ?? true,
+          autoReplyText: String(data.autoReplyText || memoryStore.botSettings.autoReplyText),
+          connectionStatus: String(data.connectionStatus || "close"),
+          lastSyncedAt: data.lastSyncedAt ? String(data.lastSyncedAt) : undefined,
+          instanceName: String(data.instanceName || "visriva-live"),
+        };
+        memoryStore.botSettings = settings;
+        return settings;
+      }
+    } catch (err) {
+      console.error("[chatStore] Admin getBotSettings failed:", err);
+    }
+  }
+
+  if (db) {
+    try {
+      const snap = await getDoc(doc(db, "config", "whatsapp_bot"));
       if (snap.exists()) {
         const data = snap.data();
-        const settings = {
+        const settings: BotSettings = {
           isActive: data.isActive ?? data.botActive ?? true,
           autoReplyText: data.autoReplyText || memoryStore.botSettings.autoReplyText,
           connectionStatus: data.connectionStatus || "close",
@@ -260,36 +312,40 @@ export async function getBotSettings(): Promise<BotSettings> {
         return settings;
       }
     } catch (err) {
-      console.warn("[chatStore] Firestore getBotSettings failed, using memory store:", err);
+      console.warn("[chatStore] Client getBotSettings failed:", err);
     }
   }
+
   return memoryStore.botSettings;
 }
 
 export async function saveBotSettings(settings: Partial<BotSettings>): Promise<void> {
-  // 1. Always update Memory store
-  memoryStore.botSettings = {
-    ...memoryStore.botSettings,
-    ...settings,
-  };
+  memoryStore.botSettings = { ...memoryStore.botSettings, ...settings };
 
-  // 2. Try Firestore
-  if (isFirestoreReady()) {
+  const updateData: Record<string, unknown> = {};
+  if (settings.isActive !== undefined) {
+    updateData.isActive = settings.isActive;
+    updateData.botActive = settings.isActive;
+  }
+  if (settings.autoReplyText !== undefined) updateData.autoReplyText = settings.autoReplyText;
+  if (settings.connectionStatus !== undefined) updateData.connectionStatus = settings.connectionStatus;
+  if (settings.lastSyncedAt !== undefined) updateData.lastSyncedAt = settings.lastSyncedAt;
+  if (settings.instanceName !== undefined) updateData.instanceName = settings.instanceName;
+
+  if (useAdmin()) {
     try {
-      const docRef = doc(db, "config", "whatsapp_bot");
-      const updateData: Record<string, unknown> = {};
-      if (settings.isActive !== undefined) {
-        updateData.isActive = settings.isActive;
-        updateData.botActive = settings.isActive;
-      }
-      if (settings.autoReplyText !== undefined) updateData.autoReplyText = settings.autoReplyText;
-      if (settings.connectionStatus !== undefined) updateData.connectionStatus = settings.connectionStatus;
-      if (settings.lastSyncedAt !== undefined) updateData.lastSyncedAt = settings.lastSyncedAt;
-      if (settings.instanceName !== undefined) updateData.instanceName = settings.instanceName;
-
-      await setDoc(docRef, updateData, { merge: true });
+      await adminDb!.doc("config/whatsapp_bot").set(updateData, { merge: true });
+      return;
     } catch (err) {
-      console.warn("[chatStore] Firestore saveBotSettings failed:", err);
+      console.error("[chatStore] Admin saveBotSettings failed:", err);
+    }
+  }
+
+  if (db) {
+    try {
+      await setDoc(doc(db, "config", "whatsapp_bot"), updateData, { merge: true });
+    } catch (err) {
+      console.warn("[chatStore] Client saveBotSettings failed:", err);
     }
   }
 }
