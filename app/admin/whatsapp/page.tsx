@@ -172,8 +172,10 @@ export default function WhatsAppCRMPage() {
     try {
       const res = await fetch("/api/whatsapp/connect?action=status", { signal: AbortSignal.timeout(8000) });
       if (!res.ok) { setWaStatus("disconnected"); return; }
-      const data = await res.json().catch(() => ({ status: "disconnected" }));
-      setWaStatus(data.status === "connected" ? "connected" : "disconnected");
+      const data = await res.json().catch(() => ({ status: "disconnected", state: "unknown" }));
+      if (data.status === "connected") setWaStatus("connected");
+      else if (data.status === "connecting" || data.state === "connecting") setWaStatus("checking");
+      else setWaStatus("disconnected");
     } catch { setWaStatus("disconnected"); }
   };
 

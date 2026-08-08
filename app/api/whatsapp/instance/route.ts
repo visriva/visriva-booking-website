@@ -1,39 +1,15 @@
 import { NextResponse } from "next/server";
 import { configureEvolutionTls, getEvolutionConfig, getEvolutionHeaders } from "@/lib/evolutionApi";
 import { registerEvolutionWebhook } from "@/lib/registerEvolutionWebhook";
+import { fetchEvolutionState, resetEvolutionInstance } from "@/lib/evolutionConnect";
 
 configureEvolutionTls();
 
 async function ensureInstanceExists(config: { url: string; key: string; instance: string }) {
-  try {
-    let needsCreation = false;
-    const checkRes = await fetch(`${config.url}/instance/connectionStatus/${config.instance}`, {
-      headers: { apikey: config.key },
-    });
-
-    if (!checkRes.ok) {
-      needsCreation = true;
-    } else {
-      const data = await checkRes.json();
-      if (data.error || data.message?.includes("not found") || data.message?.includes("not exist")) {
-        needsCreation = true;
-      }
-    }
-
-    if (needsCreation) {
-      console.log(`🔌 Evolution instance ${config.instance} not found. Re-creating...`);
-      await fetch(`${config.url}/instance/create`, {
-        method: "POST",
-        headers: getEvolutionHeaders(config.key),
-        body: JSON.stringify({
-          instanceName: config.instance,
-          token: config.key,
-          qrcode: true,
-        }),
-      });
-    }
-  } catch (e) {
-    console.warn("Failed to check or auto-create Evolution instance:", e);
+  const state = await fetchEvolutionState(config);
+  if (state === "unknown" || state === "close") {
+    console.log(`🔌 Evolution instance ${config.instance} missing or closed — recreating...`);
+    await resetEvolutionInstance(config);
   }
 }
 
@@ -46,18 +22,10 @@ export async function GET(req: Request) {
     await ensureInstanceExists(config);
 
     if (action === "status") {
-      const res = await fetch(`${config.url}/instance/connectionStatus/${config.instance}`, {
-        headers: { apikey: config.key },
-      });
-
-      if (!res.ok) {
-        return NextResponse.json({ state: "close", status: "disconnected", details: `HTTP error ${res.status}` });
-      }
-
-      const data = await res.json();
+      const state = await fetchEvolutionState(config);
       return NextResponse.json({
-        state: data.instance?.state || "close",
-        status: data.instance?.state === "open" ? "connected" : "disconnected",
+        state,
+        status: state === "open" ? "connected" : state === "connecting" ? "connecting" : "disconnected",
       });
     }
 
