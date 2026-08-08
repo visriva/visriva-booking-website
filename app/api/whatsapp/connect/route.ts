@@ -7,6 +7,8 @@ import {
   resetEvolutionInstance,
 } from "@/lib/evolutionConnect";
 
+export const runtime = "nodejs";
+
 configureEvolutionTls();
 
 async function syncStatusToFirestore(status: string) {
