@@ -13,7 +13,7 @@
     scroll-behavior: smooth;
     background-color: transparent;
     color: #FFFFFF;
-    font-family: var(--font-inter), sans-serif;
+    font-family: var(--font-montserrat), 'Montserrat', sans-serif;
     overflow-x: hidden;
     overflow-x: clip;
     max-width: 100%;
@@ -118,17 +118,17 @@
   }
 }
 
-.font-aylia { font-family: 'Aylia', var(--font-cormorant), 'Cormorant Garamond', serif; }
-.font-conya { font-family: 'Conya', var(--font-playfair), 'Playfair Display', serif; }
-.font-catilya { font-family: 'Catilya', var(--font-cormorant), 'Cormorant Garamond', serif; }
-.font-cavona { font-family: 'Cavona', var(--font-playfair), 'Playfair Display', serif; }
-.font-bogale { font-family: 'Bogale', var(--font-cinzel), 'Cinzel', serif; }
-.font-graven { font-family: 'Graven', var(--font-bodoni), 'Bodoni Moda', serif; }
-.font-cinzel { font-family: var(--font-cinzel), 'Cinzel', serif; }
-.font-bodoni { font-family: var(--font-bodoni), 'Bodoni Moda', serif; }
+.font-aylia { font-family: var(--font-cormorant), 'Cormorant Garamond', serif; }
+.font-conya { font-family: var(--font-cormorant), 'Cormorant Garamond', serif; }
+.font-catilya { font-family: var(--font-cormorant), 'Cormorant Garamond', serif; }
+.font-cavona { font-family: var(--font-cormorant), 'Cormorant Garamond', serif; }
+.font-bogale { font-family: var(--font-cormorant), 'Cormorant Garamond', serif; }
+.font-graven { font-family: var(--font-montserrat), 'Montserrat', sans-serif; }
+.font-cinzel { font-family: var(--font-cormorant), 'Cormorant Garamond', serif; }
+.font-bodoni { font-family: var(--font-cormorant), 'Cormorant Garamond', serif; }
 .font-cormorant { font-family: var(--font-cormorant), 'Cormorant Garamond', serif; }
-.font-playfair { font-family: var(--font-playfair), 'Playfair Display', serif; }
-.font-serif { font-family: var(--font-cormorant), 'Cormorant Garamond', var(--font-playfair), 'Playfair Display', serif; }
+.font-playfair { font-family: var(--font-cormorant), 'Cormorant Garamond', serif; }
+.font-serif { font-family: var(--font-cormorant), 'Cormorant Garamond', serif; }
 .font-sans { font-family: var(--font-montserrat), 'Montserrat', sans-serif; }
 
 /* Subtitle shine animation */
@@ -194,5 +194,23 @@
 
 .animate-ambient-float-slow {
   animation: ambientFloat 22s infinite ease-in-out reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-ambient-float,
+  .animate-ambient-float-slow,
+  .animate-pulse,
+  .animate-shimmer {
+    animation: none !important;
+  }
 }
 

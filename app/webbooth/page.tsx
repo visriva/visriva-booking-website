@@ -15,6 +15,7 @@ type BoothStep = "idle" | "shooting" | "preview";
 export default function WebBoothPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const mountedRef = useRef(true);
 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [shots, setShots] = useState<string[]>([]);
@@ -35,17 +36,30 @@ export default function WebBoothPage() {
     try {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
       }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
         audio: false,
       });
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      const video = videoRef.current;
+      if (!video) return;
+      video.srcObject = stream;
+      try {
+        await video.play();
+      } catch (playErr: unknown) {
+        const name = playErr instanceof Error ? playErr.name : "";
+        if (name !== "AbortError") throw playErr;
       }
     } catch (err: unknown) {
+      if (!mountedRef.current) return;
+      const name = err instanceof Error ? err.name : "";
+      if (name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "Camera access denied";
       setCameraError(msg);
       console.error("Camera access error:", err);
@@ -53,9 +67,13 @@ export default function WebBoothPage() {
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     startCamera();
     return () => {
+      mountedRef.current = false;
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
     };
   }, [startCamera]);
 

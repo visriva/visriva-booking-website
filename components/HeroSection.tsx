@@ -108,7 +108,7 @@ export default function HeroSection() {
                   </div>
                 </Magnetic3DButton>
 
-                <Magnetic3DButton href="/photo-booth">
+                <Magnetic3DButton href="/services/photo-booth">
                   <div className="w-full sm:w-auto min-w-[180px] px-7 py-4 rounded-full bg-black/40 border border-[#D4AF37]/50 text-white font-semibold text-sm hover:border-[#D4AF37] hover:bg-black/60 backdrop-blur-xl flex items-center justify-center space-x-2 cursor-pointer">
                     <Camera className="w-4 h-4 text-[#D4AF37]" />
                     <span>Photo Booth</span>
@@ -132,7 +132,7 @@ export default function HeroSection() {
                 <div className="flex flex-wrap gap-3">
                   {toggles.enablePhotoBoothService !== false && (
                     <Link
-                      href="/photo-booth"
+                      href="/services/photo-booth"
                       className="p-3 py-2.5 rounded-2xl bg-black/40 border border-[#D4AF37]/30 text-white hover:text-[#D4AF37] hover:bg-black/60 hover:border-[#D4AF37] transition-all duration-300 backdrop-blur-md flex items-center space-x-2.5 group shadow-md"
                     >
                       <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] group-hover:scale-110 transition-transform shadow-gold-sm">
@@ -299,7 +299,7 @@ export default function HeroSection() {
                       icon: Camera,
                       desc: "Studio-grade Full-Frame optics with high-speed dye-sublimation print engine.",
                       footer: "Full-Frame Optics • Instant QR Gallery",
-                      href: "/photo-booth",
+                      href: "/services/photo-booth",
                       toggleKey: "enablePhotoBoothService",
                       restClass: "top-48 left-2 sm:left-6 rotate-6 z-50",
                       hoverClass: "group-hover/deck:translate-y-10 group-hover/deck:-translate-x-4 group-hover/deck:rotate-4",

@@ -254,6 +254,15 @@ export async function markPrintJobStatus(
   }
 }
 
+function parsePrintApiError(text: string, status: number): string {
+  try {
+    const parsed = JSON.parse(text) as { error?: string };
+    return parsed.error || `Print request failed (${status})`;
+  } catch {
+    return text.startsWith("<!") ? `Print request failed (${status})` : text || `Print request failed (${status})`;
+  }
+}
+
 export async function sendImageToPrintEndpoint(blob: Blob, captureId: string): Promise<string> {
   const form = new FormData();
   form.append("image", blob, `${captureId}.jpg`);
@@ -265,7 +274,7 @@ export async function sendImageToPrintEndpoint(blob: Blob, captureId: string): P
   const res = await fetch(url, { method: "POST", body: form });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || `Print request failed (${res.status})`);
+    throw new Error(parsePrintApiError(text, res.status));
   }
   const data = await res.json();
   return String(data.jobId || data.captureId || captureId);
@@ -285,7 +294,7 @@ export async function sendImagesToPrintEndpoint(
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || `Print request failed (${res.status})`);
+    throw new Error(parsePrintApiError(text, res.status));
   }
   const data = await res.json();
   return String(data.jobId || Date.now());

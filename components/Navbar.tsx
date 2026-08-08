@@ -164,7 +164,7 @@ export default function Navbar({ onWhatsAppIconClick }: NavbarProps = {}) {
               {/* Service 1: Photo Booth */}
               {toggles.enablePhotoBoothService !== false && (
                 <a
-                  href="/photo-booth"
+                  href="/services/photo-booth"
                   onClick={() => setMenuOpen(false)}
                   className="flex items-center justify-between text-white hover:text-[#D4AF37] font-medium py-2 px-3 rounded-xl hover:bg-white/5 transition-colors"
                 >

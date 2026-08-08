@@ -79,7 +79,7 @@ export default function Footer() {
             <ul className="space-y-2.5 text-xs font-graven">
               {toggles.enablePhotoBoothService !== false && (
                 <li>
-                  <a href="/photo-booth" className="hover:text-[#D4AF37] transition-colors flex items-center justify-between group">
+                  <a href="/services/photo-booth" className="hover:text-[#D4AF37] transition-colors flex items-center justify-between group">
                     <span>Photo Booth Collections</span>
                     <ArrowUpRight className="w-3.5 h-3.5 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
                   </a>
@@ -206,8 +206,10 @@ export default function Footer() {
         {/* Bottom Copyright & Legal Bar */}
         <div className="pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between text-xs text-emerald-100/60 gap-4">
           <p className="font-cavona">© {new Date().getFullYear()} Visriva Live Station. All rights reserved.</p>
-          <div className="flex items-center space-x-6">
-            <a href="/photo-booth" className="hover:text-[#D4AF37] transition-colors">Packages &amp; Pricing</a>
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-x-6 gap-y-2">
+            <a href="/services/photo-booth" className="hover:text-[#D4AF37] transition-colors">Packages &amp; Pricing</a>
+            <a href="/privacy-policy" className="hover:text-[#D4AF37] transition-colors">Privacy Policy</a>
+            <a href="/data-deletion" className="hover:text-[#D4AF37] transition-colors">Data Deletion</a>
           </div>
         </div>
 

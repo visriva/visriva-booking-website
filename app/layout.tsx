@@ -1,33 +1,13 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Playfair_Display, Montserrat, Cinzel, Bodoni_Moda } from "next/font/google";
+import { Cormorant_Garamond, Montserrat } from "next/font/google";
 import "./globals.css";
 import { SpeedInsights } from "@vercel/speed-insights/react";
+import { DEFAULT_OG_IMAGE, SITE_URL } from "@/lib/seo";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
   variable: "--font-cormorant",
-  display: "swap",
-});
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
-  variable: "--font-playfair",
-  display: "swap",
-});
-
-const cinzel = Cinzel({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
-  variable: "--font-cinzel",
-  display: "swap",
-});
-
-const bodoni = Bodoni_Moda({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
-  variable: "--font-bodoni",
   display: "swap",
 });
 
@@ -38,11 +18,14 @@ const montserrat = Montserrat({
   display: "swap",
 });
 
+const siteTitle = "Visriva Live Station | Premium Event Tech & Photo Booths in Bengaluru";
+const siteDescription =
+  "Bengaluru's luxury live gifting station. Instant Photo Booths, Custom Fridge Magnets, Keychains, and Mug Printing for weddings and corporate events.";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.visriva.com"),
-  title: "Visriva Live Station | Premium Event Tech & Photo Booths in Bengaluru",
-  description:
-    "Bengaluru's luxury live gifting station. Instant Photo Booths, Custom Fridge Magnets, Keychains, and Mug Printing for weddings and corporate events.",
+  metadataBase: new URL(SITE_URL),
+  title: siteTitle,
+  description: siteDescription,
   keywords: [
     "Visriva",
     "Visriva Live Station",
@@ -52,27 +35,32 @@ export const metadata: Metadata = {
     "Visriva Live Booth",
     "Live Mug Printing Bangalore",
   ],
-  authors: [{ name: "Visriva Live Station", url: "https://www.visriva.com" }],
+  authors: [{ name: "Visriva Live Station", url: SITE_URL }],
+  alternates: { canonical: SITE_URL },
   openGraph: {
-    title: "Visriva Live Station | Premium Event Tech & Photo Booths in Bengaluru",
-    description:
-      "Bengaluru's luxury live gifting station. Instant Photo Booths, Custom Fridge Magnets, Keychains, and Mug Printing for weddings and corporate events.",
-    url: "https://www.visriva.com",
+    title: siteTitle,
+    description: siteDescription,
+    url: SITE_URL,
     siteName: "Visriva Live Station",
     locale: "en_IN",
     type: "website",
+    images: [
+      {
+        url: DEFAULT_OG_IMAGE,
+        width: 1200,
+        height: 630,
+        alt: "Visriva Live Station — Luxury Live Event Gifting",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Visriva Live Station | Premium Event Tech & Photo Booths in Bengaluru",
-    description:
-      "Bengaluru's luxury live gifting station. Instant Photo Booths, Custom Fridge Magnets, Keychains, and Mug Printing for weddings and corporate events.",
+    title: siteTitle,
+    description: siteDescription,
+    images: [DEFAULT_OG_IMAGE],
   },
   icons: {
-    icon: [
-      { url: "/icon.png" },
-      { url: "/mycomapnylogo.png" },
-    ],
+    icon: [{ url: "/icon.png" }, { url: "/mycomapnylogo.png" }],
     shortcut: "/mycomapnylogo.png",
     apple: "/mycomapnylogo.png",
   },
@@ -80,6 +68,7 @@ export const metadata: Metadata = {
 
 import PageTransition from "@/components/PageTransition";
 import WhatsAppWidget from "@/components/WhatsAppWidget";
+import JsonLd from "@/components/JsonLd";
 import Script from "next/script";
 
 export default function RootLayout({
@@ -88,8 +77,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${cormorant.variable} ${playfair.variable} ${cinzel.variable} ${bodoni.variable} ${montserrat.variable} overflow-x-hidden w-full`}>
+    <html lang="en" className={`${cormorant.variable} ${montserrat.variable} overflow-x-hidden w-full`}>
       <head>
+        <JsonLd />
         {/* Google Tag (gtag.js) */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-GTLC8F1PQD"

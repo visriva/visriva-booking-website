@@ -38,6 +38,7 @@ import {
   subscribeWhatsAppBotConfig,
 } from "@/lib/firebase";
 import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
+import OperatorPrintStatusBanner from "@/components/OperatorPrintStatusBanner";
 import { hasAdminPasswordsConfigured, isAuthorizedAdminPassword } from "@/lib/adminAuth";
 
 const DEFAULT_TOKENS: TokenItem[] = [];
@@ -534,6 +535,8 @@ export default function OperatorCommandCenterPage() {
         ) : (
           /* AUTHENTICATED DASHBOARD WORKSPACE */
           <div className="space-y-10">
+
+            <OperatorPrintStatusBanner />
 
             {/* 1. REAL-TIME EVENT INVENTORY & PRINT STATS CARDS */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">

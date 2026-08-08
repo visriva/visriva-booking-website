@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/admin", "/admin/whatsapp", "/operator", "/webbooth", "/webprinter"],
+      disallow: ["/admin", "/admin/whatsapp", "/operator", "/webbooth", "/webprinter", "/event-setup"],
     },
     sitemap: "https://www.visriva.com/sitemap.xml",
   };

@@ -7,6 +7,10 @@ import { usePathname } from "next/navigation";
 export default function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
+  if (pathname?.startsWith("/webbooth") || pathname?.startsWith("/webprinter")) {
+    return <>{children}</>;
+  }
+
   return (
     <AnimatePresence mode="wait">
       <motion.div

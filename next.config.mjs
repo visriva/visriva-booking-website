@@ -15,11 +15,14 @@ const nextConfig = {
     return config;
   },
   images: {
-    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
       },
     ],
   },
@@ -34,6 +37,16 @@ const nextConfig = {
           },
         ],
         destination: 'https://www.visriva.com/:path*',
+        permanent: true,
+      },
+      {
+        source: '/photo-booth',
+        destination: '/services/photo-booth',
+        permanent: true,
+      },
+      {
+        source: '/instant-photo-booth',
+        destination: '/services/photo-booth',
         permanent: true,
       },
     ];
