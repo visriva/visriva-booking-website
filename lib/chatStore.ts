@@ -17,7 +17,16 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { adminDb } from "@/lib/firebaseAdmin";
+
+async function getAdminDb() {
+  if (typeof window !== "undefined") return null;
+  try {
+    const { adminDb } = await import("@/lib/firebaseAdmin");
+    return adminDb;
+  } catch {
+    return null;
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,7 +77,6 @@ if (!(globalThis as any)._whatsappChatStore) {
 }
 
 const isServer = typeof window === "undefined";
-const useAdmin = () => isServer && !!adminDb;
 
 function toIso(ts: unknown): string | null {
   if (!ts) return null;
@@ -108,9 +116,11 @@ export async function saveChatMessage(
     lastTimestamp: tsIso,
   };
 
-  if (useAdmin()) {
-    try {
-      await adminDb!.collection(`chats/${cleanPhone}/messages`).add({
+  if (isServer) {
+    const adminDb = await getAdminDb();
+    if (adminDb) {
+      try {
+        await adminDb.collection(`chats/${cleanPhone}/messages`).add({
         sender: message.sender,
         text: message.text,
         timestamp: new Date(),
@@ -124,9 +134,10 @@ export async function saveChatMessage(
         },
         { merge: true }
       );
-      return;
-    } catch (err) {
-      console.error("[chatStore] Admin write failed:", err);
+        return;
+      } catch (err) {
+        console.error("[chatStore] Admin write failed:", err);
+      }
     }
   }
 
@@ -155,9 +166,11 @@ export async function saveChatMessage(
 
 // ─── Fetch All Threads ────────────────────────────────────────────────────────
 export async function getAllChatThreads(): Promise<ChatThread[]> {
-  if (useAdmin()) {
-    try {
-      const snap = await adminDb!.collection("chats").get();
+  if (isServer) {
+    const adminDb = await getAdminDb();
+    if (adminDb) {
+      try {
+        const snap = await adminDb.collection("chats").get();
       const threads: ChatThread[] = snap.docs.map((d) => {
         const data = d.data();
         return {
@@ -175,9 +188,10 @@ export async function getAllChatThreads(): Promise<ChatThread[]> {
         const tb = b.lastTimestamp ? new Date(b.lastTimestamp as string).getTime() : 0;
         return tb - ta;
       });
-      return threads;
-    } catch (err) {
-      console.error("[chatStore] Admin fetch threads failed:", err);
+        return threads;
+      } catch (err) {
+        console.error("[chatStore] Admin fetch threads failed:", err);
+      }
     }
   }
 
@@ -221,10 +235,12 @@ export async function getChatMessages(phoneNum: string, maxMessages = 150): Prom
   const cleanPhone = phoneNum.replace(/[^0-9]/g, "");
   if (!cleanPhone) return [];
 
-  if (useAdmin()) {
-    try {
-      const snap = await adminDb!
-        .collection(`chats/${cleanPhone}/messages`)
+  if (isServer) {
+    const adminDb = await getAdminDb();
+    if (adminDb) {
+      try {
+        const snap = await adminDb
+          .collection(`chats/${cleanPhone}/messages`)
         .orderBy("timestamp", "asc")
         .limit(maxMessages)
         .get();
@@ -238,9 +254,10 @@ export async function getChatMessages(phoneNum: string, maxMessages = 150): Prom
         };
       });
       memoryStore.messages[cleanPhone] = messages;
-      return messages;
-    } catch (err) {
-      console.error("[chatStore] Admin fetch messages failed:", err);
+        return messages;
+      } catch (err) {
+        console.error("[chatStore] Admin fetch messages failed:", err);
+      }
     }
   }
 
@@ -276,9 +293,11 @@ export async function getChatMessages(phoneNum: string, maxMessages = 150): Prom
 
 // ─── Bot Settings ─────────────────────────────────────────────────────────────
 export async function getBotSettings(): Promise<BotSettings> {
-  if (useAdmin()) {
-    try {
-      const snap = await adminDb!.doc("config/whatsapp_bot").get();
+  if (isServer) {
+    const adminDb = await getAdminDb();
+    if (adminDb) {
+      try {
+        const snap = await adminDb.doc("config/whatsapp_bot").get();
       if (snap.exists) {
         const data = snap.data()!;
         const settings: BotSettings = {
@@ -293,6 +312,7 @@ export async function getBotSettings(): Promise<BotSettings> {
       }
     } catch (err) {
       console.error("[chatStore] Admin getBotSettings failed:", err);
+    }
     }
   }
 
@@ -332,12 +352,15 @@ export async function saveBotSettings(settings: Partial<BotSettings>): Promise<v
   if (settings.lastSyncedAt !== undefined) updateData.lastSyncedAt = settings.lastSyncedAt;
   if (settings.instanceName !== undefined) updateData.instanceName = settings.instanceName;
 
-  if (useAdmin()) {
-    try {
-      await adminDb!.doc("config/whatsapp_bot").set(updateData, { merge: true });
-      return;
-    } catch (err) {
-      console.error("[chatStore] Admin saveBotSettings failed:", err);
+  if (isServer) {
+    const adminDb = await getAdminDb();
+    if (adminDb) {
+      try {
+        await adminDb.doc("config/whatsapp_bot").set(updateData, { merge: true });
+        return;
+      } catch (err) {
+        console.error("[chatStore] Admin saveBotSettings failed:", err);
+      }
     }
   }
 
