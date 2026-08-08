@@ -1,7 +1,6 @@
 /**
  * Firebase Admin SDK — Server-side initializer
  * Uses environment variables set in Vercel (never exposed to browser).
- * Compatible with firebase-admin v12+ modular API.
  */
 
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
@@ -10,21 +9,40 @@ import { getAuth } from "firebase-admin/auth";
 
 let app: App | undefined;
 
-// Prevent re-initialization across hot reloads in Next.js dev mode
+function parsePrivateKey(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  let key = raw.trim();
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
+    key = key.slice(1, -1);
+  }
+  return key.replace(/\\n/g, "\n");
+}
+
 if (!getApps().length) {
-  const projectId   = process.env.FIREBASE_PROJECT_ID;
+  const projectId =
+    process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  // Vercel stores \n as literal \\n in env vars — restore actual newlines
-  const privateKey  = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const privateKey = parsePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 
   if (projectId && clientEmail && privateKey) {
-    app = initializeApp({
-      credential: cert({ projectId, clientEmail, privateKey }),
-    });
+    try {
+      app = initializeApp({
+        credential: cert({ projectId, clientEmail, privateKey }),
+      });
+    } catch (err) {
+      console.error("[firebaseAdmin] initializeApp failed:", err);
+    }
   } else {
     console.warn(
-      "[firebaseAdmin] Missing FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY. " +
-      "Firestore server-side features will be unavailable."
+      "[firebaseAdmin] Missing credentials — projectId:",
+      !!projectId,
+      "clientEmail:",
+      !!clientEmail,
+      "privateKey:",
+      !!privateKey
     );
   }
 } else {
