@@ -3,6 +3,8 @@ import { getAllChatThreads, getChatMessages, saveChatMessage } from '@/lib/chatS
 import { configureEvolutionTls } from '@/lib/evolutionApi';
 import { sendEvolutionText } from '@/lib/evolutionSend';
 
+export const runtime = "nodejs";
+
 configureEvolutionTls();
 
 export async function GET(req: Request) {

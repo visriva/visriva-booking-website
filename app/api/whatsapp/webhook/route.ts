@@ -3,6 +3,8 @@ import { configureEvolutionTls } from "@/lib/evolutionApi";
 import { processInboundWhatsApp } from "@/lib/whatsappInbound";
 import { saveBotSettings } from "@/lib/chatStore";
 
+export const runtime = "nodejs";
+
 configureEvolutionTls();
 
 export const maxDuration = 60;
