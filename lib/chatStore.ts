@@ -120,12 +120,12 @@ export async function saveChatMessage(
     const adminDb = await getAdminDb();
     if (adminDb) {
       try {
-        await adminDb.collection(`chats/${cleanPhone}/messages`).add({
-        sender: message.sender,
-        text: message.text,
-        timestamp: new Date(),
-      });
-      await adminDb.doc(`chats/${cleanPhone}`).set(
+        await adminDb.collection("chats").doc(cleanPhone).collection("messages").add({
+          sender: message.sender,
+          text: message.text,
+          timestamp: new Date(),
+        });
+        await adminDb.collection("chats").doc(cleanPhone).set(
         {
           phoneNum: cleanPhone,
           displayName: displayName || cleanPhone,
@@ -240,7 +240,9 @@ export async function getChatMessages(phoneNum: string, maxMessages = 150): Prom
     if (adminDb) {
       try {
         const snap = await adminDb
-          .collection(`chats/${cleanPhone}/messages`)
+          .collection("chats")
+          .doc(cleanPhone)
+          .collection("messages")
         .orderBy("timestamp", "asc")
         .limit(maxMessages)
         .get();
