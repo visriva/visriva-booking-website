@@ -22,6 +22,9 @@ export interface FinanceTransaction {
   party?: string;
   eventRef?: string;
   date: string; // YYYY-MM-DD
+  bank?: string;
+  paymentMethod?: string;
+  reason?: string;
   createdAt?: unknown;
 }
 

@@ -495,8 +495,8 @@ export default function BookingEngine() {
                   <label className="block text-xs font-semibold uppercase tracking-wider text-[#D4AF37]">
                     Event Date *
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="relative">
+                  <div className="space-y-3">
+                    <div className="relative max-w-xs">
                       <input
                         type="date"
                         required

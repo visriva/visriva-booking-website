@@ -22,6 +22,9 @@ import {
   EXPENSE_CATEGORIES,
   type FinanceTransaction,
 } from "@/lib/finance";
+import ReceiptAnalyzer, { type ReceiptFormData } from "@/components/admin/ReceiptAnalyzer";
+import SheetSyncPanel from "@/components/admin/SheetSyncPanel";
+import { subscribeFinanceSettings, type FinanceSettings } from "@/lib/financeConfig";
 
 interface Props {
   onToast: (msg: string, isError?: boolean) => void;
@@ -30,11 +33,13 @@ interface Props {
 export default function FinanceDashboard({ onToast }: Props) {
   const now = new Date();
   const [rows, setRows] = useState<Array<FinanceTransaction & { id: string }>>([]);
-  const [tab, setTab] = useState<"overview" | "income" | "expense" | "ledger">("overview");
+  const [tab, setTab] = useState<"overview" | "scan" | "income" | "expense" | "ledger" | "sheets">("overview");
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [deletingId, setDeletingId] = useState("");
+  const [financeSettings, setFinanceSettings] = useState<FinanceSettings>({});
 
   const [form, setForm] = useState({
     amount: "",
@@ -42,12 +47,17 @@ export default function FinanceDashboard({ onToast }: Props) {
     description: "",
     party: "",
     eventRef: "",
+    bank: "",
+    paymentMethod: "",
+    reason: "",
     date: now.toISOString().split("T")[0],
   });
 
   useEffect(() => {
     return subscribeFinanceTransactions(setRows);
   }, []);
+
+  useEffect(() => subscribeFinanceSettings(setFinanceSettings), []);
 
   const monthSummary = useMemo(() => summarizeTransactions(rows, year, month), [rows, year, month]);
   const yearSummary = useMemo(() => summarizeTransactions(rows, year), [rows, year]);
@@ -59,8 +69,55 @@ export default function FinanceDashboard({ onToast }: Props) {
       description: "",
       party: "",
       eventRef: "",
+      bank: "",
+      paymentMethod: "",
+      reason: "",
       date: now.toISOString().split("T")[0],
     });
+  };
+
+  const syncToSheet = async (tx: FinanceTransaction & { id?: string }) => {
+    if (!financeSettings.googleSheetWebhookUrl || financeSettings.autoSyncOnSave === false) return;
+    await fetch("/api/finance/sync-sheet", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transaction: tx }),
+    });
+  };
+
+  const syncAllToSheet = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/finance/sync-sheet", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactions: rows }),
+      });
+      const data = await res.json();
+      if (res.ok) onToast(`Synced ${data.synced} rows to Google Sheet`);
+      else onToast(data.error || "Sync failed", true);
+    } catch {
+      onToast("Sync failed", true);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const applyReceipt = (data: ReceiptFormData) => {
+    setForm({
+      amount: data.amount,
+      category: data.category,
+      description: data.description,
+      party: data.party,
+      bank: data.bank,
+      paymentMethod: data.paymentMethod,
+      reason: data.reason,
+      eventRef: "",
+      date: data.date,
+    });
+    setTab(data.type === "income" ? "income" : "expense");
   };
 
   const submitTx = async (type: "income" | "expense") => {
@@ -75,18 +132,23 @@ export default function FinanceDashboard({ onToast }: Props) {
     }
 
     setSaving(true);
-    const res = await addFinanceTransaction({
+    const payload = {
       type,
       amount,
       category: form.category,
       description: form.description.trim(),
       party: form.party.trim() || undefined,
       eventRef: form.eventRef.trim() || undefined,
+      bank: form.bank.trim() || undefined,
+      paymentMethod: form.paymentMethod.trim() || undefined,
+      reason: form.reason.trim() || undefined,
       date: form.date,
-    });
+    };
+    const res = await addFinanceTransaction(payload);
     setSaving(false);
 
     if (res.success) {
+      void syncToSheet({ ...payload, id: res.id });
       onToast(type === "income" ? "Income recorded" : "Expense recorded");
       resetForm(type);
       setTab("overview");
@@ -158,8 +220,8 @@ export default function FinanceDashboard({ onToast }: Props) {
             </option>
           ))}
         </select>
-        <div className="flex gap-1 ml-auto">
-          {(["overview", "income", "expense", "ledger"] as const).map((t) => (
+        <div className="flex flex-wrap gap-1 w-full sm:w-auto sm:ml-auto">
+          {(["overview", "scan", "income", "expense", "ledger", "sheets"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -168,11 +230,11 @@ export default function FinanceDashboard({ onToast }: Props) {
                 if (t === "income") resetForm("income");
                 if (t === "expense") resetForm("expense");
               }}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${
                 tab === t ? "bg-[#D4AF37] text-[#011F15]" : "bg-white/5 text-white/60 hover:bg-white/10"
               }`}
             >
-              {t}
+              {t === "scan" ? "AI Scan" : t}
             </button>
           ))}
         </div>
@@ -251,8 +313,14 @@ export default function FinanceDashboard({ onToast }: Props) {
         </>
       )}
 
+      {tab === "scan" && <ReceiptAnalyzer onApply={applyReceipt} onToast={onToast} />}
+
+      {tab === "sheets" && (
+        <SheetSyncPanel onToast={onToast} onSyncAll={syncAllToSheet} syncing={syncing} />
+      )}
+
       {(tab === "income" || tab === "expense") && (
-        <div className="glass-card rounded-2xl border border-[#D4AF37]/30 p-6 max-w-xl space-y-4">
+        <div className="glass-card rounded-2xl border border-[#D4AF37]/30 p-6 max-w-2xl space-y-4">
           <h3 className="font-serif text-lg font-bold text-white flex items-center gap-2">
             {tab === "income" ? (
               <>
@@ -330,6 +398,36 @@ export default function FinanceDashboard({ onToast }: Props) {
                     : "DNP paper + ribbon for March events"
                 }
                 className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-[#D4AF37] resize-none"
+              />
+            </div>
+
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-[10px] font-bold uppercase text-white/40">Bank / UPI app</label>
+              <input
+                value={form.bank}
+                onChange={(e) => setForm({ ...form, bank: e.target.value })}
+                placeholder="HDFC, ICICI, PhonePe, GPay…"
+                className="w-full bg-black/30 border border-white/5 rounded-xl px-4 py-2 text-white/80 text-xs outline-none focus:border-[#D4AF37]/50"
+              />
+            </div>
+
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-[10px] font-bold uppercase text-white/40">Payment method</label>
+              <input
+                value={form.paymentMethod}
+                onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
+                placeholder="UPI, NEFT, Card, Cash…"
+                className="w-full bg-black/30 border border-white/5 rounded-xl px-4 py-2 text-white/80 text-xs outline-none focus:border-[#D4AF37]/50"
+              />
+            </div>
+
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-[10px] font-bold uppercase text-white/40">Business reason</label>
+              <input
+                value={form.reason}
+                onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                placeholder="Why this expense/income for Visriva"
+                className="w-full bg-black/30 border border-white/5 rounded-xl px-4 py-2 text-white/80 text-xs outline-none focus:border-[#D4AF37]/50"
               />
             </div>
 

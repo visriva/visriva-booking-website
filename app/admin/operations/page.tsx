@@ -7,11 +7,12 @@ import {
   IndianRupee,
   LayoutDashboard,
   ChevronRight,
-  Settings,
   Briefcase,
   Sparkles,
+  LogOut,
 } from "lucide-react";
-import AdminGate from "@/components/admin/AdminGate";
+import OperationsGate from "@/components/admin/OperationsGate";
+import { destroyOperationsSession } from "@/lib/operationsAuth";
 import AvailabilityCalendar from "@/components/admin/AvailabilityCalendar";
 import FinanceDashboard from "@/components/admin/FinanceDashboard";
 import {
@@ -45,7 +46,7 @@ export default function AdminOperationsPage() {
   };
 
   return (
-    <AdminGate>
+    <OperationsGate>
       <div className="min-h-screen bg-[#011F15] text-white">
         {/* Top bar */}
         <header className="sticky top-0 z-40 border-b border-white/10 bg-[#011F15]/95 backdrop-blur-xl">
@@ -74,6 +75,14 @@ export default function AdminOperationsPage() {
               >
                 WhatsApp
               </Link>
+              <button
+                type="button"
+                onClick={() => void destroyOperationsSession().then(() => window.location.reload())}
+                className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-rose-500/20 text-rose-300 transition flex items-center gap-1"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Log out
+              </button>
             </nav>
           </div>
         </header>
@@ -169,6 +178,6 @@ export default function AdminOperationsPage() {
           </div>
         )}
       </div>
-    </AdminGate>
+    </OperationsGate>
   );
 }
