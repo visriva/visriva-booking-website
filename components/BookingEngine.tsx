@@ -41,6 +41,7 @@ import {
 import CalendlySuccess from "./CalendlySuccess";
 import LocationAutocomplete from "./LocationAutocomplete";
 import AIConciergeWidget from "./AIConciergeWidget";
+import DateAvailabilityPicker from "./DateAvailabilityPicker";
 
 const ALL_SERVICE_OPTIONS = [
   { id: "Photos", label: "Instant Photo Booth", speed: "8-Sec Print", toggleKey: "enablePhotoBoothService" },
@@ -351,6 +352,13 @@ export default function BookingEngine() {
       scrollForm();
       return;
     }
+    if (blockedDates.fullyBookedDates.includes(eventDate)) {
+      setErrorMsg(
+        "This date is fully booked. Please choose another date or contact us on WhatsApp for the waitlist."
+      );
+      scrollForm();
+      return;
+    }
     if (!venue.trim()) {
       setErrorMsg("Please select your event venue location.");
       scrollForm();
@@ -396,6 +404,9 @@ export default function BookingEngine() {
 
     if (result.success && result.id) {
       setSubmittedLead({ data: leadPayload, id: result.id });
+      scrollForm();
+    } else if (res.status === 409) {
+      setErrorMsg(result.error || "This date is fully booked.");
       scrollForm();
     } else {
       // Fallback to direct Firestore if API unavailable
@@ -480,20 +491,28 @@ export default function BookingEngine() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 
                 {/* Event Date */}
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2 lg:col-span-1">
                   <label className="block text-xs font-semibold uppercase tracking-wider text-[#D4AF37]">
                     Event Date *
                   </label>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      required
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="relative">
+                      <input
+                        type="date"
+                        required
+                        value={eventDate}
+                        min={new Date().toISOString().split("T")[0]}
+                        onChange={(e) => setEventDate(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 focus:border-[#D4AF37] rounded-xl px-4 py-3.5 text-white text-sm outline-none transition-colors backdrop-blur-sm"
+                      />
+                      <CalendarIcon className="w-5 h-5 text-[#D4AF37] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                    <DateAvailabilityPicker
                       value={eventDate}
-                      min={new Date().toISOString().split("T")[0]}
-                      onChange={(e) => setEventDate(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 focus:border-[#D4AF37] rounded-xl px-4 py-3.5 text-white text-sm outline-none transition-colors backdrop-blur-sm"
+                      onChange={setEventDate}
+                      blockedDates={blockedDates}
+                      minDate={new Date().toISOString().split("T")[0]}
                     />
-                    <CalendarIcon className="w-5 h-5 text-[#D4AF37] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
 
                   {/* Real-Time Availability Status Indicator */}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import {
   Lock,
   ShieldCheck,
@@ -44,6 +45,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
 import { isAuthorizedAdminPassword } from "@/lib/adminAuth";
+import { isAdminSessionValid, setAdminSession } from "@/components/admin/AdminGate";
 import { doc, setDoc } from "firebase/firestore";
 import {
   subscribePricingMatrix,
@@ -314,6 +316,11 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Restore admin session (shared with /admin/operations)
+  useEffect(() => {
+    if (isAdminSessionValid()) setAuthenticated(true);
+  }, []);
+
   // Poll WhatsApp status when the scanner tab is opened
   useEffect(() => {
     if (activeCategory === "ai" && activeTab === "aiWhatsAppScanner") {
@@ -410,6 +417,7 @@ export default function AdminDashboardPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (isAuthorizedAdminPassword(pin)) {
+      setAdminSession();
       setAuthenticated(true);
       setPinError("");
     } else {
@@ -901,6 +909,14 @@ export default function AdminDashboardPage() {
                 <Layers className="w-4 h-4" />
                 <span>🏠 Dashboard Home</span>
               </button>
+
+              <Link
+                href="/admin/operations"
+                className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all bg-gradient-to-r from-emerald-500/20 to-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] hover:from-emerald-500/30 hover:to-[#D4AF37]/30"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>📅 Operations Hub</span>
+              </Link>
 
               <button
                 onClick={() => {

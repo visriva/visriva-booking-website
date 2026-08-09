@@ -2224,6 +2224,8 @@ export async function saveBentoGridConfig(
 export interface BlockedDatesConfig {
   fullyBookedDates: string[]; // YYYY-MM-DD
   highDemandDates: string[]; // YYYY-MM-DD
+  /** Optional label per date e.g. "Sharma Wedding" */
+  blockedNotes?: Record<string, string>;
 }
 
 export const DEFAULT_BLOCKED_DATES: BlockedDatesConfig = {

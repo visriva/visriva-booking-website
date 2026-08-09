@@ -23,6 +23,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
     }
 
+    const blockedSnap = await adminDb.collection("config").doc("blocked_dates").get();
+    const blocked = blockedSnap.data() as { fullyBookedDates?: string[] } | undefined;
+    if (blocked?.fullyBookedDates?.includes(lead.eventDate)) {
+      return NextResponse.json(
+        {
+          error:
+            "This date is fully booked. Please choose another date or contact us on WhatsApp for the waitlist.",
+        },
+        { status: 409 }
+      );
+    }
+
     const docRef = await adminDb.collection("bookings").add({
       ...lead,
       status: "NEW_LEAD",
