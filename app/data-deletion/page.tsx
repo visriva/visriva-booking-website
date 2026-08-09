@@ -1,10 +1,12 @@
 import React from "react";
-import { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: "Data Deletion Instructions | Visriva Live Station",
-  description: "Learn how to request the deletion of your personal data from Visriva Live Station systems and applications.",
-};
+  description:
+    "Learn how to request the deletion of your personal data from Visriva Live Station systems and applications.",
+  path: "/data-deletion",
+});
 
 export default function DataDeletionInstructions() {
   return (

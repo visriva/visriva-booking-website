@@ -5,7 +5,6 @@
 
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
 
 let app: App | undefined;
 
@@ -58,6 +57,3 @@ if (!getApps().length) {
 
 /** Firestore Admin client — use in API routes only (server-side) */
 export const adminDb = app ? getFirestore(app) : null;
-
-/** Firebase Admin Auth — use in API routes only */
-export const adminAuth = app ? getAuth(app) : null;

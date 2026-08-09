@@ -141,6 +141,14 @@ export interface BookingLead {
   isGstInvoice?: boolean;
   status?: string; // e.g. "NEW_LEAD" | "QUOTE_SENT" | "DEPOSIT_PAID" | "CONFIRMED" | "COMPLETED"
   createdAt?: unknown;
+  /** reserve | instagram_manychat */
+  source?: string;
+  instagramUsername?: string;
+  manychatSubscriberId?: string;
+  leadKeyword?: string;
+  leadNotes?: string;
+  manychatLiveChatUrl?: string;
+  profilePicUrl?: string;
 }
 
 export interface PortfolioImage {
@@ -348,7 +356,7 @@ export const DEFAULT_BENTO_GRID_CONFIG: BentoGridConfig = {
       description: "Full-frame studio cameras paired with studio strobe illumination and instant dye-sublimation print engines. Guests receive high-gloss 4×6 photo prints within 8 seconds alongside instant QR digital album access.",
       bullets: ["8-Second Dye-Sub Prints", "Custom Event Frame Overlay", "Instant QR Code Sharing", "White-Glove Tech Operator"],
       ctaText: "View Full Photo Booth Details",
-      ctaUrl: "/photo-booth",
+      ctaUrl: "/services/photo-booth",
       enabled: true,
     },
     {

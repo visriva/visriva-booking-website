@@ -14,14 +14,15 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { checkPrintServerHealth } from "@/lib/printJobs";
+import { checkPrintServerHealth, sendImageToPrintEndpoint } from "@/lib/printJobs";
+import { createTestPrintStripBlob } from "@/lib/testPrintStrip";
 
 const CHECKLIST_KEY = "visriva-event-setup-checklist";
 
 const DEFAULT_ITEMS = [
   { id: "print-server", label: "USB print server running on laptop (port 3847)" },
   { id: "webprinter", label: "Web Printer open at /webprinter with Auto-Print ON" },
-  { id: "test-print", label: "Run one test strip from /webbooth" },
+  { id: "test-print", label: "Send preflight test strip from /event-setup" },
   { id: "paper", label: "DNP printer loaded with paper & ribbon" },
   { id: "wifi", label: "iPad and laptop on the same Wi-Fi network" },
   { id: "operator", label: "Operator portal unlocked and WhatsApp bot connected" },
@@ -33,6 +34,8 @@ export default function EventSetupPage() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [printerOk, setPrinterOk] = useState<boolean | null>(null);
   const [printerName, setPrinterName] = useState<string | null>(null);
+  const [testPrinting, setTestPrinting] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -61,6 +64,25 @@ export default function EventSetupPage() {
   useEffect(() => {
     void refreshPrinter();
   }, [refreshPrinter]);
+
+  const runTestPrint = async () => {
+    setTestPrinting(true);
+    setTestResult(null);
+    try {
+      const blob = await createTestPrintStripBlob();
+      const jobId = await sendImageToPrintEndpoint(blob, `preflight-${Date.now()}`);
+      setTestResult(`Test strip queued (job ${jobId}). Check /webprinter — it should print within ~10s.`);
+      setChecked((prev) => {
+        const next = { ...prev, "test-print": true, webprinter: true };
+        localStorage.setItem(CHECKLIST_KEY, JSON.stringify(next));
+        return next;
+      });
+    } catch (err: unknown) {
+      setTestResult(err instanceof Error ? err.message : "Test print failed");
+    } finally {
+      setTestPrinting(false);
+    }
+  };
 
   const doneCount = DEFAULT_ITEMS.filter((item) => checked[item.id]).length;
   const allDone = doneCount === DEFAULT_ITEMS.length;
@@ -110,6 +132,29 @@ export default function EventSetupPage() {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Preflight test print */}
+        <div className="rounded-2xl border border-[#D4AF37]/30 bg-[#D4AF37]/5 p-5 space-y-3">
+          <h2 className="font-aylia text-lg font-bold text-white">Preflight Test Print</h2>
+          <p className="text-xs text-white/70">
+            Sends a test strip to the print queue. Open <strong>/webprinter</strong> with Auto-Print ON
+            and ensure the USB print server is running (<code className="text-[#D4AF37]">npm run print-server</code>).
+          </p>
+          <button
+            type="button"
+            onClick={() => void runTestPrint()}
+            disabled={testPrinting}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] text-xs font-extrabold uppercase tracking-wider disabled:opacity-50"
+          >
+            {testPrinting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+            {testPrinting ? "Sending…" : "Send Test Strip"}
+          </button>
+          {testResult && (
+            <p className={`text-xs ${testResult.includes("failed") || testResult.includes("Failed") ? "text-rose-300" : "text-emerald-300"}`}>
+              {testResult}
+            </p>
+          )}
         </div>
 
         {/* Checklist */}
@@ -165,10 +210,14 @@ export default function EventSetupPage() {
                 <span className="text-xs font-bold uppercase tracking-wider">Laptop (Print Node)</span>
               </div>
               <pre className="text-[11px] font-mono text-emerald-100/80 whitespace-pre-wrap leading-relaxed">
-{`npm run dev
-# or production build on port 3000
+{`# Terminal 1 — print server
+npm run print-server
 
-NEXT_PUBLIC_PRINT_SERVER_URL=http://localhost:3847`}
+# Terminal 2 — site on LAN
+npm run build && npm run start:lan
+
+# Or both at once:
+npm run event-day`}
               </pre>
             </div>
             <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">

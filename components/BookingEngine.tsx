@@ -385,41 +385,28 @@ export default function BookingEngine() {
       ...(appliedPerk ? { claimedPerk: `${appliedPerk.title} (${appliedPerk.code})` } : {}),
     };
 
-    const res = await saveBookingLead(leadPayload);
+    const res = await fetch("/api/booking/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(leadPayload),
+    });
+    const result = await res.json().catch(() => ({ success: false, error: `HTTP ${res.status}` }));
 
     setSubmitting(false);
 
-    if (res.success && res.id) {
-      setSubmittedLead({ data: leadPayload, id: res.id });
+    if (result.success && result.id) {
+      setSubmittedLead({ data: leadPayload, id: result.id });
       scrollForm();
-
-      // ── INSTANT WHATSAPP LEAD NOTIFICATION TO OWNER ──
-      if (typeof window !== "undefined") {
-        try {
-          const waMsg = encodeURIComponent(
-            `🚨 *NEW VISRIVA LIVE STATION BOOKING INQUIRY*\n\n` +
-            `👤 *Client Name:* ${clientName}\n` +
-            `📞 *Phone:* ${clientPhone}\n` +
-            `📍 *Venue:* ${venue}\n` +
-            `📅 *Event Date:* ${eventDate}\n` +
-            `🎉 *Event Type:* ${eventType}\n` +
-            `⏰ *Timings:* ${reportingTime} - ${endingTime}\n` +
-            `👥 *Guest Count:* ${pax} Guests\n` +
-            `✨ *Selected Stations:* ${selectedServices.join(", ")}\n` +
-            (appliedPerk ? `🎁 *Claimed Golden Wheel Perk:* ${appliedPerk.title} (Code: ${appliedPerk.code})\n` : "") +
-            `💰 *Estimated Total:* ${budgetInfo.amount} (${budgetInfo.tier})\n` +
-            (budgetInfo.discountAmount > 0 ? `🎉 *Multi-Station Combo Discount:* -₹${budgetInfo.discountAmount.toLocaleString("en-IN")} (10% OFF)\n` : "") +
-            `\n*Ref ID:* ${res.id}`
-          );
-          const targetPhone = (settings as any).whatsappNumber || "918884484828";
-          window.open(`https://wa.me/${targetPhone}?text=${waMsg}`, "_blank");
-        } catch (e) {
-          console.warn("WhatsApp window.open non-fatal warning:", e);
-        }
-      }
     } else {
-      setErrorMsg(res.error || "An unexpected error occurred. Please try again.");
-      scrollForm();
+      // Fallback to direct Firestore if API unavailable
+      const fallback = await saveBookingLead(leadPayload);
+      if (fallback.success && fallback.id) {
+        setSubmittedLead({ data: leadPayload, id: fallback.id });
+        scrollForm();
+      } else {
+        setErrorMsg(result.error || fallback.error || "An unexpected error occurred. Please try again.");
+        scrollForm();
+      }
     }
   };
 

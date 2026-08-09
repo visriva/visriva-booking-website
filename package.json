@@ -6,6 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "start:lan": "next start -H 0.0.0.0 -p 3000",
+    "print-server": "node tools/print-server/index.js",
+    "event-day": "node tools/print-server/index.js & next start -H 0.0.0.0 -p 3000",
     "lint": "next lint"
   },
   "dependencies": {

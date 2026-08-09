@@ -15,6 +15,8 @@ export function extractEvolutionQr(data: unknown): string {
 
 export async function fetchEvolutionState(config: EvolutionConfig): Promise<string> {
   const headers = getEvolutionHeaders(config.key);
+  let connectionState = "unknown";
+  let instanceStatus: string | null = null;
 
   try {
     const res = await fetch(`${config.url}/instance/connectionState/${config.instance}`, {
@@ -23,7 +25,7 @@ export async function fetchEvolutionState(config: EvolutionConfig): Promise<stri
     });
     if (res.ok) {
       const data = await res.json().catch(() => ({}));
-      return data?.instance?.state || data?.state || "unknown";
+      connectionState = data?.instance?.state || data?.state || "unknown";
     }
   } catch {
     /* fall through */
@@ -39,14 +41,19 @@ export async function fetchEvolutionState(config: EvolutionConfig): Promise<stri
       const row = Array.isArray(list)
         ? list.find((i: { name?: string }) => i.name === config.instance)
         : null;
-      if (row?.connectionStatus === "open") return "open";
-      if (row) return "close";
+      if (row?.connectionStatus) {
+        instanceStatus = String(row.connectionStatus);
+      }
     }
   } catch {
     /* ignore */
   }
 
-  return "unknown";
+  // Trust "open" from either endpoint; stale sessions often report connecting forever.
+  if (connectionState === "open" || instanceStatus === "open") return "open";
+  if (connectionState === "connecting" || instanceStatus === "connecting") return "connecting";
+  if (connectionState === "close" || instanceStatus === "close") return "close";
+  return connectionState !== "unknown" ? connectionState : instanceStatus || "unknown";
 }
 
 export async function fetchEvolutionQr(config: EvolutionConfig): Promise<string> {

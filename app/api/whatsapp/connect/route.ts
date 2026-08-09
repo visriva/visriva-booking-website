@@ -73,11 +73,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ connected: true, state: "open" });
     }
 
-    let qr = await fetchEvolutionQr(config);
-    console.log(`[connect] qr from connect endpoint: ${qr ? "yes" : "no"}`);
+    // "connecting" without a live socket is a dead session — always reset for a fresh QR.
+    let qr = "";
+    if (state !== "connecting") {
+      qr = await fetchEvolutionQr(config);
+      console.log(`[connect] qr from connect endpoint: ${qr ? "yes" : "no"}`);
+    }
 
     if (!qr) {
-      console.log("[connect] resetting stale instance for fresh QR...");
+      console.log("[connect] resetting instance for fresh QR...");
       qr = await resetEvolutionInstance(config);
       console.log(`[connect] qr after reset: ${qr ? "yes" : "no"}`);
     }

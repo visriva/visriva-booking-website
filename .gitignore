@@ -35,4 +35,5 @@ tools/.env
 *.serviceAccountKey.json
 *private*key*.json
 fire base private key .json
+.print-queue.json
 .env*

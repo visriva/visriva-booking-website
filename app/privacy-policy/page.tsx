@@ -1,10 +1,11 @@
 import React from "react";
-import { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: "Privacy Policy | Visriva Live Station",
   description: "Privacy Policy for Visriva Live Station services and applications.",
-};
+  path: "/privacy-policy",
+});
 
 export default function PrivacyPolicy() {
   return (

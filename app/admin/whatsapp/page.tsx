@@ -27,10 +27,39 @@ interface ChatMessage {
 
 type WaStatus = "checking" | "connected" | "disconnected" | "qr_ready";
 
+type MetaStatus = {
+  configured: boolean;
+  tokenValid?: boolean;
+  webhookUrl?: string;
+  verifyToken?: string;
+  tokenError?: string;
+  displayPhone?: string;
+} | null;
+
+type MetaDiagnose = {
+  tokenValid?: boolean;
+  displayPhone?: string;
+  verifiedName?: string;
+  wabaIdFromApi?: string;
+  webhookUrl?: string;
+  verifyToken?: string;
+  webhookVerified?: boolean;
+  wabaSubscribe?: { ok?: boolean };
+  subscribedApps?: { data?: unknown[] };
+  manualSteps?: string[];
+  envWabaMismatch?: boolean;
+} | null;
+
 type WebhookResult = {
   success: boolean;
   message?: string;
   url?: string;
+  webhookUrl?: string;
+  verifyToken?: string;
+  webhookVerified?: boolean;
+  manualRequired?: boolean;
+  manualSteps?: string[];
+  note?: string;
   error?: string;
   details?: unknown;
   status?: number;
@@ -70,6 +99,8 @@ export default function WhatsAppCRMPage() {
 
   // ── Connection State ───────────────────────────────────────────────────────
   const [waStatus,           setWaStatus]           = useState<WaStatus>("checking");
+  const [metaStatus,         setMetaStatus]         = useState<MetaStatus>(null);
+  const [metaDiagnose,       setMetaDiagnose]       = useState<MetaDiagnose>(null);
   const [waQr,               setWaQr]               = useState("");
   const [waLoading,          setWaLoading]          = useState(false);
 
@@ -108,14 +139,34 @@ export default function WhatsAppCRMPage() {
       setBotActive(cfg.isActive);
       setAutoReplyText(cfg.autoReplyText);
       if (cfg.connectionStatus === "open")       setWaStatus("connected");
-      else if (cfg.connectionStatus === "connecting") setWaStatus("checking");
+      else if (cfg.connectionStatus === "connecting") setWaStatus("disconnected");
     });
     return () => unsub();
   }, []);
 
-  // ── Check connection status & load threads on mount ─────────────────────────
+  const loadMetaDiagnose = useCallback(async () => {
+    try {
+      const res = await fetch("/api/whatsapp/meta-diagnose", { signal: AbortSignal.timeout(12000) });
+      const data = await res.json().catch(() => null);
+      setMetaDiagnose(data);
+      if (data?.tokenValid) {
+        setWaStatus("connected");
+        setMetaStatus({
+          configured: true,
+          tokenValid: true,
+          webhookUrl: data.webhookUrl,
+          verifyToken: data.verifyToken,
+          displayPhone: data.displayPhone,
+        });
+      }
+    } catch {
+      setMetaDiagnose(null);
+    }
+  }, []);
+
+  // ── Load Meta diagnostics & threads on mount ───────────────────────────────
   useEffect(() => {
-    checkStatus();
+    loadMetaDiagnose();
     loadThreads();
   }, []);
 
@@ -167,15 +218,22 @@ export default function WhatsAppCRMPage() {
     }
   }, []);
 
-  const checkStatus = async () => {
+  const checkStatus = async (autoQr = false) => {
     setWaStatus("checking");
     try {
       const res = await fetch("/api/whatsapp/connect?action=status", { signal: AbortSignal.timeout(8000) });
       if (!res.ok) { setWaStatus("disconnected"); return; }
       const data = await res.json().catch(() => ({ status: "disconnected", state: "unknown" }));
-      if (data.status === "connected") setWaStatus("connected");
-      else if (data.status === "connecting" || data.state === "connecting") setWaStatus("checking");
-      else setWaStatus("disconnected");
+      if (data.status === "connected") {
+        setWaStatus("connected");
+        return;
+      }
+      if (data.status === "connecting" || data.state === "connecting") {
+        setWaStatus("disconnected");
+        if (autoQr) await connectInstance();
+        return;
+      }
+      setWaStatus("disconnected");
     } catch { setWaStatus("disconnected"); }
   };
 
@@ -200,18 +258,21 @@ export default function WhatsAppCRMPage() {
     setWebhookSyncLoading(true);
     setWebhookResult(null);
     try {
-      const res  = await fetch("/api/whatsapp/sync-webhook", { method: "POST" });
-      const data = await res.json().catch(() => ({ success: false, error: `Server returned non-JSON response (HTTP ${res.status})` }));
+      const res  = await fetch("/api/whatsapp/meta-setup", { method: "POST" });
+      const data = await res.json().catch(() => ({ success: false, error: `HTTP ${res.status}` }));
       setWebhookResult(data);
-      if (data.success) {
-        toast("✅ Webhook synced successfully! Railway → Vercel active.");
-      } else {
-        toast(`Railway ${data.status ?? "error"}: ${data.error}`, true);
+      await loadMetaDiagnose();
+      if (data.webhookVerified) {
+        toast("Webhook ready — complete the Meta Console steps below.");
       }
     } catch (err: any) {
       setWebhookResult({ success: false, error: err.message });
       toast(`Network error: ${err.message}`, true);
     } finally { setWebhookSyncLoading(false); }
+  };
+
+  const copyText = (text: string, label: string) => {
+    navigator.clipboard.writeText(text).then(() => toast(`Copied ${label}`)).catch(() => toast("Copy failed", true));
   };
 
   const toggleBot = async () => {
@@ -296,13 +357,13 @@ export default function WhatsAppCRMPage() {
           <div className="flex flex-wrap items-center gap-2">
             {/* Live Connection Status Badge */}
             <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${
-              waStatus === "connected"    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+              metaStatus?.tokenValid || waStatus === "connected" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
               waStatus === "checking"     ? "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse" :
               waStatus === "qr_ready"     ? "bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20" :
                                            "bg-red-500/10 text-red-400 border-red-500/20"
             }`}>
-              {waStatus === "connected" ? <Wifi className="w-3 h-3" /> : waStatus === "checking" ? <RefreshCw className="w-3 h-3 animate-spin" /> : <WifiOff className="w-3 h-3" />}
-              {waStatus === "connected" ? "Connected ✅" : waStatus === "checking" ? "Checking..." : waStatus === "qr_ready" ? "Scan QR" : "Disconnected"}
+              {metaStatus?.tokenValid ? <ShieldCheck className="w-3 h-3" /> : waStatus === "connected" ? <Wifi className="w-3 h-3" /> : waStatus === "checking" ? <RefreshCw className="w-3 h-3 animate-spin" /> : <WifiOff className="w-3 h-3" />}
+              {metaStatus?.tokenValid ? "Meta API Active" : waStatus === "connected" ? "Connected ✅" : waStatus === "checking" ? "Checking..." : waStatus === "qr_ready" ? "Scan QR below" : "Setup needed"}
             </span>
 
             {/* Master Bot Toggle Switch */}
@@ -340,6 +401,56 @@ export default function WhatsAppCRMPage() {
           </div>
         </div>
 
+        {metaStatus?.configured && !metaStatus.tokenValid && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
+            Meta API token issue — check <code className="text-amber-100">WHATSAPP_ACCESS_TOKEN</code> on Vercel.
+            {metaStatus.tokenError ? ` (${metaStatus.tokenError.slice(0, 80)})` : ""}
+          </div>
+        )}
+
+        {metaStatus?.tokenValid && (
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-xs text-emerald-200/90 space-y-2">
+            <p>
+              <strong>Meta Cloud API</strong> active
+              {metaDiagnose?.displayPhone ? ` · ${metaDiagnose.displayPhone}` : ""}
+              {metaDiagnose?.verifiedName ? ` (${metaDiagnose.verifiedName})` : ""}
+              — no QR scan needed.
+            </p>
+            {!metaDiagnose?.subscribedApps?.data?.length && (
+              <p className="text-amber-200">
+                <strong>One-time setup:</strong> Open Settings below and complete the Meta webhook steps (takes 2 min).
+              </p>
+            )}
+          </div>
+        )}
+
+        {metaStatus?.tokenValid && metaStatus.webhookUrl && (
+          <div className="rounded-2xl border border-[#D4AF37]/30 bg-[#D4AF37]/5 p-5 space-y-3">
+            <h3 className="font-serif text-sm font-bold text-[#D4AF37]">Meta Webhook — one-time setup (you have app access)</h3>
+            <ol className="text-xs text-white/80 space-y-2 list-decimal pl-4">
+              <li>Open <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline">developers.facebook.com</a> → Your App → <strong>WhatsApp</strong> → <strong>Configuration</strong></li>
+              <li>Paste Callback URL (click Copy):</li>
+            </ol>
+            <div className="flex gap-2 items-center">
+              <code className="flex-1 text-[10px] bg-black/40 p-2 rounded-lg break-all">{metaStatus.webhookUrl}</code>
+              <button type="button" onClick={() => copyText(metaStatus.webhookUrl!, "URL")} className="px-3 py-2 rounded-lg bg-[#D4AF37] text-[#011F15] text-[10px] font-bold cursor-pointer">Copy</button>
+            </div>
+            <p className="text-xs text-white/80">Verify token (click Copy):</p>
+            <div className="flex gap-2 items-center">
+              <code className="flex-1 text-[10px] bg-black/40 p-2 rounded-lg">{metaStatus.verifyToken}</code>
+              <button type="button" onClick={() => copyText(metaStatus.verifyToken!, "token")} className="px-3 py-2 rounded-lg bg-[#D4AF37] text-[#011F15] text-[10px] font-bold cursor-pointer">Copy</button>
+            </div>
+            <ol className="text-xs text-white/80 space-y-1 list-decimal pl-4" start={3}>
+              <li>Click <strong>Verify and Save</strong> (green checkmark)</li>
+              <li>Under Webhook fields → <strong>Manage</strong> → subscribe to <strong>messages</strong></li>
+              <li>Test: send <strong>hi</strong> from another phone to +91 88844 84828</li>
+            </ol>
+            <button type="button" onClick={syncWebhook} disabled={webhookSyncLoading} className="text-[10px] text-white/50 underline cursor-pointer">
+              {webhookSyncLoading ? "Checking…" : "Re-check webhook status"}
+            </button>
+          </div>
+        )}
+
         {/* ── Settings Drawer / Control Panel ───────────────────────── */}
         {showSettings && (
           <div className="rounded-2xl bg-black/40 border border-white/10 p-5 space-y-4 transition-all">
@@ -348,44 +459,13 @@ export default function WhatsAppCRMPage() {
               <button type="button" onClick={() => setShowSettings(false)} className="text-white/40 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* WhatsApp Device Connection & QR */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Meta Webhook Setup */}
               <div className="space-y-3 p-4 rounded-xl bg-white/5 border border-white/10">
-                <p className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-wider">WhatsApp Device Session</p>
-                {waQr && waStatus === "qr_ready" && (
-                  <div className="bg-white p-2 rounded-xl inline-block">
-                    <img src={`data:image/png;base64,${waQr}`} alt="WhatsApp QR Code" className="w-36 h-36 rounded" />
-                  </div>
-                )}
-                {waStatus === "connected" && (
-                  <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-                    <ShieldCheck className="w-4 h-4" /> Phone Linked & Connected
-                  </div>
-                )}
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={connectInstance}
-                    disabled={waLoading}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#D4AF37] text-[#011F15] text-[10px] font-extrabold uppercase tracking-wider disabled:opacity-50 cursor-pointer hover:brightness-110"
-                  >
-                    {waLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <QrCode className="w-3.5 h-3.5" />}
-                    {waStatus === "connected" ? "Re-Link Device" : "Generate QR Code"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={checkStatus}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-[10px] font-bold uppercase tracking-wider transition hover:bg-white/10 cursor-pointer"
-                  >
-                    <Activity className="w-3.5 h-3.5" /> Check State
-                  </button>
-                </div>
-              </div>
-
-              {/* Webhook Sync & Verification */}
-              <div className="space-y-3 p-4 rounded-xl bg-white/5 border border-white/10">
-                <p className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-wider">Webhook Registration</p>
-                <p className="text-[10px] text-white/40 font-mono break-all">Target: visriva.com/api/whatsapp/webhook</p>
+                <p className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-wider">Meta Webhook Setup</p>
+                <p className="text-[10px] text-white/40 font-mono break-all">
+                  {metaStatus?.webhookUrl || "visriva-booking-website-visriva.vercel.app/api/whatsapp/webhook"}
+                </p>
 
                 <button
                   type="button"
@@ -394,18 +474,30 @@ export default function WhatsAppCRMPage() {
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#D4AF37] text-[#011F15] text-[10px] font-extrabold uppercase tracking-wider shadow transition disabled:opacity-50 cursor-pointer hover:brightness-110 active:scale-95"
                 >
                   {webhookSyncLoading
-                    ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Registering on Railway...</>
-                    : <><Zap className="w-3.5 h-3.5" /> ⚡ Force Sync Webhook</>
+                    ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Registering Meta webhook...</>
+                    : <><Zap className="w-3.5 h-3.5" /> Register Meta Webhook</>
                   }
                 </button>
 
                 {webhookResult && (
-                  <div className={`rounded-lg p-2.5 text-[10px] font-mono border ${webhookResult.success ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" : "bg-red-500/10 border-red-500/20 text-red-300"}`}>
-                    <p className="font-bold mb-1">{webhookResult.success ? "✅ SUCCESS" : `❌ FAILED (${webhookResult.status ?? "—"})`}</p>
-                    {webhookResult.url   && <p>URL: {webhookResult.url}</p>}
-                    {webhookResult.error && <p>Error: {webhookResult.error}</p>}
-                    {webhookResult.details !== undefined && (
-                      <pre className="mt-1 whitespace-pre-wrap break-all opacity-75">{JSON.stringify(webhookResult.details, null, 2)}</pre>
+                  <div className={`rounded-lg p-2.5 text-[10px] font-mono border ${
+                    webhookResult.webhookVerified ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" : "bg-amber-500/10 border-amber-500/20 text-amber-200"
+                  }`}>
+                    <p className="font-bold mb-1">
+                      {webhookResult.webhookVerified ? "✅ WEBHOOK READY — DO THESE 4 STEPS IN META" : "⚠️ WEBHOOK CHECK"}
+                    </p>
+                    {webhookResult.message && <p className="mb-2 opacity-90">{webhookResult.message}</p>}
+                    {webhookResult.note && <p className="mb-2 opacity-75 italic">{webhookResult.note}</p>}
+                    {webhookResult.manualSteps && (
+                      <ol className="mt-1 list-decimal pl-4 space-y-1">
+                        {(webhookResult.manualSteps as string[]).map((s) => <li key={s}>{s}</li>)}
+                      </ol>
+                    )}
+                    {webhookResult.webhookUrl && (
+                      <p className="mt-2 break-all opacity-75">URL: {webhookResult.webhookUrl}</p>
+                    )}
+                    {webhookResult.verifyToken && (
+                      <p className="break-all opacity-75">Token: {webhookResult.verifyToken}</p>
                     )}
                   </div>
                 )}

@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import type { LocalLandingPageData } from "@/lib/localLandingPages";
 import { buildFaqJsonLd } from "@/lib/localLandingPages";
-import { DEFAULT_CONTACT } from "@/lib/seo";
+import { DEFAULT_CONTACT, buildBreadcrumbJsonLd, buildServiceJsonLd } from "@/lib/seo";
 
 interface LocalLandingPageProps {
   data: LocalLandingPageData;
@@ -12,12 +12,29 @@ interface LocalLandingPageProps {
 
 export default function LocalLandingPage({ data }: LocalLandingPageProps) {
   const faqJsonLd = buildFaqJsonLd(data.faqs);
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: data.headline, path: `/${data.slug}` },
+  ]);
+  const serviceJsonLd = buildServiceJsonLd({
+    name: data.headline,
+    description: data.metaDescription,
+    path: `/${data.slug}`,
+  });
 
   return (
     <main className="min-h-screen bg-transparent text-white">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }}
       />
 
       <Navbar />
@@ -50,7 +67,7 @@ export default function LocalLandingPage({ data }: LocalLandingPageProps) {
 
         <section className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
-            href="/reserve"
+            href={`/reserve?utm_source=landing&utm_campaign=${data.slug}`}
             className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gold-gradient text-[#011F15] text-xs font-extrabold uppercase tracking-widest shadow-gold-sm hover:scale-[1.02] transition"
           >
             Reserve Your Date

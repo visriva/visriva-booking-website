@@ -136,7 +136,7 @@ export default function BentoGrid() {
 
                 <div className="pt-4 z-10">
                   <Link
-                    href={photoBoothCard.ctaUrl || "/photo-booth"}
+                    href={photoBoothCard.ctaUrl || "/services/photo-booth"}
                     className="inline-flex items-center space-x-2 text-xs font-bold uppercase tracking-widest text-[#D4AF37] hover:text-white transition-colors"
                   >
                     <span>{photoBoothCard.ctaText || "View Full Photo Booth Details"}</span>

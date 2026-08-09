@@ -1,61 +1,29 @@
 import { NextResponse } from 'next/server';
-import { configureEvolutionTls, getEvolutionConfig, getEvolutionHeaders, getWebhookUrl } from '@/lib/evolutionApi';
+import { configureEvolutionTls } from '@/lib/evolutionApi';
+import { registerEvolutionWebhook } from '@/lib/registerEvolutionWebhook';
 
 configureEvolutionTls();
 
 export async function POST() {
   try {
-    const { url, key, instance } = await getEvolutionConfig();
-    const webhookUrl = getWebhookUrl();
-    const endpoint = `${url}/webhook/set/${instance}`;
-
-    console.log(`[sync-webhook] Setting webhook for '${instance}' → '${webhookUrl}'`);
-
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        ...getEvolutionHeaders(key),
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        webhook: {
-          url:     webhookUrl,
-          enabled: true,
-          events:  ['MESSAGES_UPSERT', 'MESSAGES_SET', 'CONNECTION_UPDATE'],
-        },
-      }),
-      signal: AbortSignal.timeout(8000),
-    });
-
-    const responseText = await res.text();
-    let data: unknown;
-    try {
-      data = JSON.parse(responseText);
-    } catch {
-      data = { message: responseText };
-    }
-
-    if (!res.ok) {
+    const result = await registerEvolutionWebhook();
+    if (!result.ok) {
       return NextResponse.json(
         {
-          error:   `Evolution API returned HTTP ${res.status}`,
-          details: data,
-          status:  res.status,
-          endpoint,
+          success: false,
+          error: result.error,
+          url: result.url,
         },
-        { status: res.status }
+        { status: 500 }
       );
     }
 
     return NextResponse.json({
-      success:  true,
-      response: data,
-      url:      webhookUrl,
-      endpoint,
+      success: true,
+      url: result.url,
     });
-
   } catch (error: any) {
-    console.error('[sync-webhook] Top-level sync-webhook error:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    console.error('[sync-webhook] error:', error);
+    return NextResponse.json({ success: false, error: error.message || 'Internal server error' }, { status: 500 });
   }
 }

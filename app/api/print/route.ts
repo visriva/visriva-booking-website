@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { LocalPrintQueueJob } from "@/lib/printQueue";
+import { loadPrintQueue, savePrintQueue } from "@/lib/printQueueStore";
 
 export const runtime = "nodejs";
 
-/** In-memory local event print buffer (iPad booth → laptop print node on same server). */
-let printQueue: LocalPrintQueueJob[] = [];
+/** Local event print buffer — persisted to .print-queue.json on the laptop. */
+let printQueue: LocalPrintQueueJob[] = loadPrintQueue();
+
+function persistQueue() {
+  savePrintQueue(printQueue);
+}
 
 function mirrorToCloud(
   jobId: string,
@@ -52,6 +57,7 @@ export async function POST(request: NextRequest) {
       };
 
       printQueue.push(newJob);
+      persistQueue();
       mirrorToCloud(String(id), images[0], { captureId, source, size, createdAt: timestamp });
 
       return NextResponse.json({ success: true, jobId: id });
@@ -85,6 +91,7 @@ export async function POST(request: NextRequest) {
     };
 
     printQueue.push(newJob);
+    persistQueue();
     mirrorToCloud(String(id), dataUrl, { captureId, source, size, createdAt: timestamp });
 
     return NextResponse.json({ success: true, jobId: id });
@@ -114,6 +121,7 @@ export async function PATCH(request: NextRequest) {
     job.status = status;
     if (error) job.error = error;
     if (status === "printed") job.printedAt = new Date().toISOString();
+    persistQueue();
 
     return NextResponse.json({ success: true, jobId: job.id });
   } catch {

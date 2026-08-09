@@ -2475,6 +2475,26 @@ export default function AdminDashboardPage() {
                                   {lead.clientName || "VIP Inquiry"}
                                 </h4>
                                 <p className="text-[11px] text-[#D4AF37] font-bold mt-0.5">{lead.eventType || "Event"}</p>
+                                {lead.source === "instagram_manychat" && (
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-200 border border-pink-400/30">
+                                      Instagram
+                                    </span>
+                                    {lead.leadKeyword && (
+                                      <span className="text-[9px] font-mono text-white/60">#{lead.leadKeyword}</span>
+                                    )}
+                                    {lead.instagramUsername && (
+                                      <a
+                                        href={`https://instagram.com/${lead.instagramUsername}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[9px] text-pink-300 hover:underline"
+                                      >
+                                        @{lead.instagramUsername}
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
                               </div>
 
                               <div className="space-y-1 text-[11px] text-emerald-100/70 font-mono">
@@ -2485,6 +2505,11 @@ export default function AdminDashboardPage() {
                                 <div className="truncate text-white/90">📍 {lead.venue || "Bengaluru"}</div>
                                 <div className="text-[#D4AF37] font-bold">💰 {lead.estimatedBudget || "Quote Pending"}</div>
                                 <div>📱 {lead.clientPhone || "No Phone"}</div>
+                                {lead.leadNotes && lead.source === "instagram_manychat" && (
+                                  <div className="text-[10px] text-white/60 whitespace-pre-wrap line-clamp-3">
+                                    💬 {lead.leadNotes}
+                                  </div>
+                                )}
                                 {lead.customHashtag && (
                                   <div className="text-emerald-300 font-bold font-serif text-[10px]">✨ {lead.customHashtag}</div>
                                 )}

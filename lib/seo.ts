@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const SITE_URL = "https://www.visriva.com";
 export const SITE_NAME = "Visriva Live Station";
-export const DEFAULT_OG_IMAGE = "/mycomapnylogo.png";
+export const DEFAULT_OG_IMAGE = "/og-default.jpg";
 
 export const DEFAULT_CONTACT = {
   phone: "+91 88844 84828",
@@ -51,6 +51,39 @@ export function buildPageMetadata({
       description,
       images: [DEFAULT_OG_IMAGE],
     },
+  };
+}
+
+export function buildBreadcrumbJsonLd(items: Array<{ name: string; path: string }>) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: item.name,
+      item: `${SITE_URL}${item.path}`,
+    })),
+  };
+}
+
+export function buildServiceJsonLd({
+  name,
+  description,
+  path,
+}: {
+  name: string;
+  description: string;
+  path: string;
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    name,
+    description,
+    provider: { "@type": "LocalBusiness", name: SITE_NAME, url: SITE_URL },
+    areaServed: { "@type": "City", name: "Bengaluru" },
+    url: `${SITE_URL}${path}`,
   };
 }
 

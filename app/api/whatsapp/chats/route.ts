@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAllChatThreads, getChatMessages, saveChatMessage } from '@/lib/chatStore';
 import { configureEvolutionTls } from '@/lib/evolutionApi';
-import { sendEvolutionText } from '@/lib/evolutionSend';
+import { sendWhatsAppText } from '@/lib/whatsappSend';
 
 export const runtime = "nodejs";
 
@@ -40,10 +40,16 @@ export async function POST(req: Request) {
     }
 
     const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const sendResult = await sendEvolutionText(cleanPhone, text.trim(), '[Admin]');
+    const sendResult = await sendWhatsAppText(cleanPhone, text.trim(), '[Admin]');
 
     if (!sendResult.ok) {
-      return NextResponse.json({ error: sendResult.error || 'Send failed' }, { status: 502 });
+      return NextResponse.json({
+        error: sendResult.error || 'Send failed',
+        isWindowExpired: sendResult.isWindowExpired,
+        hint: sendResult.isWindowExpired
+          ? 'Customer must message you first (24h window), or use a template message.'
+          : undefined,
+      }, { status: 502 });
     }
 
     await saveChatMessage(cleanPhone, {
@@ -52,7 +58,7 @@ export async function POST(req: Request) {
       timestamp: new Date()
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, provider: sendResult.provider });
 
   } catch (error: any) {
     console.error('[chats POST] Error:', error);

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { CheckCircle2, Calendar as CalendarIcon, Clock, ShieldCheck, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, Calendar as CalendarIcon, Clock, FileText, Sparkles } from "lucide-react";
 import { BookingLead } from "@/lib/firebase";
 
 interface CalendlySuccessProps {
@@ -32,9 +33,12 @@ export default function CalendlySuccess({ leadData, leadId }: CalendlySuccessPro
           Booking Inquiry Received!
         </h3>
 
-        <p className="text-gold-300 text-base sm:text-lg max-w-xl mx-auto mb-6 font-light">
+        <p className="text-gold-300 text-base sm:text-lg max-w-xl mx-auto mb-2 font-light">
           Your request for <strong className="text-white">{leadData.eventType || "your event"}</strong> on{" "}
-          <strong className="text-white">{leadData.eventDate || "selected date"}</strong> has been logged into our VIP queue.
+          <strong className="text-white">{leadData.eventDate || "selected date"}</strong> is in our VIP queue.
+        </p>
+        <p className="text-emerald-300/80 text-sm max-w-lg mx-auto mb-6">
+          We&apos;ve sent a confirmation to our team. Save your reference ID below — you&apos;ll need it for your consultation call.
         </p>
 
         {/* Lead Reference Details Box */}
@@ -53,17 +57,26 @@ export default function CalendlySuccess({ leadData, leadId }: CalendlySuccessPro
           </div>
         </div>
 
-        {/* Instant WhatsApp Alert Trigger Button */}
-        <div className="pt-4 flex justify-center">
+        {/* Actions */}
+        <div className="pt-4 flex flex-col sm:flex-row justify-center gap-3">
+          {leadId && (
+            <Link
+              href={`/contract?leadId=${leadId}`}
+              className="px-6 py-3 rounded-full bg-[#D4AF37] hover:brightness-110 text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-lg transition-all flex items-center justify-center gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              View Quote &amp; Contract
+            </Link>
+          )}
           <a
             href={`https://wa.me/918884484828?text=${encodeURIComponent(
-              `Hello Visriva Live Station! I just submitted a booking inquiry (Ref: ${leadId || "CONFIRMED"}). My event is on ${leadData.eventDate || "selected date"} at ${leadData.venue || "Bengaluru"}. Please confirm availability!`
+              `Hello Visriva! Booking inquiry Ref: ${leadId || "CONFIRMED"}. Event: ${leadData.eventDate} at ${leadData.venue}.`
             )}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-6 py-3 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg hover:scale-105 transition-all flex items-center space-x-2"
+            className="px-6 py-3 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg hover:scale-105 transition-all flex items-center justify-center gap-2"
           >
-            <span>💬 Instant Chat &amp; Confirm on WhatsApp</span>
+            💬 Chat on WhatsApp
           </a>
         </div>
       </div>

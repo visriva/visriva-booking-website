@@ -1,6 +1,7 @@
 import { saveChatMessage, getBotSettings } from "@/lib/chatStore";
 import { parseEvolutionInbound } from "@/lib/whatsappWebhookParse";
-import { sendEvolutionText } from "@/lib/evolutionSend";
+import { parseMetaInbound } from "@/lib/metaWhatsApp";
+import { sendWhatsAppText } from "@/lib/whatsappSend";
 
 function keywordAutoReply(message: string, fallback: string): string {
   const lower = message.toLowerCase();
@@ -32,6 +33,19 @@ export interface InboundProcessResult {
   aiReply?: boolean;
   ruleReply?: boolean;
   reason?: string;
+  provider?: string;
+}
+
+interface ParsedInbound {
+  phone: string;
+  pushName: string;
+  text: string;
+}
+
+function parseInbound(body: unknown): ParsedInbound | null {
+  const meta = parseMetaInbound(body);
+  if (meta) return meta;
+  return parseEvolutionInbound(body);
 }
 
 /** Full inbound pipeline: parse → store → AI or keyword reply. */
@@ -39,7 +53,7 @@ export async function processInboundWhatsApp(
   body: unknown,
   options?: { skipAi?: boolean }
 ): Promise<InboundProcessResult> {
-  const parsed = parseEvolutionInbound(body);
+  const parsed = parseInbound(body);
   if (!parsed) {
     return { handled: false, reason: "ignored_event" };
   }
@@ -94,7 +108,11 @@ export async function processInboundWhatsApp(
 
   const replyText = keywordAutoReply(text, botSettings.autoReplyText);
   console.log(`[Inbound] Keyword reply → ${phone}`);
-  await sendEvolutionText(phone, replyText, "[Rules]");
+  const sendResult = await sendWhatsAppText(phone, replyText, "[Rules]");
+  if (!sendResult.ok) {
+    console.warn("[Inbound] Reply send failed:", sendResult.error);
+    return { handled: true, phone, reason: "reply_send_failed" };
+  }
   await saveChatMessage(phone, { sender: "bot", text: replyText, timestamp: new Date() }, pushName);
-  return { handled: true, phone, ruleReply: true };
+  return { handled: true, phone, ruleReply: true, provider: sendResult.provider };
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { configureEvolutionTls } from "@/lib/evolutionApi";
 import { processInboundWhatsApp } from "@/lib/whatsappInbound";
 import { saveBotSettings } from "@/lib/chatStore";
+import { getMetaConfig, verifyMetaWebhookChallenge } from "@/lib/metaWhatsApp";
 
 export const runtime = "nodejs";
 
@@ -9,8 +10,25 @@ configureEvolutionTls();
 
 export const maxDuration = 60;
 
-export async function GET() {
-  return NextResponse.json({ status: "online", webhook: "/api/whatsapp/webhook" });
+/** Meta webhook verification OR health check. */
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const meta = getMetaConfig();
+
+  if (meta) {
+    const challenge = verifyMetaWebhookChallenge(searchParams, meta.verifyToken);
+    if (challenge) {
+      console.log("[Webhook] Meta verification OK");
+      return new NextResponse(challenge, { status: 200 });
+    }
+  }
+
+  return NextResponse.json({
+    status: "online",
+    webhook: "/api/whatsapp/webhook",
+    metaConfigured: !!meta,
+    evolutionConfigured: !!(process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY),
+  });
 }
 
 export async function POST(request: Request) {
@@ -20,6 +38,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: "success", note: "empty body" });
     }
 
+    // ── Meta Cloud API inbound ───────────────────────────────────────────────
+    if (body.object === "whatsapp_business_account") {
+      const result = await processInboundWhatsApp(body, { skipAi: true });
+      return NextResponse.json({ status: "success", source: "meta", ...result });
+    }
+
+    // ── Evolution API inbound ──────────────────────────────────────────────
     const event = String(body?.event || body?.type || "").toUpperCase().replace(/\./g, "_");
     if (event.includes("CONNECTION")) {
       const state = body?.data?.state || body?.data?.instance?.state || body?.state;
@@ -32,9 +57,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: "success", note: "connection_event" });
     }
 
-    // Keyword replies only in webhook — keeps under Vercel Hobby 10s limit. AI runs via /api/ai-agent/reply.
     const result = await processInboundWhatsApp(body, { skipAi: true });
-    return NextResponse.json({ status: "success", ...result });
+    return NextResponse.json({ status: "success", source: "evolution", ...result });
   } catch (error: any) {
     console.error("[Error] webhook:", error?.message || error);
     return NextResponse.json({ status: "success", error: error?.message });
