@@ -33,3 +33,6 @@ next-env.d.ts
 tools/serviceAccountKey.json
 tools/.env
 *.serviceAccountKey.json
+*private*key*.json
+fire base private key .json
+.env*

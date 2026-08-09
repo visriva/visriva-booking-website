@@ -22,28 +22,35 @@ function parsePrivateKey(raw?: string): string | undefined {
 }
 
 if (!getApps().length) {
-  const projectId =
-    process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = parsePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
-
-  if (projectId && clientEmail && privateKey) {
+  const jsonRaw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (jsonRaw) {
     try {
-      app = initializeApp({
-        credential: cert({ projectId, clientEmail, privateKey }),
-      });
+      const serviceAccount = JSON.parse(jsonRaw);
+      app = initializeApp({ credential: cert(serviceAccount) });
     } catch (err) {
-      console.error("[firebaseAdmin] initializeApp failed:", err);
+      console.error("[firebaseAdmin] FIREBASE_SERVICE_ACCOUNT_JSON parse failed:", err);
     }
-  } else {
-    console.warn(
-      "[firebaseAdmin] Missing credentials — projectId:",
-      !!projectId,
-      "clientEmail:",
-      !!clientEmail,
-      "privateKey:",
-      !!privateKey
-    );
+  }
+
+  if (!app) {
+    const projectId =
+      process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = parsePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+
+    if (projectId && clientEmail && privateKey) {
+      try {
+        app = initializeApp({
+          credential: cert({ projectId, clientEmail, privateKey }),
+        });
+      } catch (err) {
+        console.error("[firebaseAdmin] initializeApp failed:", err);
+      }
+    } else if (!jsonRaw) {
+      console.warn(
+        "[firebaseAdmin] Missing credentials — set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_* env vars"
+      );
+    }
   }
 } else {
   app = getApps()[0];
