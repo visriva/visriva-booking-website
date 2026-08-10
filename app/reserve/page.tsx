@@ -74,7 +74,7 @@ export default function ReservePage() {
   const email = settings.contactEmail || DEFAULT_GLOBAL_SETTINGS.contactEmail;
   const whatsappLink =
     settings.whatsappLogoLink || `https://wa.me/${settings.whatsappNumber || "918884484828"}?text=Hello%20Visriva!%20I%20want%20to%20reserve%20a%20Live%20Station.`;
-  const instagramUrl = settings.instagramUrl || DEFAULT_GLOBAL_SETTINGS.instagramUrl || "https://instagram.com/visriva.live";
+  const instagramUrl = settings.instagramUrl || DEFAULT_GLOBAL_SETTINGS.instagramUrl || "https://instagram.com/visriva.co";
   const linkedinUrl = settings.linkedinUrl || DEFAULT_GLOBAL_SETTINGS.linkedinUrl;
   const address = settings.physicalAddress || DEFAULT_GLOBAL_SETTINGS.physicalAddress;
 
@@ -249,7 +249,7 @@ export default function ReservePage() {
             className="flex items-center space-x-1.5 text-white/70 hover:text-pink-400 transition"
           >
             <FaInstagram className="w-3.5 h-3.5" />
-            <span>@visriva.live</span>
+            <span>@visriva.co</span>
           </a>
           <a
             href={linkedinUrl}

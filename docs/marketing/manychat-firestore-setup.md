@@ -70,7 +70,7 @@ Change `"keyword": "EVENT"` to match the flow (`PLANNER`, `PRICE`, etc.).
 
 ## Step 3 — Test
 
-1. From a personal Instagram account, DM `@visriva.live` with **EVENT**
+1. From a personal Instagram account, DM `@visriva.co` with **EVENT**
 2. Complete the flow
 3. Check:
    - **Admin → Booking CRM** → new card with pink **Instagram** badge

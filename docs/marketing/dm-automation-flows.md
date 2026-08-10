@@ -1,6 +1,6 @@
 # DM Automation Flows — Instagram (ManyChat)
 
-Set up at [manychat.com](https://manychat.com) → Connect Instagram Business account linked to `@visriva.live`.
+Set up at [manychat.com](https://manychat.com) → Connect Instagram Business account linked to `@visriva.co`.
 
 **Rules:**
 - Only automate replies to people who **DM you first** or comment your trigger keyword.

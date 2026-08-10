@@ -82,7 +82,7 @@ Quick question 👇
 Wedding or Corporate event?
 
 [Footer, small]
-@visriva.live
+@visriva.co
 ```
 
 ### Story — Date urgency

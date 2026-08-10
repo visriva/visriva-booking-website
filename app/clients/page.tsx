@@ -491,9 +491,9 @@ export default function ClientsPage() {
               <Mail className="w-3.5 h-3.5" />
               <span>{email}</span>
             </a>
-            <a href={`${settings.instagramUrl || "https://instagram.com/visriva.live"}`} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-1.5 hover:text-pink-400 transition">
+            <a href={`${settings.instagramUrl || "https://instagram.com/visriva.co"}`} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-1.5 hover:text-pink-400 transition">
               <FaInstagram className="w-3.5 h-3.5" />
-              <span>@visriva.live</span>
+              <span>@visriva.co</span>
             </a>
             <a href={`${settings.linkedinUrl || "https://linkedin.com/company/visriva"}`} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-1.5 hover:text-blue-400 transition">
               <FaLinkedin className="w-3.5 h-3.5" />

@@ -23,7 +23,7 @@ Everything you need to run Instagram + DM + ads for client acquisition.
 
 ## Brand constants
 
-- **Instagram:** [@visriva.live](https://instagram.com/visriva.live)
+- **Instagram:** [@visriva.co](https://instagram.com/visriva.co)
 - **Book:** https://www.visriva.com/reserve
 - **WhatsApp:** https://wa.me/918884484828
 - **Planner page:** https://www.visriva.com/planners

@@ -8,7 +8,7 @@ export const DEFAULT_CONTACT = {
   phone: "+91 88844 84828",
   email: "visriva.work@gmail.com",
   address: "Bengaluru, Karnataka, India",
-  instagram: "https://instagram.com/visriva.live",
+  instagram: "https://instagram.com/visriva.co",
   linkedin: "https://linkedin.com/company/visriva",
 };
 

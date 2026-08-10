@@ -158,7 +158,7 @@ export default function Footer() {
 
             <div className="flex items-center space-x-4 pt-2">
               <a
-                href={contact.instagramUrl || "https://instagram.com/visriva.live"}
+                href={contact.instagramUrl || "https://instagram.com/visriva.co"}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Instagram"

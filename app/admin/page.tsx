@@ -987,7 +987,7 @@ export default function AdminDashboardPage() {
                     value={globalSettings.instagramUrl || ""}
                     onChange={(e) => setGlobalSettings({ ...globalSettings, instagramUrl: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-sans text-sm focus:border-[#D4AF37] focus:outline-none"
-                    placeholder="https://instagram.com/visrivalivebooth"
+                    placeholder="https://instagram.com/visriva.co"
                   />
                 </div>
 

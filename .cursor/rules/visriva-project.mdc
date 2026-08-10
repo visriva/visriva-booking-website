@@ -1,0 +1,47 @@
+---
+description: Visriva Live Station — project ownership, stack, and conventions
+alwaysApply: true
+---
+
+# Visriva Live Station — Project Context
+
+You are the primary developer for this codebase. Take ownership of features, fixes, deploys, and improvements unless the user says otherwise.
+
+## Business
+- **Visriva Live Station** — luxury live experiential gifting & photo booths (Bengaluru + pan-India)
+- **Site**: https://www.visriva.com
+- **Phone/WhatsApp**: +91 88844 84828 (`918884484828` for wa.me links)
+- **Email**: visriva.work@gmail.com
+- **Instagram**: https://instagram.com/visriva.co
+
+## Stack
+- Next.js 13 App Router, React 18, TypeScript, Tailwind
+- Firebase (Firestore, Storage, admin CMS at `/admin`)
+- Supabase optional for print queue cloud mirror
+- WhatsApp: Meta Cloud API + Evolution API (VPS)
+- Print pipeline: `/webbooth` → `/api/print` → `/webprinter` → localhost:3847 USB server
+- Hosting: Vercel (project: `visriva-booking-website`), repo: `visriva/visriva-booking-website`
+
+## Key routes
+- Public: `/`, `/reserve`, `/services/*`, `/gallery`, `/frame-customizer`, local SEO pages
+- Crew (noindex): `/operator`, `/webbooth`, `/webprinter`, `/event-setup`
+- Internal: `/admin`, `/ai-agent`, `/planners`
+
+## Conventions
+- Brand: emerald `#011F15` + gold `#D4AF37`, fonts Cormorant + Montserrat
+- SEO helpers in `lib/seo.ts`; service metadata in `app/services/*/layout.tsx`
+- On-site events: run print node on LAN laptop, not cloud-only (in-memory queue)
+- Only commit when user asks; never force-push main
+- WhatsApp URLs: `https://wa.me/918884484828?text=...`
+
+## Recent priorities (Aug 2026)
+- SEO: `public/og-default.jpg`, dynamic sitemap/robots, Bengaluru landings + JSON-LD breadcrumbs
+- Booking: `/api/booking/submit` → Firestore + Meta owner alert; `/reserve` confirmation + contract link
+- Event-day: `/event-setup` checklist, operator print status banner
+- Pending: Google Search Console — set `GOOGLE_SITE_VERIFICATION` env on Vercel after GSC setup
+
+## WhatsApp CRM — Meta Cloud API only (Aug 2026)
+Inbound: Meta webhook → `/api/whatsapp/webhook` → keyword auto-reply → Firestore `chats`.
+Outbound: Meta Cloud API via `lib/metaWhatsApp.ts` and `/api/send-whatsapp`.
+Setup: `/admin/whatsapp` → Meta setup panel. Webhook must be verified in Meta Developer Console.
+Evolution API code remains but is **not** used in the primary path.

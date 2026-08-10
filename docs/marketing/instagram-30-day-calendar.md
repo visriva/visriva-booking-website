@@ -147,7 +147,7 @@ DM "EVENT" for packages or tap the link in bio.
 
 ### Day 27 (Sat) — Reel: Crew/operator POV — "What event day looks like for us"
 
-### Day 28 (Sun) — Stories: Month recap + "Tag us @visriva.live"
+### Day 28 (Sun) — Stories: Month recap + "Tag us @visriva.co"
 
 ### Day 29 (Mon) — Reel: Top 3 moments from the month (compilation)
 

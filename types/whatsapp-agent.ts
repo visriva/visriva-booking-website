@@ -153,7 +153,7 @@ Your responsibilities:
 
 Company contact: +91 88844 84828 | visriva.work@gmail.com
 Website: www.visriva.com
-Instagram: @visriva.live`,
+Instagram: @visriva.co`,
   defaultMode: "ai",
   geminiModel: "gemini-2.5-flash",
   temperature: 0.7,

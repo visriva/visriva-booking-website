@@ -419,7 +419,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettingsConfig = {
   phoneNumber: "+91 88844 84828",
   physicalAddress: "Bengaluru, Karnataka, India",
   linkedinUrl: "https://linkedin.com/company/visriva",
-  instagramUrl: "https://instagram.com/visriva.live",
+  instagramUrl: "https://instagram.com/visriva.co",
   whatsappNumber: "918884484828",
   whatsappLogoLink: "https://wa.me/918884484828?text=Hello%20Visriva%20Live%20Station%2C%20I%20would%20like%20to%20inquire%20about%20booking",
 };

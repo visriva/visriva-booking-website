@@ -6,7 +6,7 @@
 - **Phone & WhatsApp Number**: `+91 88844 84828` (Raw format for WhatsApp links: `918884484828`)
 - **Official Contact Email**: `visriva.work@gmail.com`
 - **Primary Locations**: Bengaluru, Karnataka & Pune, Maharashtra, India
-- **Instagram**: `https://instagram.com/visriva.live`
+- **Instagram**: `https://instagram.com/visriva.co`
 - **LinkedIn**: `https://linkedin.com/company/visriva`
 
 ## WhatsApp Integration Standard
