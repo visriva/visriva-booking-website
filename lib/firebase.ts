@@ -2232,6 +2232,8 @@ export interface BlockedDatesConfig {
   highDemandDates: string[]; // YYYY-MM-DD
   /** Optional label per date e.g. "Sharma Wedding" */
   blockedNotes?: Record<string, string>;
+  /** Rich calendar events (Google Calendar–style) */
+  events?: import("@/lib/calendarEvents").CalendarEvent[];
   /** Dates last imported from Google Calendar iCal feed */
   googleSyncedFullyBooked?: string[];
   googleSyncedHighDemand?: string[];

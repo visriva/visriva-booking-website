@@ -6,14 +6,24 @@ import {
   ChevronRight,
   Calendar,
   Mic,
-  ExternalLink,
   Loader2,
   CheckCircle2,
+  Plus,
+  Sparkles,
 } from "lucide-react";
 import type { BlockedDatesConfig } from "@/lib/firebase";
 import { saveBlockedDates } from "@/lib/firebase";
-import { parseBlockCommand, googleCalendarBlockUrl } from "@/lib/parseBlockCommand";
+import {
+  type CalendarEvent,
+  migrateConfigToEvents,
+  mergeConfigWithEvents,
+  eventsOnDate,
+  formatEventTimeRange,
+  newEventId,
+} from "@/lib/calendarEvents";
+import { parseCalendarIntent } from "@/lib/parseCalendarIntent";
 import GoogleCalendarSyncPanel from "@/components/admin/GoogleCalendarSyncPanel";
+import CalendarEventModal from "@/components/admin/CalendarEventModal";
 
 type DayStatus = "available" | "blocked" | "high_demand";
 
@@ -50,7 +60,13 @@ export default function AvailabilityCalendar({ config, onConfigChange, onToast, 
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [command, setCommand] = useState("");
   const [saving, setSaving] = useState(false);
-  const [noteInput, setNoteInput] = useState("");
+  const [parsing, setParsing] = useState(false);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
+  const [modalInitial, setModalInitial] = useState<Partial<CalendarEvent> & { startDate: string }>();
+
+  const events = useMemo(() => migrateConfigToEvents(config), [config]);
 
   const monthName = new Date(viewYear, viewMonth, 1).toLocaleString("en-IN", {
     month: "long",
@@ -59,74 +75,132 @@ export default function AvailabilityCalendar({ config, onConfigChange, onToast, 
 
   const cells = useMemo(() => buildCalendarDays(viewYear, viewMonth), [viewYear, viewMonth]);
 
-  const persist = async (next: BlockedDatesConfig, msg: string) => {
+  const persistEvents = async (nextEvents: CalendarEvent[], msg: string) => {
     setSaving(true);
-    onConfigChange(next);
-    const res = await saveBlockedDates(next);
+    const merged = mergeConfigWithEvents(config, nextEvents);
+    onConfigChange(merged);
+    const res = await saveBlockedDates(merged);
     setSaving(false);
     if (res.success) onToast(msg);
     else onToast(res.error || "Save failed", true);
   };
 
-  const cycleDay = async (iso: string) => {
-    const status = getDayStatus(iso, config);
-    let next: BlockedDatesConfig = {
-      fullyBookedDates: [...(config.fullyBookedDates || [])],
-      highDemandDates: [...(config.highDemandDates || [])],
-      blockedNotes: { ...(config.blockedNotes || {}) },
+  const openCreate = (iso: string, prefill?: Partial<CalendarEvent>) => {
+    setModalMode("create");
+    setModalInitial({ startDate: iso, endDate: iso, ...prefill });
+    setModalOpen(true);
+  };
+
+  const openEdit = (ev: CalendarEvent) => {
+    setModalMode("edit");
+    setModalInitial(ev);
+    setModalOpen(true);
+  };
+
+  const handleDayClick = (iso: string) => {
+    const dayEvents = eventsOnDate(events, iso);
+    if (dayEvents.length === 1) {
+      openEdit(dayEvents[0]);
+    } else if (dayEvents.length > 1) {
+      openCreate(iso);
+      onToast(`${dayEvents.length} events on this day — tap one below or add new`);
+    } else {
+      openCreate(iso);
+    }
+  };
+
+  const handleSaveEvent = async (ev: CalendarEvent) => {
+    const now = new Date().toISOString();
+    const saved: CalendarEvent = {
+      ...ev,
+      id: ev.id || newEventId(),
+      source: ev.source || "manual",
+      createdAt: ev.createdAt || now,
+      updatedAt: now,
     };
 
-    next.fullyBookedDates = next.fullyBookedDates.filter((d) => d !== iso);
-    next.highDemandDates = next.highDemandDates.filter((d) => d !== iso);
-
-    if (status === "available") {
-      next.fullyBookedDates.push(iso);
-      if (noteInput.trim()) {
-        next.blockedNotes![iso] = noteInput.trim();
-      }
-    } else if (status === "blocked") {
-      next.highDemandDates.push(iso);
-      delete next.blockedNotes![iso];
+    let next: CalendarEvent[];
+    if (modalMode === "edit" && ev.id) {
+      next = events.map((e) => (e.id === ev.id ? saved : e));
+    } else {
+      next = [...events, saved];
     }
 
-    await persist(next, `Updated ${iso} on website calendar`);
+    await persistEvents(next, `Saved "${saved.title}" — live on website & Google export`);
+    setModalOpen(false);
+    setCommand("");
+  };
+
+  const handleDeleteEvent = async (id: string) => {
+    const next = events.filter((e) => e.id !== id);
+    await persistEvents(next, "Event removed");
+    setModalOpen(false);
   };
 
   const runCommand = async () => {
-    const parsed = parseBlockCommand(command);
-    if (!parsed) {
-      onToast('Could not parse. Try: "block 25 dec" or "high demand 14 feb" or "unblock 10-12 jan"', true);
-      return;
-    }
+    const text = command.trim();
+    if (!text) return;
 
-    let next: BlockedDatesConfig = {
-      fullyBookedDates: [...(config.fullyBookedDates || [])],
-      highDemandDates: [...(config.highDemandDates || [])],
-      blockedNotes: { ...(config.blockedNotes || {}) },
-    };
+    setParsing(true);
+    let intent = parseCalendarIntent(text);
 
-    for (const iso of parsed.dates) {
-      next.fullyBookedDates = next.fullyBookedDates.filter((d) => d !== iso);
-      next.highDemandDates = next.highDemandDates.filter((d) => d !== iso);
-
-      if (parsed.action === "block") {
-        next.fullyBookedDates.push(iso);
-        if (parsed.note) next.blockedNotes![iso] = parsed.note;
-      } else if (parsed.action === "high_demand") {
-        next.highDemandDates.push(iso);
-      } else {
-        delete next.blockedNotes![iso];
+    if (!intent) {
+      try {
+        const res = await fetch("/api/calendar/parse-intent", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        const data = await res.json();
+        if (res.ok && data.intent) {
+          intent = data.intent;
+        } else {
+          onToast(data.hint || data.error || "Could not understand — try adding the date clearly", true);
+          setParsing(false);
+          return;
+        }
+      } catch {
+        onToast("Could not parse command", true);
+        setParsing(false);
+        return;
       }
     }
 
-    next.fullyBookedDates = Array.from(new Set(next.fullyBookedDates));
-    next.highDemandDates = Array.from(new Set(next.highDemandDates));
+    setParsing(false);
 
-    await persist(
-      next,
-      `${parsed.action === "unblock" ? "Opened" : "Updated"} ${parsed.dates.length} date(s) — live on website`
-    );
-    setCommand("");
+    if (!intent) {
+      onToast("Could not understand command", true);
+      return;
+    }
+
+    const parsed = intent;
+
+    if (parsed.action === "delete") {
+      const toRemove = events.filter(
+        (e) => e.startDate <= parsed.endDate && e.endDate >= parsed.startDate
+      );
+      if (!toRemove.length) {
+        onToast("No events found on that date to remove", true);
+        return;
+      }
+      const next = events.filter((e) => !toRemove.some((r) => r.id === e.id));
+      await persistEvents(next, `Removed ${toRemove.length} event(s)`);
+      setCommand("");
+      return;
+    }
+
+    openCreate(parsed.startDate, {
+      title: parsed.title,
+      description: parsed.description,
+      endDate: parsed.endDate,
+      startTime: parsed.startTime,
+      endTime: parsed.endTime,
+      allDay: parsed.allDay,
+      status: parsed.status,
+      source: "command",
+    });
+    onToast("Review the event details below, then Save");
   };
 
   const prevMonth = () => {
@@ -136,61 +210,58 @@ export default function AvailabilityCalendar({ config, onConfigChange, onToast, 
     } else setViewMonth((m) => m - 1);
   };
 
-  const nextMonth = () => {
+  const nextMonthNav = () => {
     if (viewMonth === 11) {
       setViewMonth(0);
       setViewYear((y) => y + 1);
     } else setViewMonth((m) => m + 1);
   };
 
-  const upcomingBlocked = [...(config.fullyBookedDates || [])]
-    .filter((d) => d >= today.toISOString().split("T")[0])
-    .sort()
-    .slice(0, 12);
+  const upcomingEvents = useMemo(() => {
+    const todayIso = today.toISOString().split("T")[0];
+    return [...events]
+      .filter((e) => e.endDate >= todayIso)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.title.localeCompare(b.title))
+      .slice(0, 20);
+  }, [events, today]);
 
   return (
     <div className="space-y-6">
       <GoogleCalendarSyncPanel onToast={onToast} onSynced={onRefresh} />
 
-      {/* Command bar */}
+      {/* Smart command */}
       <div className="glass-card rounded-2xl border border-[#D4AF37]/30 p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Mic className="w-4 h-4 text-[#D4AF37]" />
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Quick Block Command</h3>
-          {saving && <Loader2 className="w-4 h-4 text-[#D4AF37] animate-spin ml-auto" />}
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Smart calendar command</h3>
+          {(saving || parsing) && <Loader2 className="w-4 h-4 text-[#D4AF37] animate-spin ml-auto" />}
         </div>
-        <p className="text-xs text-white/50">
-          Type naturally — e.g. <code className="text-[#D4AF37]">block 25 dec</code>,{" "}
-          <code className="text-[#D4AF37]">block 10-12 jan 2027</code>,{" "}
-          <code className="text-[#D4AF37]">high demand 14 feb</code>,{" "}
-          <code className="text-[#D4AF37]">unblock 25 dec</code>
+        <p className="text-xs text-white/50 leading-relaxed">
+          Describe the event naturally — date, time, name, and reason. Example:{" "}
+          <code className="text-[#D4AF37]">17th aug missy event</code> or{" "}
+          <code className="text-[#D4AF37]">25 dec 2pm-8pm Sharma wedding corporate booth</code>
         </p>
         <div className="flex flex-col sm:flex-row gap-2">
           <input
             value={command}
             onChange={(e) => setCommand(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void runCommand()}
-            placeholder='e.g. "block 25 december" or "block 10-12 dec for Sharma wedding"'
+            placeholder='e.g. "17th aug missy event" or "high demand 14 feb valentine enquiries"'
             className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[#D4AF37]"
           />
           <button
             type="button"
             onClick={() => void runCommand()}
-            disabled={saving || !command.trim()}
-            className="px-5 py-3 rounded-xl bg-gold-gradient text-[#011F15] text-xs font-extrabold uppercase tracking-wider disabled:opacity-50"
+            disabled={saving || parsing || !command.trim()}
+            className="px-5 py-3 rounded-xl bg-gold-gradient text-[#011F15] text-xs font-extrabold uppercase tracking-wider disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            Apply
+            <Sparkles className="w-4 h-4" />
+            Analyze &amp; add
           </button>
         </div>
-        <input
-          value={noteInput}
-          onChange={(e) => setNoteInput(e.target.value)}
-          placeholder="Optional note when clicking calendar (e.g. client name)"
-          className="w-full bg-black/30 border border-white/5 rounded-lg px-3 py-2 text-xs text-white/80 outline-none focus:border-[#D4AF37]/50"
-        />
       </div>
 
-      {/* Calendar grid */}
+      {/* Calendar */}
       <div className="glass-card rounded-2xl border border-white/10 p-5">
         <div className="flex items-center justify-between mb-4">
           <button type="button" onClick={prevMonth} className="p-2 rounded-lg hover:bg-white/10">
@@ -200,9 +271,19 @@ export default function AvailabilityCalendar({ config, onConfigChange, onToast, 
             <Calendar className="w-5 h-5 text-[#D4AF37]" />
             {monthName}
           </h3>
-          <button type="button" onClick={nextMonth} className="p-2 rounded-lg hover:bg-white/10">
-            <ChevronRight className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => openCreate(today.toISOString().split("T")[0])}
+              className="p-2 rounded-lg hover:bg-[#D4AF37]/20 text-[#D4AF37]"
+              title="Add event"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+            <button type="button" onClick={nextMonthNav} className="p-2 rounded-lg hover:bg-white/10">
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase text-white/40 mb-2">
@@ -213,29 +294,46 @@ export default function AvailabilityCalendar({ config, onConfigChange, onToast, 
 
         <div className="grid grid-cols-7 gap-1">
           {cells.map((cell, i) => {
-            if (!cell.iso) return <div key={`pad-${i}`} className="aspect-square" />;
+            if (!cell.iso) return <div key={`pad-${i}`} className="min-h-[72px]" />;
             const status = getDayStatus(cell.iso, config);
+            const dayEvents = eventsOnDate(events, cell.iso);
             const isToday = cell.iso === today.toISOString().split("T")[0];
-            const note = config.blockedNotes?.[cell.iso];
 
             const bg =
               status === "blocked"
-                ? "bg-rose-500/30 border-rose-400/50 text-rose-100"
+                ? "bg-rose-500/20 border-rose-400/40 hover:bg-rose-500/30"
                 : status === "high_demand"
-                  ? "bg-amber-500/25 border-amber-400/40 text-amber-100"
-                  : "bg-white/5 border-white/10 text-white/80 hover:bg-emerald-500/15 hover:border-emerald-400/30";
+                  ? "bg-amber-500/15 border-amber-400/30 hover:bg-amber-500/25"
+                  : "bg-white/5 border-white/10 hover:bg-emerald-500/10 hover:border-emerald-400/20";
 
             return (
               <button
                 key={cell.iso}
                 type="button"
-                title={note || cell.iso}
-                onClick={() => void cycleDay(cell.iso!)}
-                className={`aspect-square rounded-lg border text-sm font-mono font-bold transition ${bg} ${
+                onClick={() => handleDayClick(cell.iso!)}
+                className={`min-h-[72px] rounded-lg border p-1 text-left transition flex flex-col ${bg} ${
                   isToday ? "ring-2 ring-[#D4AF37]/60" : ""
                 }`}
               >
-                {cell.day}
+                <span className="text-xs font-mono font-bold text-white/90 px-0.5">{cell.day}</span>
+                <div className="flex-1 space-y-0.5 mt-0.5 overflow-hidden">
+                  {dayEvents.slice(0, 2).map((ev) => (
+                    <div
+                      key={ev.id}
+                      className={`text-[8px] leading-tight px-1 py-0.5 rounded truncate font-semibold ${
+                        ev.status === "high_demand"
+                          ? "bg-amber-500/40 text-amber-50"
+                          : "bg-rose-500/40 text-rose-50"
+                      }`}
+                      title={ev.description || ev.title}
+                    >
+                      {ev.title}
+                    </div>
+                  ))}
+                  {dayEvents.length > 2 && (
+                    <span className="text-[8px] text-white/40 px-1">+{dayEvents.length - 2} more</span>
+                  )}
+                </div>
               </button>
             );
           })}
@@ -251,47 +349,68 @@ export default function AvailabilityCalendar({ config, onConfigChange, onToast, 
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded bg-amber-500/25 border border-amber-400/40" /> High demand
           </span>
-          <span className="text-white/40">Click day: available → blocked → high demand → available</span>
+          <span className="text-white/40">Click any day to view, edit, or add events</span>
         </div>
 
         <div className="mt-3 flex items-center gap-2 text-xs text-emerald-300">
           <CheckCircle2 className="w-4 h-4" />
-          Synced live to /reserve — customers see status instantly
+          Synced live to /reserve + Google Calendar export feed
         </div>
       </div>
 
-      {/* Upcoming blocked + Google Calendar */}
+      {/* Upcoming events */}
       <div className="glass-card rounded-2xl border border-white/10 p-5 space-y-3">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wider">Upcoming Blocked Dates</h3>
-        {upcomingBlocked.length === 0 ? (
-          <p className="text-xs text-white/40">No upcoming blocked dates.</p>
+        <h3 className="text-sm font-bold text-white uppercase tracking-wider">Upcoming events</h3>
+        {upcomingEvents.length === 0 ? (
+          <p className="text-xs text-white/40">No events scheduled. Click a day or use the smart command above.</p>
         ) : (
           <ul className="space-y-2">
-            {upcomingBlocked.map((d) => (
-              <li
-                key={d}
-                className="flex flex-wrap items-center justify-between gap-2 text-xs bg-black/30 rounded-xl px-3 py-2 border border-white/5"
-              >
-                <div>
-                  <span className="font-mono font-bold text-rose-300">{d}</span>
-                  {config.blockedNotes?.[d] && (
-                    <span className="text-white/50 ml-2">— {config.blockedNotes[d]}</span>
-                  )}
-                </div>
-                <a
-                  href={googleCalendarBlockUrl(d, config.blockedNotes?.[d] || "Visriva — Fully Booked")}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[#D4AF37] hover:underline"
+            {upcomingEvents.map((ev) => (
+              <li key={ev.id}>
+                <button
+                  type="button"
+                  onClick={() => openEdit(ev)}
+                  className="w-full text-left flex flex-wrap items-start justify-between gap-2 text-xs bg-black/30 rounded-xl px-3 py-3 border border-white/5 hover:border-[#D4AF37]/30 transition"
                 >
-                  <ExternalLink className="w-3 h-3" />
-                  Google Calendar
-                </a>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                          ev.status === "high_demand"
+                            ? "bg-amber-500/20 text-amber-200"
+                            : "bg-rose-500/20 text-rose-200"
+                        }`}
+                      >
+                        {ev.status === "high_demand" ? "High demand" : "Fully booked"}
+                      </span>
+                      {ev.source === "google" && (
+                        <span className="text-[9px] text-blue-300 font-mono">Google</span>
+                      )}
+                    </div>
+                    <p className="font-bold text-white mt-1">{ev.title}</p>
+                    <p className="text-white/50 font-mono text-[10px] mt-0.5">
+                      {ev.startDate}
+                      {ev.endDate !== ev.startDate ? ` → ${ev.endDate}` : ""} · {formatEventTimeRange(ev)}
+                    </p>
+                    {ev.description && (
+                      <p className="text-white/60 mt-1.5 leading-relaxed">{ev.description}</p>
+                    )}
+                  </div>
+                </button>
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      <CalendarEventModal
+        open={modalOpen}
+        mode={modalMode}
+        initial={modalInitial}
+        onClose={() => setModalOpen(false)}
+        onSave={(ev) => void handleSaveEvent(ev)}
+        onDelete={modalMode === "edit" ? (id) => void handleDeleteEvent(id) : undefined}
+      />
     </div>
   );
 }

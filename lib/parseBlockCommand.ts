@@ -19,6 +19,11 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
+/** "17th" → "17", "1st" → "1" */
+function stripOrdinals(text: string): string {
+  return text.replace(/\b(\d{1,2})(?:st|nd|rd|th)\b/gi, "$1");
+}
+
 function toIso(y: number, m: number, d: number): string | null {
   const dt = new Date(y, m, d);
   if (dt.getFullYear() !== y || dt.getMonth() !== m || dt.getDate() !== d) return null;
@@ -26,7 +31,7 @@ function toIso(y: number, m: number, d: number): string | null {
 }
 
 function parseOneDate(token: string, ref: Date): string | null {
-  const t = token.trim().toLowerCase();
+  const t = stripOrdinals(token.trim().toLowerCase());
   if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
 
   // 25 dec 2026 / 25 december / dec 25
@@ -74,7 +79,7 @@ export function parseBlockCommand(input: string, ref = new Date()): ParsedBlockC
   if (!raw) return null;
 
   let action: BlockCommandAction = "block";
-  let rest = raw.toLowerCase();
+  let rest = stripOrdinals(raw.toLowerCase());
 
   if (/^unblock\b|^open\b|^free\b|^available\b/.test(rest)) {
     action = "unblock";
@@ -86,9 +91,11 @@ export function parseBlockCommand(input: string, ref = new Date()): ParsedBlockC
     rest = rest.replace(/^(block|booked|full|close|closed|busy|red)\s+/i, "");
   }
 
-  // Range: 10-12 dec 2026
+  rest = rest.trim();
+
+  // Range: 10-12 dec 2026 / 10th-12th dec for Sharma wedding
   const range = rest.match(
-    /^(\d{1,2})\s*-\s*(\d{1,2})\s+([a-z]+)(?:\s+(\d{4}))?(?:\s+(.+))?$/i
+    /^(\d{1,2})\s*-\s*(\d{1,2})\s+([a-z]+)(?:\s+(\d{4}))?(?:\s+(?:for|because|note)\s+)?(.+)?$/i
   );
   if (range) {
     const month = MONTHS[range[3].toLowerCase()];
@@ -102,7 +109,48 @@ export function parseBlockCommand(input: string, ref = new Date()): ParsedBlockC
       if (iso) dates.push(iso);
     }
     if (!dates.length) return null;
-    return { action, dates, note: range[5]?.trim() };
+    const note = range[5]?.trim();
+    return { action, dates, note: note || undefined };
+  }
+
+  // Single date + optional trailing note: "17th aug missy event" / "17 aug for Sharma"
+  const single = rest.match(
+    /^(\d{1,2})\s+([a-z]+)(?:\s+(\d{4}))?(?:\s+(?:for|because|note)\s+)?(.+)?$/i
+  );
+  if (single) {
+    const month = MONTHS[single[2].toLowerCase()];
+    if (month !== undefined) {
+      const day = Number(single[1]);
+      let year = single[3] ? Number(single[3]) : ref.getFullYear();
+      let iso = toIso(year, month, day);
+      if (!iso) return null;
+      if (!single[3] && new Date(iso) < ref) {
+        iso = toIso(year + 1, month, day);
+      }
+      if (!iso) return null;
+      const note = single[4]?.trim();
+      return { action, dates: [iso], note: note || undefined };
+    }
+  }
+
+  // Month-first single: "aug 17 missy event"
+  const monthFirst = rest.match(
+    /^([a-z]+)\s+(\d{1,2})(?:\s+(\d{4}))?(?:\s+(?:for|because|note)\s+)?(.+)?$/i
+  );
+  if (monthFirst) {
+    const month = MONTHS[monthFirst[1].toLowerCase()];
+    if (month !== undefined) {
+      const day = Number(monthFirst[2]);
+      let year = monthFirst[3] ? Number(monthFirst[3]) : ref.getFullYear();
+      let iso = toIso(year, month, day);
+      if (!iso) return null;
+      if (!monthFirst[3] && new Date(iso) < ref) {
+        iso = toIso(year + 1, month, day);
+      }
+      if (!iso) return null;
+      const note = monthFirst[4]?.trim();
+      return { action, dates: [iso], note: note || undefined };
+    }
   }
 
   // Split on "and" / commas
@@ -112,8 +160,18 @@ export function parseBlockCommand(input: string, ref = new Date()): ParsedBlockC
 
   for (const part of parts) {
     const withNote = part.match(/^(.+?)\s+(?:for|because|note)\s+(.+)$/i);
-    const datePart = withNote ? withNote[1] : part;
+    let datePart = withNote ? withNote[1] : part;
     if (withNote?.[2]) note = withNote[2].trim();
+
+    // Trailing note without keyword: "17 aug missy event"
+    if (!withNote) {
+      const dateThenNote = datePart.match(/^(\d{1,2}\s+[a-z]+(?:\s+\d{4})?)\s+(.+)$/i);
+      if (dateThenNote) {
+        datePart = dateThenNote[1];
+        note = dateThenNote[2].trim();
+      }
+    }
+
     const iso = parseOneDate(datePart, ref);
     if (iso) dates.push(iso);
   }

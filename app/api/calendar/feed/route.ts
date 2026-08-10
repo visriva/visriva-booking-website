@@ -29,6 +29,7 @@ export async function GET(req: Request) {
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.visriva.com";
   const ics = buildIcalExport({
+    events: blocked.events,
     fullyBookedDates: blocked.fullyBookedDates || [],
     highDemandDates: blocked.highDemandDates || [],
     notes: blocked.blockedNotes,

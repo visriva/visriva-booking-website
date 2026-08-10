@@ -3,6 +3,7 @@
 export interface IcalEvent {
   uid: string;
   summary: string;
+  description?: string;
   start: Date;
   end: Date;
   allDay: boolean;
@@ -76,7 +77,7 @@ export function parseIcalFeed(ics: string): IcalEvent[] {
   const lines = unfoldLines(ics);
   const events: IcalEvent[] = [];
   let inEvent = false;
-  let current: Partial<IcalEvent> & { dtStartRaw?: string; dtStartParams?: string; dtEndRaw?: string; dtEndParams?: string } =
+  let current: Partial<IcalEvent> & { dtStartRaw?: string; dtStartParams?: string; dtEndRaw?: string; dtEndParams?: string; description?: string } =
     {};
 
   for (const line of lines) {
@@ -95,6 +96,7 @@ export function parseIcalFeed(ics: string): IcalEvent[] {
           events.push({
             uid: current.uid || `evt-${events.length}`,
             summary: current.summary || "Busy",
+            description: current.description,
             start: start.date,
             end: end?.date || start.date,
             allDay: start.allDay,
@@ -114,6 +116,9 @@ export function parseIcalFeed(ics: string): IcalEvent[] {
 
     if (key === "UID") current.uid = value;
     if (key === "SUMMARY") current.summary = value.replace(/\\n/g, " ").replace(/\\,/g, ",");
+    if (key === "DESCRIPTION") {
+      current.description = value.replace(/\\n/g, "\n").replace(/\\,/g, ",");
+    }
     if (key === "DTSTART") {
       current.dtStartRaw = value;
       current.dtStartParams = left;
@@ -127,7 +132,21 @@ export function parseIcalFeed(ics: string): IcalEvent[] {
   return events;
 }
 
+import type { CalendarEvent } from "@/lib/calendarEvents";
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function toIcalUtc(d: Date): string {
+  return (
+    `${d.getUTCFullYear()}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}T` +
+    `${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}${pad2(d.getUTCSeconds())}Z`
+  );
+}
+
 export function buildIcalExport(options: {
+  events?: CalendarEvent[];
   fullyBookedDates: string[];
   highDemandDates: string[];
   notes?: Record<string, string>;
@@ -140,31 +159,67 @@ export function buildIcalExport(options: {
     "PRODID:-//Visriva Live Station//Availability//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    "X-WR-CALNAME:Visriva Blocked Dates",
+    "X-WR-CALNAME:Visriva Operations Calendar",
   ];
 
-  const addEvent = (iso: string, title: string, color?: string) => {
-    const start = iso.replace(/-/g, "");
-    const endDate = new Date(iso + "T12:00:00");
-    endDate.setDate(endDate.getDate() + 1);
-    const end = `${endDate.getFullYear()}${String(endDate.getMonth() + 1).padStart(2, "0")}${String(endDate.getDate()).padStart(2, "0")}`;
+  const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+
+  const addRichEvent = (ev: CalendarEvent) => {
     lines.push("BEGIN:VEVENT");
-    lines.push(`UID:visriva-block-${iso}@visriva.com`);
+    lines.push(`UID:visriva-${ev.id}@visriva.com`);
     lines.push(`DTSTAMP:${now}`);
-    lines.push(`DTSTART;VALUE=DATE:${start}`);
-    lines.push(`DTEND;VALUE=DATE:${end}`);
-    lines.push(`SUMMARY:${title.replace(/,/g, "\\,")}`);
-    if (color) lines.push(`CATEGORIES:${color}`);
+    lines.push(`SUMMARY:${esc(ev.title)}`);
+    if (ev.description?.trim()) lines.push(`DESCRIPTION:${esc(ev.description.trim())}`);
+    lines.push(`CATEGORIES:${ev.status === "high_demand" ? "HIGH_DEMAND" : "BLOCKED"}`);
+
+    if (ev.allDay) {
+      const start = ev.startDate.replace(/-/g, "");
+      const endD = new Date(ev.endDate + "T12:00:00");
+      endD.setDate(endD.getDate() + 1);
+      const end = `${endD.getFullYear()}${pad2(endD.getMonth() + 1)}${pad2(endD.getDate())}`;
+      lines.push(`DTSTART;VALUE=DATE:${start}`);
+      lines.push(`DTEND;VALUE=DATE:${end}`);
+    } else {
+      const [sy, sm, sd] = ev.startDate.split("-").map(Number);
+      const [sh, smin] = (ev.startTime || "09:00").split(":").map(Number);
+      const [ey, em, ed] = ev.endDate.split("-").map(Number);
+      const [eh, emin] = (ev.endTime || ev.startTime || "18:00").split(":").map(Number);
+      const startDt = new Date(Date.UTC(sy, sm - 1, sd, sh - 5, smin)); // IST approx for export
+      const endDt = new Date(Date.UTC(ey, em - 1, ed, eh - 5, emin));
+      lines.push(`DTSTART:${toIcalUtc(startDt)}`);
+      lines.push(`DTEND:${toIcalUtc(endDt)}`);
+    }
+
     if (options.siteUrl) lines.push(`URL:${options.siteUrl}/reserve`);
     lines.push("END:VEVENT");
   };
 
-  for (const iso of options.fullyBookedDates) {
-    addEvent(iso, options.notes?.[iso] || "Visriva — Fully Booked", "BLOCKED");
-  }
-  for (const iso of options.highDemandDates) {
-    if (options.fullyBookedDates.includes(iso)) continue;
-    addEvent(iso, options.notes?.[iso] || "Visriva — High Demand", "HIGH_DEMAND");
+  if (options.events?.length) {
+    for (const ev of options.events) addRichEvent(ev);
+  } else {
+    const addEvent = (iso: string, title: string, color?: string) => {
+      const start = iso.replace(/-/g, "");
+      const endDate = new Date(iso + "T12:00:00");
+      endDate.setDate(endDate.getDate() + 1);
+      const end = `${endDate.getFullYear()}${pad2(endDate.getMonth() + 1)}${pad2(endDate.getDate())}`;
+      lines.push("BEGIN:VEVENT");
+      lines.push(`UID:visriva-block-${iso}@visriva.com`);
+      lines.push(`DTSTAMP:${now}`);
+      lines.push(`DTSTART;VALUE=DATE:${start}`);
+      lines.push(`DTEND;VALUE=DATE:${end}`);
+      lines.push(`SUMMARY:${esc(title)}`);
+      if (color) lines.push(`CATEGORIES:${color}`);
+      if (options.siteUrl) lines.push(`URL:${options.siteUrl}/reserve`);
+      lines.push("END:VEVENT");
+    };
+
+    for (const iso of options.fullyBookedDates) {
+      addEvent(iso, options.notes?.[iso] || "Visriva — Fully Booked", "BLOCKED");
+    }
+    for (const iso of options.highDemandDates) {
+      if (options.fullyBookedDates.includes(iso)) continue;
+      addEvent(iso, options.notes?.[iso] || "Visriva — High Demand", "HIGH_DEMAND");
+    }
   }
 
   lines.push("END:VCALENDAR");

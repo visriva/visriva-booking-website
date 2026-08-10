@@ -1,11 +1,18 @@
 import type { BlockedDatesConfig } from "@/lib/firebase";
 import type { CalendarSyncSettings } from "@/lib/calendarConfig";
-import { expandEventToIsoDates, parseIcalFeed } from "@/lib/parseIcal";
+import type { CalendarEvent } from "@/lib/calendarEvents";
+import {
+  deriveBlockedDatesFromEvents,
+  migrateConfigToEvents,
+  mergeConfigWithEvents,
+} from "@/lib/calendarEvents";
+import { expandEventToIsoDates, parseIcalFeed, type IcalEvent } from "@/lib/parseIcal";
 
 export interface GoogleSyncResult {
   fullyBooked: string[];
   highDemand: string[];
   notes: Record<string, string>;
+  events: CalendarEvent[];
   eventCount: number;
 }
 
@@ -19,6 +26,57 @@ function parseKeywords(raw?: string): string[] {
 function isHighDemand(summary: string, keywords: string[]): boolean {
   const lower = summary.toLowerCase();
   return keywords.some((k) => lower.includes(k));
+}
+
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function toIsoDate(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function toTime(d: Date): string {
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function icalToCalendarEvent(event: IcalEvent, status: "blocked" | "high_demand"): CalendarEvent | null {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const horizon = new Date(today);
+  horizon.setMonth(horizon.getMonth() + 18);
+
+  const startDate = toIsoDate(event.start);
+  let endDate = toIsoDate(event.end);
+
+  if (event.allDay) {
+    const endExclusive = new Date(event.end);
+    endExclusive.setDate(endExclusive.getDate() - 1);
+    if (endExclusive >= event.start) {
+      endDate = toIsoDate(endExclusive);
+    }
+  }
+
+  const d = new Date(startDate + "T12:00:00");
+  if (d < today || d > horizon) return null;
+
+  const now = new Date().toISOString();
+
+  return {
+    id: `google-${event.uid.replace(/[^a-zA-Z0-9_-]/g, "_")}`,
+    title: event.summary || "Google Calendar event",
+    description: event.description,
+    startDate,
+    endDate: endDate >= startDate ? endDate : startDate,
+    allDay: event.allDay,
+    startTime: event.allDay ? undefined : toTime(event.start),
+    endTime: event.allDay ? undefined : toTime(event.end),
+    status,
+    source: "google",
+    googleUid: event.uid,
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 export async function fetchGoogleCalendarEvents(
@@ -39,7 +97,7 @@ export async function fetchGoogleCalendarEvents(
     throw new Error("Invalid iCal feed — paste the secret address from Google Calendar settings.");
   }
 
-  const events = parseIcalFeed(ics);
+  const parsed = parseIcalFeed(ics);
   const keywords = parseKeywords(settings.highDemandKeywords);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -49,14 +107,18 @@ export async function fetchGoogleCalendarEvents(
   const fullySet = new Set<string>();
   const highSet = new Set<string>();
   const notes: Record<string, string> = {};
+  const events: CalendarEvent[] = [];
 
-  for (const event of events) {
+  for (const event of parsed) {
     if (!settings.includeTimedEvents && !event.allDay) continue;
 
-    const dates = expandEventToIsoDates(event);
     const high = isHighDemand(event.summary, keywords);
+    const calEv = icalToCalendarEvent(event, high ? "high_demand" : "blocked");
+    if (!calEv) continue;
 
-    for (const iso of dates) {
+    events.push(calEv);
+
+    for (const iso of expandEventToIsoDates(event)) {
       const d = new Date(iso + "T12:00:00");
       if (d < today || d > horizon) continue;
       if (high) {
@@ -69,14 +131,14 @@ export async function fetchGoogleCalendarEvents(
     }
   }
 
-  // Fully booked wins over high demand on same day
   for (const iso of fullySet) highSet.delete(iso);
 
   return {
     fullyBooked: Array.from(fullySet).sort(),
     highDemand: Array.from(highSet).sort(),
     notes,
-    eventCount: events.length,
+    events,
+    eventCount: parsed.length,
   };
 }
 
@@ -84,38 +146,14 @@ export function mergeGoogleSyncIntoBlockedDates(
   current: BlockedDatesConfig,
   google: GoogleSyncResult
 ): BlockedDatesConfig {
-  const prevGoogleFully = new Set(current.googleSyncedFullyBooked || []);
-  const prevGoogleHigh = new Set(current.googleSyncedHighDemand || []);
+  const existing = migrateConfigToEvents(current);
+  const manualEvents = existing.filter((e) => e.source !== "google");
+  const mergedEvents = [...manualEvents, ...google.events];
 
-  const manualFully = (current.fullyBookedDates || []).filter((d) => !prevGoogleFully.has(d));
-  const manualHigh = (current.highDemandDates || []).filter((d) => !prevGoogleHigh.has(d));
-
-  const mergedFully = Array.from(new Set([...manualFully, ...google.fullyBooked])).sort();
-  const mergedHigh = Array.from(
-    new Set([...manualHigh, ...google.highDemand].filter((d) => !mergedFully.includes(d)))
-  ).sort();
-
-  const blockedNotes = { ...(current.blockedNotes || {}) };
-  for (const d of prevGoogleFully) {
-    if (!google.fullyBooked.includes(d) && current.googleSyncedNotes?.[d]) {
-      delete blockedNotes[d];
-    }
-  }
-  for (const d of prevGoogleHigh) {
-    if (!google.highDemand.includes(d) && current.googleSyncedNotes?.[d]) {
-      delete blockedNotes[d];
-    }
-  }
-  for (const [iso, note] of Object.entries(google.notes)) {
-    if (google.fullyBooked.includes(iso) || google.highDemand.includes(iso)) {
-      blockedNotes[iso] = note;
-    }
-  }
+  const base = mergeConfigWithEvents(current, mergedEvents);
 
   return {
-    fullyBookedDates: mergedFully,
-    highDemandDates: mergedHigh,
-    blockedNotes,
+    ...base,
     googleSyncedFullyBooked: google.fullyBooked,
     googleSyncedHighDemand: google.highDemand,
     googleSyncedNotes: google.notes,
