@@ -18,13 +18,16 @@ import {
   subscribeGlobalContactSettings,
   GlobalSettingsConfig,
   DEFAULT_GLOBAL_SETTINGS,
-  subscribeWebsiteText,
-  WebsiteTextConfig,
-  DEFAULT_WEBSITE_TEXT,
   subscribeFeatureToggles,
   FeatureTogglesConfig,
   DEFAULT_FEATURE_TOGGLES,
+  subscribeReservePageConfig,
+  type ReservePageConfig,
+  subscribeWebsiteText,
+  WebsiteTextConfig,
+  DEFAULT_WEBSITE_TEXT,
 } from "@/lib/firebase";
+import { DEFAULT_RESERVE_PAGE_CONFIG } from "@/lib/reservePage";
 
 // Service badge map — only shown if toggle is ON in Admin Panel
 const SERVICE_BADGE_MAP: { id: keyof FeatureTogglesConfig; label: string }[] = [
@@ -37,15 +40,17 @@ const SERVICE_BADGE_MAP: { id: keyof FeatureTogglesConfig; label: string }[] = [
 
 export default function ReservePage() {
   const [settings, setSettings] = useState<GlobalSettingsConfig>(DEFAULT_GLOBAL_SETTINGS);
-  const [text, setText] = useState<WebsiteTextConfig>(DEFAULT_WEBSITE_TEXT);
+  const [reservePage, setReservePage] = useState<ReservePageConfig>(DEFAULT_RESERVE_PAGE_CONFIG);
+  const [websiteText, setWebsiteText] = useState<WebsiteTextConfig>(DEFAULT_WEBSITE_TEXT);
   const [toggles, setToggles] = useState<FeatureTogglesConfig>(DEFAULT_FEATURE_TOGGLES);
 
   useEffect(() => {
     const unsubSettings = subscribeGlobalContactSettings((data) => {
       if (data) setSettings(data);
     });
+    const unsubReserve = subscribeReservePageConfig(setReservePage);
     const unsubText = subscribeWebsiteText((data) => {
-      if (data) setText(data);
+      if (data) setWebsiteText(data);
     });
     const unsubToggles = subscribeFeatureToggles((data) => {
       if (data) setToggles(data);
@@ -53,6 +58,7 @@ export default function ReservePage() {
 
     return () => {
       unsubSettings();
+      unsubReserve();
       unsubText();
       unsubToggles();
     };
@@ -133,20 +139,18 @@ export default function ReservePage() {
           {/* Badge — uses Admin heroTagline */}
           <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 text-[#D4AF37] text-xs font-bold uppercase tracking-widest">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>{text.heroTagline || "Reserve Your Live Station"}</span>
+            <span>{reservePage.heroBadge}</span>
             <Sparkles className="w-3.5 h-3.5" />
           </div>
 
           {/* Title — uses Admin heroTitle */}
           <h1 className="text-3xl sm:text-5xl font-serif font-bold text-white leading-tight">
-            Lock In Your Date &amp;{" "}
-            <span className="text-[#D4AF37]">Instant Quote</span>
+            {reservePage.heroTitle}{" "}
+            <span className="text-[#D4AF37]">{reservePage.heroTitleHighlight}</span>
           </h1>
 
-          {/* Subtitle — uses Admin heroSubtitle */}
           <p className="text-sm sm:text-base text-emerald-100/75 max-w-xl mx-auto leading-relaxed">
-            {text.heroSubtitle ||
-              "Configure your ideal live event printing setup, get an instant pricing estimate, and submit your booking request."}
+            {reservePage.heroSubtitle}
           </p>
 
           {/* Live Service Badges — only active services from Admin toggles */}
@@ -168,14 +172,9 @@ export default function ReservePage() {
       {/* ── USP STRIP ─────────────────────────────────────────────── */}
       <section className="relative z-10 max-w-5xl mx-auto px-4 pb-8">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { icon: "⚡", title: "8-Sec Prints", desc: "Live dye-sublimation" },
-            { icon: "🏅", title: "GST Invoice", desc: "Corporate friendly" },
-            { icon: "📱", title: "QR Gallery", desc: "Instant digital share" },
-            { icon: "🚀", title: "Zero Setup Fee", desc: "All-inclusive pricing" },
-          ].map((usp, i) => (
+          {reservePage.uspItems.map((usp, i) => (
             <motion.div
-              key={usp.title}
+              key={`${usp.title}-${i}`}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 + i * 0.05 }}
@@ -265,7 +264,7 @@ export default function ReservePage() {
 
         {/* Footer description from Admin Website Text */}
         <p className="text-[10px] text-white/40 max-w-lg mx-auto leading-relaxed pt-1">
-          {text.footerDescription}
+          {websiteText.footerDescription}
         </p>
 
         <p className="text-[10px] text-white/30">

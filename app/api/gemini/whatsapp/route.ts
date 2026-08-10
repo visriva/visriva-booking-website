@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
+import { generateGeminiContent } from "@/lib/geminiClient";
 import { DEFAULT_AI_WHATSAPP_CONFIG } from "@/lib/firebase";
 
 export async function POST(req: Request) {
   try {
     const { leadName, eventType, guestCount, location, eventDate, selectedServices, notes, customSystemPrompt } = await req.json();
-
-    const apiKey =
-      process.env.GEMINI_API_KEY ||
-      process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
-      "AQ.Ab8RN6L7Ff_7vRzv290Gzm2wjSTyEen4e1uBb-ooo0hQe-L0fg";
 
     const basePrompt = customSystemPrompt || DEFAULT_AI_WHATSAPP_CONFIG.systemPrompt;
 
@@ -37,23 +33,10 @@ Return ONLY raw JSON with this exact schema:
 }
 `;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
+    const { text: candidateText } = await generateGeminiContent({
+      model: "gemini-1.5-flash",
+      parts: [{ text: prompt }],
     });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      return NextResponse.json({ error: "Gemini API error", details: errText }, { status: response.status });
-    }
-
-    const data = await response.json();
-    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     const cleanJsonText = candidateText.replace(/```json/gi, "").replace(/```/g, "").trim();
     const parsedData = JSON.parse(cleanJsonText);

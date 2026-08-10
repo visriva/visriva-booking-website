@@ -2,19 +2,16 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import {
-  Calendar as CalendarIcon,
   MapPin,
   Users,
   CheckSquare,
   Square,
   Sparkles,
   ArrowRight,
-  TrendingUp,
   Lock,
   User,
   Phone,
   Mail,
-  Clock,
   Briefcase,
   HelpCircle,
   Upload,
@@ -22,7 +19,6 @@ import {
   Building2,
   FileCheck,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   saveBookingLead,
   BookingLead,
@@ -42,13 +38,45 @@ import CalendlySuccess from "./CalendlySuccess";
 import LocationAutocomplete from "./LocationAutocomplete";
 import AIConciergeWidget from "./AIConciergeWidget";
 import DateAvailabilityPicker from "./DateAvailabilityPicker";
+import BookingEstimatePanel from "./booking/BookingEstimatePanel";
+import BookingProgressStepper from "./booking/BookingProgressStepper";
+
+const INPUT_CLASS =
+  "w-full bg-[#011F15]/80 border border-white/10 focus:border-[#D4AF37]/60 focus:ring-2 focus:ring-[#D4AF37]/15 rounded-xl px-4 py-3.5 text-white text-sm outline-none transition-all placeholder:text-white/30";
+
+function FormSection({
+  step,
+  title,
+  subtitle,
+  children,
+}: {
+  step: number;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-transparent p-5 sm:p-6 space-y-5">
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-extrabold text-sm shrink-0 shadow-gold-sm">
+          {step}
+        </div>
+        <div>
+          <h3 className="font-serif text-lg sm:text-xl font-bold text-white">{title}</h3>
+          {subtitle && <p className="text-xs text-emerald-100/55 mt-0.5 leading-relaxed">{subtitle}</p>}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 const ALL_SERVICE_OPTIONS = [
-  { id: "Photos", label: "Instant Photo Booth", speed: "8-Sec Print", toggleKey: "enablePhotoBoothService" },
-  { id: "Magnets", label: "Custom Fridge Magnets", speed: "Live Gloss Finish", toggleKey: "enableMagnetService" },
-  { id: "Keychains", label: "Instant Keepsake Keychains", speed: "Acrylic / Metal", toggleKey: "enableKeychainService" },
-  { id: "Mugs", label: "Live Mug Printing", speed: "VIP Return Gift", toggleKey: "enableMugService" },
-  { id: "ToteTshirt", label: "Tote Bag & T-Shirt Station", speed: "Sublimation Press", toggleKey: "enableToteTshirtService" },
+  { id: "Photos", label: "Instant Photo Booth", speed: "8-Sec Print", icon: "📸", toggleKey: "enablePhotoBoothService" },
+  { id: "Magnets", label: "Custom Fridge Magnets", speed: "Live Gloss Finish", icon: "🧲", toggleKey: "enableMagnetService" },
+  { id: "Keychains", label: "Instant Keepsake Keychains", speed: "Acrylic / Metal", icon: "🔑", toggleKey: "enableKeychainService" },
+  { id: "Mugs", label: "Live Mug Printing", speed: "VIP Return Gift", icon: "☕", toggleKey: "enableMugService" },
+  { id: "ToteTshirt", label: "Tote Bag & T-Shirt Station", speed: "Sublimation Press", icon: "👕", toggleKey: "enableToteTshirtService" },
 ];
 
 export default function BookingEngine() {
@@ -154,7 +182,32 @@ export default function BookingEngine() {
     id: string;
   } | null>(null);
 
-  // MODULAR DYNAMIC PRICING CALCULATOR ENGINE (Reads directly from config/global_settings & package selections)
+  const bookingProgress = useMemo(
+    () => ({
+      step1Complete: Boolean(
+        eventDate &&
+          venue.trim() &&
+          eventType.trim() &&
+          reportingTime &&
+          endingTime &&
+          Number(pax) > 0
+      ),
+      step2Complete: selectedServices.length > 0,
+      step3Complete: Boolean(clientName.trim() && clientPhone.trim()),
+    }),
+    [
+      eventDate,
+      venue,
+      eventType,
+      reportingTime,
+      endingTime,
+      pax,
+      selectedServices.length,
+      clientName,
+      clientPhone,
+    ]
+  );
+
   const budgetInfo = useMemo(() => {
     const guestCount = Number(pax) || 0;
     let total = 0;
@@ -422,20 +475,20 @@ export default function BookingEngine() {
   };
 
   return (
-    <section id="booking-engine" className="py-24 bg-transparent relative">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <section id="booking-engine" className="py-20 sm:py-28 bg-transparent relative">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Section Title Header */}
-        <div className="text-left max-w-3xl mb-12">
-          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-[#D4AF37] text-xs font-bold uppercase tracking-widest mb-4 backdrop-blur-md font-cinzel">
-            <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
-            <span>Interactive Intake &amp; Live Estimator</span>
+        <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-14">
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-[#D4AF37]/30 text-[#D4AF37] text-xs font-bold uppercase tracking-widest mb-4 backdrop-blur-md">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Concierge Booking</span>
           </div>
-          <h2 className="font-playfair text-4xl sm:text-6xl font-bold tracking-tight text-white mb-4">
+          <h2 className="font-playfair text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white mb-4">
             Reserve Your <span className="text-gold-gradient">Live Station</span>
           </h2>
-          <p className="font-sans text-emerald-100/80 text-base sm:text-lg font-light">
-            Check date availability, customize your live printing package, and receive an instant investment estimate.
+          <p className="font-sans text-emerald-100/75 text-base sm:text-lg font-light max-w-2xl mx-auto">
+            Check live availability, build your package, and get an instant estimate — no payment required.
           </p>
         </div>
 
@@ -444,9 +497,11 @@ export default function BookingEngine() {
           <CalendlySuccess leadData={submittedLead.data} leadId={submittedLead.id} />
         ) : (
           /* Intake Form Card */
-          <div className="glass-card rounded-2xl p-6 sm:p-10 border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)]">
-            <form onSubmit={handleSubmit} className="space-y-8">
-              
+          <div className="glass-card rounded-3xl p-5 sm:p-8 lg:p-10 border border-[#D4AF37]/20 shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+            <form onSubmit={handleSubmit} className="space-y-6">
+
+              <BookingProgressStepper state={bookingProgress} />
+
               {/* ACTIVE GOLDEN PERK BANNER */}
               {appliedPerk && (
                 <div className="p-4 rounded-2xl bg-gradient-to-r from-[#D4AF37]/20 via-amber-500/10 to-[#D4AF37]/20 border border-[#D4AF37]/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-gold-sm animate-fade-in">
@@ -482,97 +537,84 @@ export default function BookingEngine() {
                 </div>
               )}
 
-              {/* AI Concierge Widget Banner */}
-              <div className="my-4">
-                <AIConciergeWidget onApplyRecommendation={handleApplyAIRecommendation} />
-              </div>
+              {/* AI Concierge — compact */}
+              <AIConciergeWidget compact onApplyRecommendation={handleApplyAIRecommendation} />
 
-              {/* Form Grid Section 1: Event Details & New Expanded Fields */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] gap-8 items-start">
+                <div className="space-y-6">
+
+              <FormSection step={1} title="Event details" subtitle="When, where, and how many guests">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                {/* Event Date */}
-                <div className="space-y-2 md:col-span-2 lg:col-span-1">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#D4AF37]">
-                    Event Date *
+                {/* Event Date — calendar only */}
+                <div className="space-y-3 lg:col-span-1">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">
+                    Event date *
                   </label>
-                  <div className="space-y-3">
-                    <div className="relative max-w-xs">
-                      <input
-                        type="date"
-                        required
-                        value={eventDate}
-                        min={new Date().toISOString().split("T")[0]}
-                        onChange={(e) => setEventDate(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 focus:border-[#D4AF37] rounded-xl px-4 py-3.5 text-white text-sm outline-none transition-colors backdrop-blur-sm"
-                      />
-                      <CalendarIcon className="w-5 h-5 text-[#D4AF37] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
-                    <DateAvailabilityPicker
-                      value={eventDate}
-                      onChange={setEventDate}
-                      blockedDates={blockedDates}
-                      minDate={new Date().toISOString().split("T")[0]}
-                    />
-                  </div>
+                  <DateAvailabilityPicker
+                    value={eventDate}
+                    onChange={setEventDate}
+                    blockedDates={blockedDates}
+                    minDate={new Date().toISOString().split("T")[0]}
+                  />
+                  <input type="hidden" required value={eventDate} readOnly />
 
-                  {/* Real-Time Availability Status Indicator */}
                   {eventDate && (
-                    <div className="pt-1">
+                    <div className="pt-0.5">
                       {blockedDates.fullyBookedDates.includes(eventDate) ? (
-                        <span className="inline-flex items-center space-x-1.5 text-[11px] font-mono font-bold text-red-400 bg-red-500/20 px-2.5 py-1 rounded-lg border border-red-500/40">
-                          <span>🔴 Date Fully Booked (Waitlist Inquiry)</span>
+                        <span className="inline-flex items-center text-[11px] font-semibold text-rose-300 bg-rose-500/15 px-3 py-1.5 rounded-lg border border-rose-500/30">
+                          Fully booked — join waitlist via submit
                         </span>
                       ) : blockedDates.highDemandDates.includes(eventDate) ? (
-                        <span className="inline-flex items-center space-x-1.5 text-[11px] font-mono font-bold text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-500/40">
-                          <span>🟡 High Demand Date (Only 1 Rig Remaining)</span>
+                        <span className="inline-flex items-center text-[11px] font-semibold text-amber-200 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-400/30">
+                          High demand — only 1 rig left on this date
                         </span>
                       ) : (
-                        <span className="inline-flex items-center space-x-1.5 text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/40">
-                          <span>🟢 Date Available for Instant Reservation</span>
+                        <span className="inline-flex items-center text-[11px] font-semibold text-emerald-300 bg-emerald-500/15 px-3 py-1.5 rounded-lg border border-emerald-400/30">
+                          Available for instant reservation
                         </span>
                       )}
                     </div>
                   )}
                 </div>
 
-                {/* Venue Location (Google Places Swiggy-Style Autocomplete) */}
-                <div className="space-y-2 md:col-span-2 lg:col-span-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#D4AF37]">
-                    Venue / Location (Google Places Autocomplete) *
+                {/* Venue + event type + times */}
+                <div className="space-y-4 lg:col-span-1">
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">
+                    Venue / location *
                   </label>
                   <LocationAutocomplete
                     value={venue}
                     onChange={setVenue}
-                    placeholder="Search venue, address, or landmark (e.g. Taj West End, Bengaluru)..."
+                    placeholder="Search venue or address in Bengaluru…"
                   />
-                  <p className="text-[11px] text-emerald-100/70 font-sans flex items-center space-x-1 pt-0.5">
-                    <span className="text-[#D4AF37] font-bold">• Note:</span>
-                    <span>Complimentary venue logistics included within <strong>15 km</strong> from Bengaluru City Center. Venues beyond 15 km billed extra at actuals.</span>
+                  <p className="text-[10px] text-emerald-100/50 leading-relaxed">
+                    Free logistics within <strong className="text-white/70">15 km</strong> of Bengaluru city centre.
                   </p>
                 </div>
 
-                {/* Event Type Text Input */}
-                <div className="space-y-2 md:col-span-3 lg:col-span-1">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#D4AF37]">
-                    Event Type *
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">
+                    Event type *
                   </label>
                   <div className="relative">
                     <input
                       type="text"
                       required
-                      placeholder="e.g. South Indian Wedding, Corporate Tech Gala"
+                      placeholder="Wedding, sangeet, corporate gala…"
                       value={eventType}
                       onChange={(e) => setEventType(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 focus:border-[#D4AF37] rounded-xl px-4 py-3.5 text-white text-sm outline-none transition-colors backdrop-blur-sm"
+                      className={INPUT_CLASS}
                     />
-                    <Briefcase className="w-4 h-4 text-[#D4AF37] absolute right-3.5 top-1/2 -translate-y-1/2" />
+                    <Briefcase className="w-4 h-4 text-[#D4AF37]/70 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 </div>
 
-                {/* NEW FIELD: Reporting Time (Time Picker) */}
+                <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#D4AF37]">
-                    Reporting Time (Team Arrival) *
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">
+                    Crew arrival *
                   </label>
                   <div className="relative">
                     <input
@@ -580,16 +622,13 @@ export default function BookingEngine() {
                       required
                       value={reportingTime}
                       onChange={(e) => setReportingTime(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 focus:border-[#D4AF37] rounded-xl px-4 py-3.5 text-white text-sm outline-none transition-colors backdrop-blur-sm"
+                      className={INPUT_CLASS}
                     />
-                    <Clock className="w-5 h-5 text-[#D4AF37] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 </div>
-
-                {/* NEW FIELD: Ending Time (Time Picker) */}
                 <div className="space-y-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#D4AF37]">
-                    Ending Time (Station Close) *
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">
+                    Station close *
                   </label>
                   <div className="relative">
                     <input
@@ -597,14 +636,16 @@ export default function BookingEngine() {
                       required
                       value={endingTime}
                       onChange={(e) => setEndingTime(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 focus:border-[#D4AF37] rounded-xl px-4 py-3.5 text-white text-sm outline-none transition-colors backdrop-blur-sm"
+                      className={INPUT_CLASS}
                     />
-                    <Clock className="w-5 h-5 text-[#D4AF37] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 </div>
+                </div>
+                </div>
+              </div>
 
-                {/* ── FEATURE 8: INTERACTIVE PAX GUEST COUNT SLIDER & CAPACITY ESTIMATOR ── */}
-                <div className="space-y-3">
+              {/* Guest count */}
+              <div className="space-y-3 pt-2 border-t border-white/10">
                   <div className="flex justify-between items-center">
                     <label className="block text-xs font-semibold uppercase tracking-wider text-[#D4AF37]">
                       Expected Guest Count (Pax) &amp; Print Capacity *
@@ -669,46 +710,42 @@ export default function BookingEngine() {
                     </div>
                   </div>
                 </div>
+              </FormSection>
 
-              </div>
-
-              {/* Form Grid Section 2: Services Checkboxes */}
-              <div className="space-y-3">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[#D4AF37]">
-                  Select Required Stations *
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <FormSection step={2} title="Live stations" subtitle="Choose packages — combo discount unlocks at 2+ stations">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {ALL_SERVICE_OPTIONS.filter((s) => {
                     const toggleVal = featureToggles[s.toggleKey as keyof FeatureTogglesConfig];
                     return toggleVal !== false;
                   }).map((service) => {
                     const isSelected = selectedServices.includes(service.id);
                     return (
-                      <div
+                      <button
                         key={service.id}
+                        type="button"
                         onClick={() => toggleService(service.id)}
-                        className={`cursor-pointer rounded-xl p-4 border transition-all duration-200 flex items-center justify-between ${
+                        className={`text-left rounded-2xl p-4 border transition-all duration-200 ${
                           isSelected
-                            ? "bg-white/10 border-[#D4AF37] shadow-gold-sm"
-                            : "bg-black/30 border-white/10 hover:border-white/30"
+                            ? "bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/5 border-[#D4AF37] shadow-gold-sm ring-1 ring-[#D4AF37]/40"
+                            : "bg-black/30 border-white/10 hover:border-white/25 hover:bg-white/[0.04]"
                         }`}
                       >
-                        <div className="flex items-center space-x-3">
-                          {isSelected ? (
-                            <CheckSquare className="w-5 h-5 text-[#D4AF37] flex-shrink-0" />
-                          ) : (
-                            <Square className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                          )}
-                          <div>
-                            <span className="block text-sm font-semibold text-white">
-                              {service.label}
-                            </span>
-                            <span className="block text-[11px] text-emerald-300/70">
-                              {service.speed}
-                            </span>
+                        <div className="flex items-start gap-3">
+                          <span className="text-2xl leading-none mt-0.5">{service.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-bold text-white">{service.label}</span>
+                              {isSelected ? (
+                                <CheckSquare className="w-4 h-4 text-[#D4AF37] shrink-0" />
+                              ) : (
+                                <Square className="w-4 h-4 text-white/25 shrink-0" />
+                              )}
+                            </div>
+                            <span className="block text-[11px] text-emerald-300/65 mt-0.5">{service.speed}</span>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -924,73 +961,9 @@ export default function BookingEngine() {
                   </div>
                 )}
               </div>
+              </FormSection>
 
-              {/* DYNAMIC MODULAR PRICING MATRIX BOX */}
-              <div className="glass-card border-2 border-[#D4AF37]/60 rounded-2xl p-6 shadow-gold-md relative overflow-hidden bg-white/5 space-y-4">
-                
-                {/* Combo Discount Banner */}
-                {budgetInfo.isComboEligible ? (
-                  <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 text-xs font-bold flex items-center justify-between animate-pulse">
-                    <div className="flex items-center space-x-2">
-                      <Sparkles className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                      <span>🎉 10% MULTI-STATION COMBO DISCOUNT APPLIED!</span>
-                    </div>
-                    <span className="font-mono text-white bg-emerald-600 px-2 py-0.5 rounded">
-                      SAVE ₹{budgetInfo.discountAmount.toLocaleString("en-IN")}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-emerald-100/70 text-[11px] flex items-center space-x-2">
-                    <Sparkles className="w-3.5 h-3.5 text-[#D4AF37] flex-shrink-0" />
-                    <span>💡 Tip: Select 1 more live station to unlock an instant <strong>10% Multi-Station Combo Discount</strong>!</span>
-                  </div>
-                )}
-
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2 text-[#D4AF37] text-xs uppercase tracking-widest font-bold">
-                      <TrendingUp className="w-4 h-4 text-[#D4AF37]" />
-                      <span>Live Modular Pricing Matrix</span>
-                    </div>
-
-                    {/* Glowing Animated Spinning Number */}
-                    <div className="font-serif text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center space-x-2">
-                      <span>Estimated Investment:</span>
-                      <AnimatePresence mode="wait">
-                        <motion.span
-                          key={budgetInfo.amount}
-                          initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                          transition={{ duration: 0.25 }}
-                          className="text-gold-gradient drop-shadow-md font-mono"
-                        >
-                          {budgetInfo.amount}
-                        </motion.span>
-                      </AnimatePresence>
-                    </div>
-                  </div>
-
-                  <div className="px-4 py-2 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-sm shadow-md whitespace-nowrap self-start sm:self-center">
-                    {budgetInfo.tier}
-                  </div>
-                </div>
-
-                {/* Line Item Breakdown */}
-                <div className="pt-3 border-t border-white/10 text-xs text-emerald-100/80 font-mono space-y-1">
-                  <div className="text-[11px] text-[#D4AF37] uppercase tracking-wider font-sans font-semibold">
-                    Calculation Breakdown:
-                  </div>
-                  {budgetInfo.lineItems.map((item, idx) => (
-                    <div key={idx} className="flex items-center space-x-2">
-                      <span className="text-[#D4AF37]">•</span>
-                      <span className={item.includes("10% OFF") ? "text-emerald-400 font-bold" : ""}>{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* FEATURE 2: CLIENT BRANDING INTAKE & LOGO UPLOAD */}
+              <FormSection step={3} title="Your details" subtitle="Branding, GST invoice, and contact for confirmation">
               <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-4">
                 <div className="flex items-center space-x-2 text-[#D4AF37] text-xs font-bold uppercase tracking-wider font-mono">
                   <Sparkles className="w-4 h-4 text-[#D4AF37]" />
@@ -1099,9 +1072,9 @@ export default function BookingEngine() {
               </div>
 
               {/* Client Contact Info Section */}
-              <div className="pt-4 border-t border-white/10 space-y-4">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-[#D4AF37]">
-                  Your Contact Details
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">
+                  Contact details
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
@@ -1146,36 +1119,57 @@ export default function BookingEngine() {
                   </div>
                 </div>
               </div>
+              </FormSection>
 
               {/* Error Message Display */}
               {errorMsg && (
-                <div className="p-4 rounded-xl bg-red-950/80 border border-red-500/50 text-red-200 text-xs flex items-center space-x-2">
+                <div className="p-4 rounded-xl bg-red-950/80 border border-red-500/50 text-red-200 text-xs flex items-center space-x-2 xl:hidden">
                   <Lock className="w-4 h-4 text-red-400 flex-shrink-0" />
                   <span>{errorMsg}</span>
                 </div>
               )}
 
-              {/* Submit Button */}
-              <div className="pt-2">
+              {/* Submit — mobile / tablet */}
+              <div className="pt-2 xl:hidden">
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-4 rounded-full bg-gold-gradient text-[#011F15] font-extrabold text-base shadow-gold-lg hover:shadow-gold-md hover:scale-[1.02] active:scale-98 transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50"
+                  className="w-full py-4 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-base shadow-gold-lg hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {submitting ? (
-                    <span>Securing Your Date...</span>
+                    <span>Securing your date…</span>
                   ) : (
                     <>
-                      <span>Check Availability &amp; Reserve Date</span>
-                      <ArrowRight className="w-5 h-5 text-[#011F15]" />
+                      <span>Check availability &amp; reserve</span>
+                      <ArrowRight className="w-5 h-5" />
                     </>
                   )}
                 </button>
               </div>
 
-              <div className="flex items-center justify-center space-x-2 text-[11px] text-emerald-200/60 font-mono">
+                </div>
+
+                <aside className="xl:sticky xl:top-24 space-y-4">
+                  <BookingEstimatePanel
+                    amount={budgetInfo.amount}
+                    tier={budgetInfo.tier}
+                    lineItems={budgetInfo.lineItems}
+                    isComboEligible={budgetInfo.isComboEligible}
+                    discountAmount={budgetInfo.discountAmount}
+                    submitting={submitting}
+                  />
+                  {errorMsg && (
+                    <div className="hidden xl:flex p-4 rounded-xl bg-red-950/80 border border-red-500/50 text-red-200 text-xs items-center gap-2">
+                      <Lock className="w-4 h-4 text-red-400 shrink-0" />
+                      <span>{errorMsg}</span>
+                    </div>
+                  )}
+                </aside>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 text-[11px] text-emerald-200/50 font-mono pt-2 border-t border-white/10">
                 <Lock className="w-3.5 h-3.5 text-[#D4AF37]" />
-                <span>Zero Commitment • Instant Availability Check • Direct Team Response</span>
+                <span>Zero commitment · Instant availability · Team responds within hours</span>
               </div>
 
             </form>

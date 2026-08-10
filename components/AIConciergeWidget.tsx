@@ -18,6 +18,8 @@ interface Message {
 
 interface AIConciergeProps {
   onApplyRecommendation?: (serviceIds: string[]) => void;
+  /** Slimmer collapsed banner for booking form */
+  compact?: boolean;
 }
 
 const SERVICE_LABELS: Record<string, { emoji: string; label: string }> = {
@@ -28,7 +30,7 @@ const SERVICE_LABELS: Record<string, { emoji: string; label: string }> = {
   totes:         { emoji: "👕", label: "Tote & T-Shirt" },
 };
 
-export default function AIConciergeWidget({ onApplyRecommendation }: AIConciergeProps) {
+export default function AIConciergeWidget({ onApplyRecommendation, compact = false }: AIConciergeProps) {
   const [config, setConfig]             = useState<AIConciergeConfig>(DEFAULT_AI_CONCIERGE_CONFIG);
   const [isOpen, setIsOpen]             = useState(false);
   const [messages, setMessages]         = useState<Message[]>([]);
@@ -308,31 +310,38 @@ export default function AIConciergeWidget({ onApplyRecommendation }: AIConcierge
   // ── COLLAPSED BANNER ──────────────────────────────────────────────────────
   if (!isOpen) {
     return (
-      <div
+      <button
+        type="button"
         onClick={() => setIsOpen(true)}
-        className="group relative glass-card p-4 sm:p-5 rounded-2xl border border-[#D4AF37]/40 bg-gradient-to-r from-[#01281c] via-[#023324] to-[#011F15] cursor-pointer hover:border-[#D4AF37] transition-all shadow-xl hover:shadow-[0_0_30px_rgba(212,175,55,0.3)] flex items-center justify-between"
+        className={`group w-full text-left relative rounded-xl border border-[#D4AF37]/30 bg-gradient-to-r from-[#01281c]/90 to-[#011F15] cursor-pointer hover:border-[#D4AF37]/60 transition-all flex items-center justify-between gap-3 ${
+          compact ? "p-3 sm:p-3.5" : "glass-card p-4 sm:p-5 rounded-2xl shadow-xl hover:shadow-[0_0_30px_rgba(212,175,55,0.3)]"
+        }`}
       >
-        <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gold-gradient text-[#011F15] flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
-            <Bot className="w-5 h-5 sm:w-6 sm:h-6" />
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`rounded-lg bg-gold-gradient text-[#011F15] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${compact ? "w-9 h-9" : "w-10 h-10 sm:w-11 sm:h-11 rounded-xl shadow-md"}`}>
+            <Bot className={compact ? "w-4 h-4" : "w-5 h-5 sm:w-6 sm:h-6"} />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-serif font-bold text-white text-sm sm:text-base">Chat with Drupitha — AI Station Advisor</span>
-              <span className="text-[10px] font-mono uppercase bg-[#D4AF37]/20 text-[#D4AF37] px-2 py-0.5 rounded border border-[#D4AF37]/40 flex items-center gap-1 font-bold">
-                <Sparkles className="w-3 h-3" /> Gemini AI
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`font-serif font-bold text-white truncate ${compact ? "text-sm" : "text-sm sm:text-base"}`}>
+                {compact ? "Ask Drupitha — AI advisor" : "Chat with Drupitha — AI Station Advisor"}
+              </span>
+              <span className="text-[9px] font-mono uppercase bg-[#D4AF37]/15 text-[#D4AF37] px-1.5 py-0.5 rounded border border-[#D4AF37]/30 font-bold shrink-0">
+                Gemini
               </span>
             </div>
-            <p className="text-xs text-emerald-100/70 mt-0.5">
-              Tell her about your event — she'll find the perfect stations for you
-            </p>
+            {!compact && (
+              <p className="text-xs text-emerald-100/70 mt-0.5">
+                Tell her about your event — she&apos;ll find the perfect stations for you
+              </p>
+            )}
           </div>
         </div>
-        <div className="hidden sm:flex items-center gap-2 text-xs font-extrabold text-[#D4AF37] group-hover:translate-x-1 transition-transform">
-          <span>Chat Now</span>
+        <div className="flex items-center gap-1 text-[10px] sm:text-xs font-bold text-[#D4AF37] shrink-0 group-hover:translate-x-0.5 transition-transform">
+          <span className="hidden sm:inline">Chat</span>
           <ArrowRight className="w-4 h-4" />
         </div>
-      </div>
+      </button>
     );
   }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { generateGeminiContent } from "@/lib/geminiClient";
 import { isOperationsApiAuthorized } from "@/lib/operationsApiAuth";
 import type { ReceiptAnalysis } from "@/lib/receiptAnalysis";
 
@@ -30,11 +31,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized — log in to Operations Hub" }, { status: 401 });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-  if (!apiKey || apiKey.startsWith("AQ.")) {
-    return NextResponse.json({ error: "GEMINI_API_KEY not configured on server" }, { status: 503 });
-  }
-
   try {
     const form = await req.formData();
     const file = form.get("image");
@@ -46,48 +42,41 @@ export async function POST(req: Request) {
     const mime = file.type || "image/jpeg";
     const base64 = buffer.toString("base64");
 
-    const model = process.env.GEMINI_RECEIPT_MODEL || "gemini-2.0-flash";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-    const geminiRes = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: PROMPT },
-              { inline_data: { mime_type: mime, data: base64 } },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          responseMimeType: "application/json",
-        },
-      }),
+    const model = process.env.GEMINI_RECEIPT_MODEL || "gemini-flash-latest";
+    const { text } = await generateGeminiContent({
+      model,
+      parts: [
+        { text: PROMPT },
+        { inlineData: { mimeType: mime, data: base64 } },
+      ],
+      responseMimeType: "application/json",
+      temperature: 0.2,
     });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("[analyze-receipt]", errText.slice(0, 300));
-      return NextResponse.json({ error: "Vision analysis failed" }, { status: 502 });
-    }
-
-    const data = await geminiRes.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     const parsed = JSON.parse(text) as ReceiptAnalysis;
 
     if (!parsed.amount || parsed.amount <= 0) {
-      return NextResponse.json({ error: "Could not detect amount — enter manually", analysis: parsed }, { status: 422 });
+      return NextResponse.json(
+        { error: "Could not detect amount — enter manually", analysis: parsed },
+        { status: 422 }
+      );
     }
 
     return NextResponse.json({ success: true, analysis: parsed });
   } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Analysis failed";
     console.error("[analyze-receipt]", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Analysis failed" },
-      { status: 500 }
-    );
+
+    if (message.includes("not configured") || message.includes("UNAUTHENTICATED")) {
+      return NextResponse.json(
+        {
+          error:
+            "Gemini AI not configured — add a valid GEMINI_API_KEY in Vercel (https://aistudio.google.com/apikey) and redeploy.",
+        },
+        { status: 503 }
+      );
+    }
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

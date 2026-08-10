@@ -77,7 +77,7 @@ function doPost(e) {
 | Sync failed 401 | Log in to Operations Hub again (PIN G1) |
 | Sheet empty after sync | Redeploy Apps Script; ensure "Anyone" access |
 | Duplicate rows | Normal if you sync all multiple times — dedupe in sheet |
-| GEMINI scan fails | Set `GEMINI_API_KEY` on Vercel |
+| GEMINI scan fails | Create a new key at [Google AI Studio](https://aistudio.google.com/apikey) → set `GEMINI_API_KEY` on Vercel → redeploy. Old `AQ.` keys may be revoked if leaked. Alternative: [enable Vertex AI API](https://console.developers.google.com/apis/api/aiplatform.googleapis.com/overview?project=visriva-live-station) on project `visriva-live-station` (uses Firebase service account fallback). Check status: `/api/operations/gemini-status` |
 
 ---
 

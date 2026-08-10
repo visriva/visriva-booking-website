@@ -50,8 +50,13 @@ const nextConfig = {
         permanent: true,
       },
       {
-        source: '/instant-photo-booth',
-        destination: '/services/photo-booth',
+        source: '/planners',
+        destination: '/clients',
+        permanent: true,
+      },
+      {
+        source: '/planners/:path*',
+        destination: '/clients',
         permanent: true,
       },
     ];

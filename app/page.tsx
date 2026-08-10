@@ -6,8 +6,7 @@ import WhatsIncluded from "@/components/WhatsIncluded";
 import WhyVisriva from "@/components/WhyVisriva";
 import PortfolioGallery from "@/components/PortfolioGallery";
 import PrintFramePreviewer from "@/components/PrintFramePreviewer";
-import Testimonials from "@/components/Testimonials";
-import { HOMEPAGE_TESTIMONIALS } from "@/lib/testimonials";
+import HomeTestimonialsSection from "@/components/HomeTestimonialsSection";
 import GoldenPerksWheel from "@/components/GoldenPerksWheel";
 import BookingEngine from "@/components/BookingEngine";
 import Footer from "@/components/Footer";
@@ -40,7 +39,7 @@ export default function Home() {
       <PrintFramePreviewer />
 
       {/* Section 6.75: Client Testimonials */}
-      <Testimonials testimonials={HOMEPAGE_TESTIMONIALS} />
+      <HomeTestimonialsSection />
 
       {/* Section 7: Full-width Booking Engine & Budget Estimator */}
       <BookingEngine />

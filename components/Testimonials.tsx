@@ -6,12 +6,14 @@ interface TestimonialsProps {
   testimonials: Testimonial[];
   title?: string;
   subtitle?: string;
+  badgeText?: string;
 }
 
 export default function Testimonials({
   testimonials,
   title = "What Our Clients Say",
   subtitle = "Real celebrations. Real keepsakes. Real reactions.",
+  badgeText = "Client Love",
 }: TestimonialsProps) {
   if (!testimonials.length) return null;
 
@@ -21,7 +23,7 @@ export default function Testimonials({
         <div className="text-center space-y-3">
           <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-white/5 border border-white/10 text-[#D4AF37] text-xs font-bold uppercase tracking-widest backdrop-blur-md font-cinzel">
             <Star className="w-3.5 h-3.5 fill-[#D4AF37]" />
-            <span>Client Love</span>
+            <span>{badgeText}</span>
           </div>
           <h2 className="font-playfair text-3xl sm:text-5xl font-bold text-gold-gradient tracking-tight">
             {title}

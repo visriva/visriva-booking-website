@@ -52,7 +52,11 @@ export default function ReceiptAnalyzer({ onApply, onToast }: Props) {
       });
       const data = await res.json();
       if (!res.ok) {
-        onToast(data.error || "Analysis failed", true);
+        const hint =
+          res.status === 503
+            ? " Create a new key at aistudio.google.com/apikey → Vercel → GEMINI_API_KEY → redeploy."
+            : "";
+        onToast((data.error || "Analysis failed") + hint, true);
         if (data.analysis) setAnalysis(data.analysis);
         return;
       }

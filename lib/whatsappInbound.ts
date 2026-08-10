@@ -85,8 +85,8 @@ export async function processInboundWhatsApp(
         return loadAgentSettings();
       })();
 
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-  const geminiUsable = !!geminiKey && !geminiKey.startsWith("AQ.");
+  const { resolveGeminiApiKey, resolveServiceAccount } = await import("@/lib/geminiClient");
+  const geminiUsable = !!resolveGeminiApiKey() || !!resolveServiceAccount();
 
   if (!options?.skipAi && agentSettings.aiEnabled && geminiUsable) {
     const { runAiAutoReply } = await import("@/lib/whatsappAiEngine");

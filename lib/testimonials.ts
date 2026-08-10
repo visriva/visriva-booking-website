@@ -4,6 +4,14 @@ export interface Testimonial {
   event: string;
 }
 
+export interface TestimonialsConfig {
+  enabled: boolean;
+  badgeText: string;
+  title: string;
+  subtitle: string;
+  items: Testimonial[];
+}
+
 export const HOMEPAGE_TESTIMONIALS: Testimonial[] = [
   {
     quote:
@@ -30,3 +38,11 @@ export const HOMEPAGE_TESTIMONIALS: Testimonial[] = [
     event: "Partner Planner",
   },
 ];
+
+export const DEFAULT_TESTIMONIALS_CONFIG: TestimonialsConfig = {
+  enabled: true,
+  badgeText: "Client Love",
+  title: "What Our Clients Say",
+  subtitle: "Real celebrations. Real keepsakes. Real reactions.",
+  items: HOMEPAGE_TESTIMONIALS,
+};

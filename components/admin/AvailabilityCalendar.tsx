@@ -13,6 +13,7 @@ import {
 import type { BlockedDatesConfig } from "@/lib/firebase";
 import { saveBlockedDates } from "@/lib/firebase";
 import { parseBlockCommand, googleCalendarBlockUrl } from "@/lib/parseBlockCommand";
+import GoogleCalendarSyncPanel from "@/components/admin/GoogleCalendarSyncPanel";
 
 type DayStatus = "available" | "blocked" | "high_demand";
 
@@ -20,6 +21,7 @@ interface Props {
   config: BlockedDatesConfig;
   onConfigChange: (config: BlockedDatesConfig) => void;
   onToast: (msg: string, isError?: boolean) => void;
+  onRefresh?: () => void;
 }
 
 function getDayStatus(dateIso: string, config: BlockedDatesConfig): DayStatus {
@@ -42,7 +44,7 @@ function buildCalendarDays(year: number, month: number): Array<{ iso: string | n
   return cells;
 }
 
-export default function AvailabilityCalendar({ config, onConfigChange, onToast }: Props) {
+export default function AvailabilityCalendar({ config, onConfigChange, onToast, onRefresh }: Props) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -148,6 +150,8 @@ export default function AvailabilityCalendar({ config, onConfigChange, onToast }
 
   return (
     <div className="space-y-6">
+      <GoogleCalendarSyncPanel onToast={onToast} onSynced={onRefresh} />
+
       {/* Command bar */}
       <div className="glass-card rounded-2xl border border-[#D4AF37]/30 p-5 space-y-3">
         <div className="flex items-center gap-2">

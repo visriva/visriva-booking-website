@@ -295,37 +295,22 @@ export async function runAiAutoReply(
   fullPrompt += `Customer's latest message: "${customerMessage}"\n\n`;
   fullPrompt += "Respond as the support agent. Be concise, helpful, and professional. Use WhatsApp formatting.";
 
-  const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error("[AI] Error — GEMINI_API_KEY not configured");
-    return { replied: false, reason: "no_gemini_key" };
-  }
+  const { generateGeminiContent } = await import("@/lib/geminiClient");
 
   const model = settings.geminiModel || "gemini-2.5-flash";
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-  const geminiRes = await fetch(geminiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: fullPrompt }] }],
-      generationConfig: {
-        temperature: settings.temperature || 0.7,
-        maxOutputTokens: settings.maxTokens || 800,
-      },
-    }),
-    signal: AbortSignal.timeout(30000),
-  });
-
-  if (!geminiRes.ok) {
-    const errText = await geminiRes.text();
-    console.error("[AI] Error — Gemini API:", errText.slice(0, 300));
+  let aiReply = "";
+  try {
+    const { text } = await generateGeminiContent({
+      model,
+      parts: [{ text: fullPrompt }],
+      temperature: settings.temperature || 0.7,
+    });
+    aiReply = text;
+  } catch (err) {
+    console.error("[AI] Error — Gemini API:", err);
     return { replied: false, reason: "gemini_error" };
   }
-
-  const geminiData = await geminiRes.json();
-  const aiReply = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  const tokensUsed = geminiData.usageMetadata?.totalTokenCount || 0;
 
   if (!aiReply.trim()) {
     console.error("[AI] Error — empty Gemini response");
@@ -360,7 +345,7 @@ export async function runAiAutoReply(
 
   await storeAiMessage(phone, aiReply, {
     model,
-    tokensUsed,
+    tokensUsed: 0,
     ragUsed: !!kbContext,
     waMessageId: sendResult.messageId,
     sent: sentViaApi,

@@ -12,6 +12,10 @@ import {
 } from "firebase/firestore";
 import { getStorage, ref, deleteObject, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getAuth } from "firebase/auth";
+import type { TestimonialsConfig } from "./testimonials";
+import { DEFAULT_TESTIMONIALS_CONFIG } from "./testimonials";
+import type { ReservePageConfig } from "./reservePage";
+import { DEFAULT_RESERVE_PAGE_CONFIG } from "./reservePage";
 
 const isDummyKey = !process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY === "AIzaSyDummyKeyForDevelopment";
 
@@ -206,6 +210,8 @@ export interface MasterSyncPayload {
   aiConciergeConfig?: AIConciergeConfig;
   aiWhatsAppConfig?: AIWhatsAppConfig;
   impactStats?: LiveImpactStatsConfig;
+  testimonialsConfig?: TestimonialsConfig;
+  reservePageConfig?: ReservePageConfig;
   plannersConfig?: PlannersPageConfig;
 }
 
@@ -2226,6 +2232,11 @@ export interface BlockedDatesConfig {
   highDemandDates: string[]; // YYYY-MM-DD
   /** Optional label per date e.g. "Sharma Wedding" */
   blockedNotes?: Record<string, string>;
+  /** Dates last imported from Google Calendar iCal feed */
+  googleSyncedFullyBooked?: string[];
+  googleSyncedHighDemand?: string[];
+  googleSyncedNotes?: Record<string, string>;
+  googleLastSyncedAt?: string;
 }
 
 export const DEFAULT_BLOCKED_DATES: BlockedDatesConfig = {
@@ -2972,6 +2983,12 @@ export async function masterSyncAllConfigurations(
   if (payload.impactStats) {
     tasks.push({ key: "impact_stats", run: () => saveLiveImpactStats(payload.impactStats!) });
   }
+  if (payload.testimonialsConfig) {
+    tasks.push({ key: "testimonials", run: () => saveTestimonialsConfig(payload.testimonialsConfig!) });
+  }
+  if (payload.reservePageConfig) {
+    tasks.push({ key: "reserve_page", run: () => saveReservePageConfig(payload.reservePageConfig!) });
+  }
   if (payload.plannersConfig) {
     tasks.push({ key: "planners", run: () => savePlannersConfig(payload.plannersConfig!) });
   }
@@ -3090,6 +3107,172 @@ export async function saveLiveImpactStats(
   }
 }
 
+// ─── CLIENT TESTIMONIALS / FEEDBACK CMS ──────────────────────────────────────
+
+export type { TestimonialsConfig };
+
+export function subscribeTestimonialsConfig(
+  callback: (config: TestimonialsConfig) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem("visriva_testimonials_config");
+      if (local) {
+        try {
+          callback({ ...DEFAULT_TESTIMONIALS_CONFIG, ...JSON.parse(local) });
+          return;
+        } catch (e) {}
+      }
+    }
+    callback(DEFAULT_TESTIMONIALS_CONFIG);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("testimonials_config_updated", handleUpdate);
+  }
+
+  try {
+    const docRef = doc(db, "config", "testimonials");
+    const unsubscribe = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as TestimonialsConfig;
+          const merged = { ...DEFAULT_TESTIMONIALS_CONFIG, ...data };
+          if (typeof window !== "undefined") {
+            localStorage.setItem("visriva_testimonials_config", JSON.stringify(merged));
+          }
+          callback(merged);
+        } else {
+          loadLocal();
+        }
+      },
+      () => loadLocal()
+    );
+
+    return () => {
+      unsubscribe();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("testimonials_config_updated", handleUpdate);
+      }
+    };
+  } catch (e) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("testimonials_config_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveTestimonialsConfig(
+  config: TestimonialsConfig
+): Promise<{ success: boolean; firestoreSynced?: boolean; error?: string }> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("visriva_testimonials_config", JSON.stringify(config));
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("testimonials_config_updated"));
+  }
+
+  try {
+    const docRef = doc(db, "config", "testimonials");
+    await setDoc(docRef, config, { merge: true });
+    return { success: true, firestoreSynced: true };
+  } catch (e: any) {
+    console.warn("saveTestimonialsConfig Firestore fallback note:", e?.message);
+    return { success: true, firestoreSynced: false, error: e?.message };
+  }
+}
+
+// ─── RESERVE / BOOKING PAGE CMS ──────────────────────────────────────────────
+
+export type { ReservePageConfig };
+
+export function subscribeReservePageConfig(
+  callback: (config: ReservePageConfig) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem("visriva_reserve_page_config");
+      if (local) {
+        try {
+          callback({ ...DEFAULT_RESERVE_PAGE_CONFIG, ...JSON.parse(local) });
+          return;
+        } catch (e) {}
+      }
+    }
+    callback(DEFAULT_RESERVE_PAGE_CONFIG);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("reserve_page_config_updated", handleUpdate);
+  }
+
+  try {
+    const docRef = doc(db, "config", "reserve_page");
+    const unsubscribe = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as ReservePageConfig;
+          const merged = { ...DEFAULT_RESERVE_PAGE_CONFIG, ...data };
+          if (typeof window !== "undefined") {
+            localStorage.setItem("visriva_reserve_page_config", JSON.stringify(merged));
+          }
+          callback(merged);
+        } else {
+          loadLocal();
+        }
+      },
+      () => loadLocal()
+    );
+
+    return () => {
+      unsubscribe();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("reserve_page_config_updated", handleUpdate);
+      }
+    };
+  } catch (e) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("reserve_page_config_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveReservePageConfig(
+  config: ReservePageConfig
+): Promise<{ success: boolean; firestoreSynced?: boolean; error?: string }> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("visriva_reserve_page_config", JSON.stringify(config));
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("reserve_page_config_updated"));
+  }
+
+  try {
+    const docRef = doc(db, "config", "reserve_page");
+    await setDoc(docRef, config, { merge: true });
+    return { success: true, firestoreSynced: true };
+  } catch (e: any) {
+    console.warn("saveReservePageConfig Firestore fallback note:", e?.message);
+    return { success: true, firestoreSynced: false, error: e?.message };
+  }
+}
+
 // ─── PLANNERS & B2B PARTNER PORTAL CMS ───────────────────────────────────────
 export interface PlannersPageConfig {
   heroBadge: string;
@@ -3105,60 +3288,62 @@ export interface PlannersPageConfig {
   faqs: { question: string; answer: string }[];
 }
 
+// Clients page CMS (stored at config/planners for backward compatibility)
 export const DEFAULT_PLANNERS_CONFIG: PlannersPageConfig = {
-  heroBadge: "Exclusive Partner Program — For Planners & Decorators Only",
-  heroTitlePrefix: "Your Clients Deserve ",
+  heroBadge: "Luxury Live Stations — For Your Celebration",
+  heroTitlePrefix: "Your Event Deserves ",
   heroTitleHighlight: "Visriva",
   heroSubtitle:
-    "Partner with Bengaluru's most sought-after live event printing stations. Exclusive net vendor rates, co-branding on every print, and a dedicated crew that makes you look brilliant.",
-  whyPartnerTitle: "Why Partner With Us",
-  whyPartnerSubtitle: "The Visriva Planner Advantage",
+    "Premium live photo booths, custom magnets, keychains, and mug printing — crafted for weddings, corporate events, and celebrations across Bengaluru and pan-India.",
+  whyPartnerTitle: "Why Clients Choose Us",
+  whyPartnerSubtitle: "The Visriva Client Experience",
   whyPartnerCards: [
     {
-      title: "Exclusive Net Vendor Rates",
-      desc: "Registered planners and decorators receive private pricing not available to the public. Your margin, your business.",
+      title: "Luxury Live Experiences",
+      desc: "Studio-grade booths and live printing stations that elevate any wedding, sangeet, or corporate gala.",
     },
     {
-      title: "Co-Branded souvenir Frames",
-      desc: "Add your agency logo alongside the host's branding on every physical keepsake printed at the venue.",
+      title: "Personalised Keepsakes",
+      desc: "Every guest receives a custom print, magnet, keychain, or mug branded to your celebration.",
     },
     {
-      title: "Priority Date Locking",
-      desc: "Hold event dates up to 6 months in advance with a zero-friction hold policy for your VIP clients.",
+      title: "8-Second Live Prints",
+      desc: "Ultra-fast dye-sublimation keeps queues moving and energy high all evening.",
     },
     {
-      title: "Dedicated On-Site Manager",
-      desc: "A single point of contact coordinates crew arrival, dress code, power setup, and guest flow seamlessly.",
+      title: "White-Glove Crew",
+      desc: "Dedicated on-site team for setup, guest flow, printing, and pack-down.",
     },
     {
-      title: "Same-Day Custom Proposals",
-      desc: "Receive beautifully designed, client-ready pitch deck PDFs within 2 hours of your inquiry.",
+      title: "Easy Online Booking",
+      desc: "Check availability, get an instant quote, and lock your date on our reserve page.",
     },
     {
-      title: "Volume & Loyalty Bonuses",
-      desc: "Execute 3+ events per quarter and unlock complimentary station upgrades and bonus print passes.",
+      title: "Weddings to Corporate",
+      desc: "From intimate ceremonies to 1,500-guest galas — we scale beautifully across India.",
     },
   ],
-  netRatesTitle: "Partner Pricing Privacy Policy",
-  netRatesSubtitle: "Confidential B2B Vendor Rates",
+  netRatesTitle: "Simple, Transparent Booking",
+  netRatesSubtitle: "Instant Quote & Date Hold",
   netRatesDescription:
-    "We protect event planners by keeping net vendor rates confidential. We never publish wholesale prices publicly. Contact our B2B team on WhatsApp to get instant partner pricing for your upcoming event.",
+    "Use our online reserve page for an instant package estimate, or WhatsApp us for a personalised quote. GST invoices, clear inclusions, and no hidden setup fees.",
   faqs: [
     {
-      question: "How do Net Vendor Rates work for planners?",
-      answer: "We offer registered planners a flat wholesale rate per station. You can markup or bundle our service into your total event package freely.",
+      question: "How do I book Visriva for my event?",
+      answer:
+        "Visit our reserve page for an instant quote, or WhatsApp us at +91 88844 84828 with your date, venue, and guest count.",
     },
     {
-      question: "Can we add our agency logo to the live prints?",
-      answer: "Yes! Every photo, magnet, keychain, or mug can feature your agency logo alongside the client's event branding.",
+      question: "What types of events do you cover?",
+      answer: "Weddings, sangeets, corporate galas, brand activations, and private celebrations — from 80 to 1,500+ guests.",
     },
     {
-      question: "What space and power requirements do your stations need?",
-      answer: "Our compact stations require a standard 6x6 ft footprint and a single standard 5A power outlet. Setup takes 30-45 minutes.",
+      question: "Do you travel outside Bengaluru?",
+      answer: "Yes — we operate pan-India for premium events. Travel is included transparently in your quote.",
     },
     {
-      question: "Do you travel for destination events outside Bengaluru & Pune?",
-      answer: "Yes, our mobile crews regularly travel across Karnataka, Maharashtra, Goa, and pan-India destination venues.",
+      question: "Can we book multiple live stations?",
+      answer: "Absolutely. Many clients book 2–3 stations for maximum guest engagement. Bundle pricing is available.",
     },
   ],
 };

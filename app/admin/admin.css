@@ -1,0 +1,13 @@
+.admin-root {
+  min-height: 100vh;
+  background-color: #011f15;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

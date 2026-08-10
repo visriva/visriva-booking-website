@@ -92,6 +92,10 @@ export function subscribeFinanceTransactions(
   }
 }
 
+function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+}
+
 export async function addFinanceTransaction(
   tx: Omit<FinanceTransaction, "id" | "createdAt">
 ): Promise<{ success: boolean; id?: string; error?: string }> {
@@ -104,11 +108,14 @@ export async function addFinanceTransaction(
   }
 
   try {
-    const ref = await addDoc(collection(db, "finance_transactions"), {
-      ...tx,
-      amount: Number(tx.amount),
-      createdAt: serverTimestamp(),
-    });
+    const ref = await addDoc(
+      collection(db, "finance_transactions"),
+      stripUndefined({
+        ...tx,
+        amount: Number(tx.amount),
+        createdAt: serverTimestamp(),
+      })
+    );
     return { success: true, id: ref.id };
   } catch (error: unknown) {
     return {
