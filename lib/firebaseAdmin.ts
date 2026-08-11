@@ -56,4 +56,14 @@ if (!getApps().length) {
 }
 
 /** Firestore Admin client — use in API routes only (server-side) */
-export const adminDb = app ? getFirestore(app) : null;
+export const adminDb = app
+  ? (() => {
+      const firestore = getFirestore(app);
+      try {
+        firestore.settings({ ignoreUndefinedProperties: true });
+      } catch {
+        // already initialized
+      }
+      return firestore;
+    })()
+  : null;

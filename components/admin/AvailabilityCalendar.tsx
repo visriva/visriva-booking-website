@@ -20,6 +20,7 @@ import {
   eventsOnDate,
   formatEventTimeRange,
   newEventId,
+  sanitizeCalendarEvent,
 } from "@/lib/calendarEvents";
 import { parseCalendarIntent } from "@/lib/parseCalendarIntent";
 import GoogleCalendarSyncPanel from "@/components/admin/GoogleCalendarSyncPanel";
@@ -111,13 +112,13 @@ export default function AvailabilityCalendar({ config, onConfigChange, onToast, 
 
   const handleSaveEvent = async (ev: CalendarEvent) => {
     const now = new Date().toISOString();
-    const saved: CalendarEvent = {
+    const saved: CalendarEvent = sanitizeCalendarEvent({
       ...ev,
       id: ev.id || newEventId(),
       source: ev.source || "manual",
       createdAt: ev.createdAt || now,
       updatedAt: now,
-    };
+    });
 
     let next: CalendarEvent[];
     if (modalMode === "edit" && ev.id) {
@@ -192,10 +193,10 @@ export default function AvailabilityCalendar({ config, onConfigChange, onToast, 
 
     openCreate(parsed.startDate, {
       title: parsed.title,
-      description: parsed.description,
+      ...(parsed.description ? { description: parsed.description } : {}),
       endDate: parsed.endDate,
-      startTime: parsed.startTime,
-      endTime: parsed.endTime,
+      ...(parsed.startTime ? { startTime: parsed.startTime } : {}),
+      ...(parsed.endTime ? { endTime: parsed.endTime } : {}),
       allDay: parsed.allDay,
       status: parsed.status,
       source: "command",

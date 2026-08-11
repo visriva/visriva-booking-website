@@ -168,7 +168,7 @@ export function mergeConfigWithEvents(
 } {
   const derived = deriveBlockedDatesFromEvents(events);
   return {
-    events,
+    events: events.map(sanitizeCalendarEvent),
     ...derived,
     googleSyncedFullyBooked: config.googleSyncedFullyBooked,
     googleSyncedHighDemand: config.googleSyncedHighDemand,
@@ -214,4 +214,18 @@ export function googleCalendarEventUrl(ev: CalendarEvent): string {
   const end = `${ey}${pad(em)}${pad(ed)}T${pad(eh)}${pad(emin)}00`;
 
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&details=${details}`;
+}
+
+function omitUndefined<T extends Record<string, unknown>>(obj: T): T {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+}
+
+/** Strip optional fields Firestore rejects (undefined) from a calendar event. */
+export function sanitizeCalendarEvent(ev: CalendarEvent): CalendarEvent {
+  return omitUndefined({ ...ev });
+}
+
+/** Prepare blocked-dates config for Firestore writes (deep strip of undefined). */
+export function sanitizeBlockedDatesForFirestore<T>(config: T): T {
+  return JSON.parse(JSON.stringify(config)) as T;
 }

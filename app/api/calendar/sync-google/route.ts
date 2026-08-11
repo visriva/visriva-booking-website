@@ -4,6 +4,7 @@ import type { CalendarSyncSettings } from "@/lib/calendarConfig";
 import { fetchGoogleCalendarEvents, mergeGoogleSyncIntoBlockedDates } from "@/lib/googleCalendarSync";
 import type { BlockedDatesConfig } from "@/lib/firebase";
 import { DEFAULT_BLOCKED_DATES } from "@/lib/firebase";
+import { sanitizeBlockedDatesForFirestore } from "@/lib/calendarEvents";
 
 export const runtime = "nodejs";
 
@@ -54,7 +55,10 @@ export async function POST() {
     const current = await getBlockedDates();
     const merged = mergeGoogleSyncIntoBlockedDates(current, google);
 
-    await adminDb.collection("config").doc("blocked_dates").set(merged, { merge: true });
+    await adminDb.collection("config").doc("blocked_dates").set(
+      sanitizeBlockedDatesForFirestore(merged),
+      { merge: true }
+    );
     await adminDb.collection("config").doc("calendar_settings").set(
       {
         lastSyncedAt: new Date().toISOString(),

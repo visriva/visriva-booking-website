@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { X, ExternalLink, Trash2, Save, Clock, CalendarDays } from "lucide-react";
 import type { CalendarEvent, CalendarEventStatus } from "@/lib/calendarEvents";
-import { googleCalendarEventUrl } from "@/lib/calendarEvents";
+import { googleCalendarEventUrl, sanitizeCalendarEvent } from "@/lib/calendarEvents";
 
 export type EventModalMode = "create" | "edit";
 
@@ -50,9 +50,12 @@ export default function CalendarEventModal({
   useEffect(() => {
     if (!open) return;
     const base = blankEvent(initial?.startDate || new Date().toISOString().split("T")[0]);
+    const prefill = Object.fromEntries(
+      Object.entries(initial || {}).filter(([, v]) => v !== undefined)
+    ) as Partial<CalendarEvent>;
     setForm({
       ...base,
-      ...initial,
+      ...prefill,
       id: initial?.id || "",
       endDate: initial?.endDate || initial?.startDate || base.startDate,
     });
@@ -67,16 +70,18 @@ export default function CalendarEventModal({
   const handleSave = () => {
     if (!form.title.trim()) return;
     const now = new Date().toISOString();
-    onSave({
-      ...form,
-      title: form.title.trim(),
-      description: form.description?.trim() || undefined,
-      endDate: form.endDate >= form.startDate ? form.endDate : form.startDate,
-      startTime: form.allDay ? undefined : form.startTime,
-      endTime: form.allDay ? undefined : form.endTime,
-      updatedAt: now,
-      createdAt: form.createdAt || now,
-    });
+    onSave(
+      sanitizeCalendarEvent({
+        ...form,
+        title: form.title.trim(),
+        description: form.description?.trim() || undefined,
+        endDate: form.endDate >= form.startDate ? form.endDate : form.startDate,
+        startTime: form.allDay ? undefined : form.startTime,
+        endTime: form.allDay ? undefined : form.endTime,
+        updatedAt: now,
+        createdAt: form.createdAt || now,
+      })
+    );
   };
 
   const previewUrl = googleCalendarEventUrl(form);

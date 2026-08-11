@@ -65,12 +65,13 @@ function icalToCalendarEvent(event: IcalEvent, status: "blocked" | "high_demand"
   return {
     id: `google-${event.uid.replace(/[^a-zA-Z0-9_-]/g, "_")}`,
     title: event.summary || "Google Calendar event",
-    description: event.description,
+    ...(event.description ? { description: event.description } : {}),
     startDate,
     endDate: endDate >= startDate ? endDate : startDate,
     allDay: event.allDay,
-    startTime: event.allDay ? undefined : toTime(event.start),
-    endTime: event.allDay ? undefined : toTime(event.end),
+    ...(!event.allDay
+      ? { startTime: toTime(event.start), endTime: toTime(event.end) }
+      : {}),
     status,
     source: "google",
     googleUid: event.uid,

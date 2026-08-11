@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import {
   getFirestore,
+  initializeFirestore,
   collection,
   addDoc,
   doc,
@@ -16,6 +17,7 @@ import type { TestimonialsConfig } from "./testimonials";
 import { DEFAULT_TESTIMONIALS_CONFIG } from "./testimonials";
 import type { ReservePageConfig } from "./reservePage";
 import { DEFAULT_RESERVE_PAGE_CONFIG } from "./reservePage";
+import { sanitizeBlockedDatesForFirestore } from "./calendarEvents";
 
 const isDummyKey = !process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY === "AIzaSyDummyKeyForDevelopment";
 
@@ -34,7 +36,13 @@ if (typeof window !== "undefined") {
 
 // Initialize Firebase App & Services
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const db = getFirestore(app);
+let dbInstance;
+try {
+  dbInstance = initializeFirestore(app, { ignoreUndefinedProperties: true });
+} catch {
+  dbInstance = getFirestore(app);
+}
+export const db = dbInstance;
 export const storage = getStorage(app);
 export const auth = getAuth(app);
 
@@ -2323,7 +2331,7 @@ export async function saveBlockedDates(
 
   try {
     const docRef = doc(db, "config", "blocked_dates");
-    await setDoc(docRef, config, { merge: true });
+    await setDoc(docRef, sanitizeBlockedDatesForFirestore(config), { merge: true });
     return { success: true, firestoreSynced: true };
   } catch (error: unknown) {
     const errMessage = error instanceof Error ? error.message : "Failed to save blocked dates";
