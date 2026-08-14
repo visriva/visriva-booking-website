@@ -3173,6 +3173,114 @@ export async function saveCapturedMomentsPageConfig(
   }
 }
 
+// ─── EVENT GALLERY SETTINGS (Kwikpic Instagram gate) ─────────────────────────
+
+export interface EventGallerySettings {
+  instagramUrl: string;
+  eventPassword: string;
+  kwikpicEmbedUrl: string;
+}
+
+export const DEFAULT_EVENT_GALLERY_SETTINGS: EventGallerySettings = {
+  instagramUrl: "https://instagram.com/visriva.co",
+  eventPassword: "",
+  kwikpicEmbedUrl: "",
+};
+
+const EVENT_GALLERY_SETTINGS_LOCAL_KEY = "visriva_event_gallery_settings";
+
+export function subscribeEventGallerySettings(
+  callback: (config: EventGallerySettings) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem(EVENT_GALLERY_SETTINGS_LOCAL_KEY);
+      if (local) {
+        try {
+          callback({ ...DEFAULT_EVENT_GALLERY_SETTINGS, ...JSON.parse(local) });
+          return;
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    callback(DEFAULT_EVENT_GALLERY_SETTINGS);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("event_gallery_settings_updated", handleUpdate);
+  }
+
+  if (isDummyKey) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("event_gallery_settings_updated", handleUpdate);
+      }
+    };
+  }
+
+  try {
+    const docRef = doc(db, "config", "gallery_settings");
+    const unsub = onSnapshot(
+      docRef,
+      (snapshot) => {
+        const data = snapshot.exists() ? (snapshot.data() as Partial<EventGallerySettings>) : {};
+        const merged = { ...DEFAULT_EVENT_GALLERY_SETTINGS, ...data };
+        callback(merged);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(EVENT_GALLERY_SETTINGS_LOCAL_KEY, JSON.stringify(merged));
+        }
+      },
+      (err) => console.warn("Event gallery settings snapshot warning:", err.message)
+    );
+
+    return () => {
+      unsub();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("event_gallery_settings_updated", handleUpdate);
+      }
+    };
+  } catch {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("event_gallery_settings_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveEventGallerySettings(
+  config: EventGallerySettings
+): Promise<{ success: boolean; error?: string }> {
+  const payload: EventGallerySettings = {
+    instagramUrl: config.instagramUrl.trim(),
+    eventPassword: config.eventPassword.trim(),
+    kwikpicEmbedUrl: config.kwikpicEmbedUrl.trim(),
+  };
+
+  if (typeof window !== "undefined") {
+    localStorage.setItem(EVENT_GALLERY_SETTINGS_LOCAL_KEY, JSON.stringify(payload));
+    window.dispatchEvent(new Event("event_gallery_settings_updated"));
+  }
+
+  if (isDummyKey) return { success: true };
+
+  try {
+    await setDoc(doc(db, "config", "gallery_settings"), payload, { merge: true });
+    return { success: true };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to save gallery settings";
+    return { success: false, error: message };
+  }
+}
+
 /**
  * Push all CMS configuration documents to Firestore in one coordinated sync.
  */

@@ -44,6 +44,7 @@ export type AdminTab =
   | "aiWhatsAppScanner"
   | "impactStatsCMS"
   | "capturedMomentsCMS"
+  | "eventGallerySettings"
   | "testimonialsCMS"
   | "reservePageCMS"
   | "clientsCMS";
@@ -169,7 +170,8 @@ export const ADMIN_SUBNAV: Record<Exclude<AdminCategory, "dashboard">, AdminSubN
     { id: "impactStatsCMS", label: "Track Record" },
   ],
   capturedMoments: [
-    { id: "capturedMomentsCMS", label: "Event Albums" },
+    { id: "capturedMomentsCMS", label: "Drive Albums" },
+    { id: "eventGallerySettings", label: "AI Gallery Gate" },
   ],
   reserve: [
     { id: "reservePageCMS", label: "Page Content" },
@@ -209,9 +211,10 @@ export const ADMIN_SITE_PAGES: AdminSitePage[] = [
   { path: "/", label: "Homepage", category: "branding", tab: "websiteText" },
   { path: "/", label: "Real Impact Stats", category: "impact", tab: "impactStatsCMS", note: "Homepage track record counters" },
   { path: "/captured-moments", label: "Captured Moments", category: "capturedMoments", tab: "capturedMomentsCMS", note: "Guest Drive unlock portal" },
+  { path: "/gallery", label: "AI Event Gallery", category: "capturedMoments", tab: "eventGallerySettings", note: "Kwikpic Instagram-gated portal" },
   { path: "/clients", label: "Clients Page", category: "clients", tab: "clientsCMS" },
   { path: "/reserve", label: "Reserve / Booking", category: "reserve", tab: "reservePageCMS" },
-  { path: "/gallery", label: "Gallery", category: "crm", tab: "galleryManager" },
+  { path: "/gallery", label: "Gallery (legacy CMS)", category: "crm", tab: "galleryManager" },
   { path: "/services/photo-booth", label: "Photo Booth Service", category: "services", tab: "serviceToggles" },
   { path: "/services/magnet-station", label: "Magnet Station", category: "services", tab: "serviceToggles" },
   { path: "/contact", label: "Contact (footer & global)", category: "crm", tab: "globalSettings", note: "Phone, email, WhatsApp" },

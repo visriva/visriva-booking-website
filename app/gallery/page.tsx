@@ -1,98 +1,94 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { FaInstagram } from "react-icons/fa";
 import {
   Sparkles,
-  Camera,
-  Magnet,
-  Key,
-  Coffee,
-  ShoppingBag,
-  Download,
-  Share2,
-  Search,
-  X,
   Lock,
-  ArrowRight,
-  CheckCircle2,
+  KeyRound,
+  ExternalLink,
+  MessageCircle,
+  Unlock,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
-  subscribeGalleries,
-  GalleryItem,
+  DEFAULT_EVENT_GALLERY_SETTINGS,
+  EventGallerySettings,
+  subscribeEventGallerySettings,
   subscribeFeatureToggles,
   DEFAULT_FEATURE_TOGGLES,
   FeatureTogglesConfig,
 } from "@/lib/firebase";
 
-const SAMPLE_GALLERY_PHOTOS: (GalleryItem & { eventCode: string })[] = [
-  {
-    id: "g1",
-    url: "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80",
-    tagline: "Rahul & Ananya Sangeet • Taj West End",
-    category: "photo-booth" as any,
-    eventCode: "rahul-ananya",
-    createdAt: Date.now(),
-  },
-  {
-    id: "g2",
-    url: "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=800&q=80",
-    tagline: "Custom Acrylic Fridge Magnet Keepsake",
-    category: "magnet-station" as any,
-    eventCode: "rahul-ananya",
-    createdAt: Date.now(),
-  },
-  {
-    id: "g3",
-    url: "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80",
-    tagline: "Google Tech Gala • Leela Palace",
-    category: "photo-booth" as any,
-    eventCode: "google-gala",
-    createdAt: Date.now(),
-  },
-  {
-    id: "g4",
-    url: "https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=800&q=80",
-    tagline: "Live Canvas Tote Bag Pressing",
-    category: "tote-tshirt-station" as any,
-    eventCode: "google-gala",
-    createdAt: Date.now(),
-  },
-];
+const UNLOCK_SESSION_KEY = "visriva_gallery_ai_unlocked";
 
-function GalleryContent() {
-  const [eventCodeInput, setEventCodeInput] = useState("rahul-ananya");
-  const [activeEventCode, setActiveEventCode] = useState("rahul-ananya");
-  const [activeCategory, setActiveCategory] = useState<string>("all");
-  const [selectedPhoto, setSelectedPhoto] = useState<GalleryItem | null>(null);
-  const [firestoreItems, setFirestoreItems] = useState<GalleryItem[]>([]);
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
+function GalleryGatedContent() {
+  const [settings, setSettings] = useState<EventGallerySettings>(DEFAULT_EVENT_GALLERY_SETTINGS);
   const [featureToggles, setFeatureToggles] = useState<FeatureTogglesConfig>(DEFAULT_FEATURE_TOGGLES);
+  const [loaded, setLoaded] = useState(false);
+  const [password, setPassword] = useState("");
+  const [unlocked, setUnlocked] = useState(false);
+  const [error, setError] = useState("");
+  const [shake, setShake] = useState(false);
 
   useEffect(() => {
-    const unsub = subscribeGalleries((items) => {
-      setFirestoreItems(items);
+    const unsubSettings = subscribeEventGallerySettings((data) => {
+      setSettings(data);
+      setLoaded(true);
+      if (typeof window !== "undefined") {
+        const saved = sessionStorage.getItem(UNLOCK_SESSION_KEY);
+        if (saved && data.eventPassword && saved === data.eventPassword.trim()) {
+          setUnlocked(true);
+        }
+      }
     });
     const unsubToggles = subscribeFeatureToggles((data) => {
       if (data) setFeatureToggles(data);
     });
     return () => {
-      unsub();
+      unsubSettings();
       unsubToggles();
     };
   }, []);
 
+  const handleUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    const expected = settings.eventPassword.trim();
+    const entered = password.trim();
+
+    if (!expected) {
+      setError("Gallery password is not configured yet. Please check back soon.");
+      triggerShake();
+      return;
+    }
+
+    if (!entered || entered !== expected) {
+      setError("Incorrect password. DM us on Instagram for access.");
+      triggerShake();
+      return;
+    }
+
+    setError("");
+    setUnlocked(true);
+    sessionStorage.setItem(UNLOCK_SESSION_KEY, expected);
+  };
+
+  const triggerShake = () => {
+    setShake(true);
+    window.setTimeout(() => setShake(false), 500);
+  };
+
   if (featureToggles.enableGuestGallery === false) {
     return (
-      <main className="min-h-screen bg-[#011F15] text-white selection:bg-[#D4AF37] selection:text-[#011F15]">
+      <main className="min-h-screen bg-[#011F15] text-white">
         <Navbar />
         <div className="pt-44 pb-28 px-4 text-center max-w-md mx-auto space-y-4">
           <Lock className="w-12 h-12 text-[#D4AF37] mx-auto opacity-70" />
-          <h2 className="font-serif text-2xl font-bold text-white">Guest Photo Portal Offline</h2>
+          <h2 className="font-serif text-2xl font-bold text-white">Guest Gallery Offline</h2>
           <p className="text-xs text-emerald-100/70">
-            The Guest Photo Portal is currently under maintenance or disabled by the Administrator.
+            The guest photo portal is temporarily disabled. Contact Visriva for access.
           </p>
         </div>
         <Footer />
@@ -100,207 +96,162 @@ function GalleryContent() {
     );
   }
 
-  const allItems = [...firestoreItems, ...SAMPLE_GALLERY_PHOTOS];
-
-  const filteredPhotos = allItems.filter((item) => {
-    const codeMatch =
-      !activeEventCode ||
-      (item as any).eventCode?.toLowerCase() === activeEventCode.toLowerCase() ||
-      item.tagline?.toLowerCase().includes(activeEventCode.toLowerCase());
-
-    const catMatch = activeCategory === "all" || item.category === activeCategory;
-    return codeMatch && catMatch;
-  });
-
-  const handleSearchEvent = (e: React.FormEvent) => {
-    e.preventDefault();
-    setActiveEventCode(eventCodeInput.trim());
-  };
-
-  const handleDownload = (photoUrl: string) => {
-    const link = document.createElement("a");
-    link.href = photoUrl;
-    link.download = `Visriva-Live-Photo-${Date.now()}.jpg`;
-    link.target = "_blank";
-    link.click();
-    setDownloadSuccess(true);
-    setTimeout(() => setDownloadSuccess(false), 3000);
-  };
-
-  const handleOrderExtraPrint = (photo: GalleryItem) => {
-    const waMsg = encodeURIComponent(
-      `Hello Visriva! I would like to order extra physical magnet/tote prints for this photo from event (${activeEventCode}):\n${photo.url}`
-    );
-    window.open(`https://wa.me/918884484828?text=${waMsg}`, "_blank");
-  };
-
   return (
     <main className="min-h-screen bg-[#011F15] text-white selection:bg-[#D4AF37] selection:text-[#011F15]">
       <Navbar />
 
-      <section className="pt-36 sm:pt-40 pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        
-        {/* HEADER */}
-        <div className="text-center max-w-3xl mx-auto mb-10 space-y-4">
-          <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-black/50 border border-[#D4AF37]/40 text-[#D4AF37] text-xs font-bold uppercase tracking-widest backdrop-blur-md font-cinzel">
-            <Sparkles className="w-4 h-4 text-[#D4AF37]" />
-            <span>Client &amp; Guest Live Event Gallery</span>
+      <section className="pt-36 sm:pt-40 pb-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
+        <div className="text-center max-w-2xl mx-auto mb-8 space-y-3">
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-black/50 border border-[#D4AF37]/40 text-[#D4AF37] text-xs font-bold uppercase tracking-widest">
+            <Sparkles className="w-4 h-4" />
+            <span>AI Event Gallery</span>
           </div>
-          <h1 className="font-playfair text-3xl sm:text-5xl font-bold text-white tracking-tight">
-            Download Your <span className="text-gold-gradient">High-Res Event Captures</span>
+          <h1 className="font-serif text-3xl sm:text-5xl font-bold tracking-tight">
+            Find your <span className="text-[#D4AF37]">moments</span>
           </h1>
-          <p className="font-sans text-emerald-100/80 text-xs sm:text-sm font-light">
-            Enter your Event PIN or Couple Hashtag below to view and download your digital photo booth portraits &amp; magnet keepsakes.
+          <p className="text-xs sm:text-sm text-emerald-100/75 font-light leading-relaxed">
+            Facial recognition gallery powered by Kwikpic — unlock after following Visriva on Instagram.
           </p>
-
-          {/* SEARCH BAR */}
-          <form onSubmit={handleSearchEvent} className="flex items-center justify-center max-w-md mx-auto pt-3">
-            <div className="relative w-full">
-              <input
-                type="text"
-                value={eventCodeInput}
-                onChange={(e) => setEventCodeInput(e.target.value)}
-                placeholder="Enter Event PIN / Hashtag (e.g. rahul-ananya)..."
-                className="w-full pl-4 pr-12 py-3 rounded-full bg-black/60 border border-[#D4AF37]/50 text-white font-mono text-sm focus:border-[#D4AF37] focus:outline-none shadow-2xl"
-              />
-              <button
-                type="submit"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-gold-gradient text-[#011F15] flex items-center justify-center shadow-md hover:scale-105 transition cursor-pointer"
-              >
-                <Search className="w-4 h-4" />
-              </button>
-            </div>
-          </form>
         </div>
 
-        {/* CATEGORY FILTERS */}
-        <div className="flex flex-wrap justify-center gap-2 max-w-3xl mx-auto mb-10">
-          {[
-            { id: "all", label: "All Captures", icon: Camera },
-            { id: "photo-booth", label: "Photo Booth", icon: Camera },
-            { id: "magnet-station", label: "Fridge Magnets", icon: Magnet },
-            { id: "keychain-station", label: "Keychains", icon: Key },
-            { id: "tote-tshirt-station", label: "Tote Bags", icon: ShoppingBag },
-            { id: "mug-printing", label: "Live Mugs", icon: Coffee },
-          ].map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`px-4 py-2 rounded-full border text-xs font-bold font-mono transition-all cursor-pointer ${
-                activeCategory === cat.id
-                  ? "bg-[#D4AF37] text-black border-[#D4AF37] shadow-gold-sm"
-                  : "bg-white/5 border-white/15 text-white/80 hover:border-[#D4AF37]/50 hover:text-white"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-
-        {/* PHOTO MASONRY GRID */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {filteredPhotos.length === 0 ? (
-            <div className="col-span-full py-16 text-center space-y-3 glass-card p-8 rounded-3xl border border-white/10 max-w-md mx-auto">
-              <Lock className="w-10 h-10 text-[#D4AF37] mx-auto opacity-80" />
-              <h3 className="font-serif text-lg text-white font-bold">No Photos Found for "{activeEventCode}"</h3>
-              <p className="text-emerald-100/70 text-xs">
-                Check your event PIN spelling or try searching "rahul-ananya" or "google-gala".
-              </p>
-            </div>
-          ) : (
-            filteredPhotos.map((photo) => (
-              <motion.div
-                key={photo.id}
-                whileHover={{ scale: 1.03, y: -4 }}
-                className="group relative rounded-2xl overflow-hidden border border-white/15 bg-black/50 shadow-xl cursor-pointer aspect-[3/4]"
-                onClick={() => setSelectedPhoto(photo)}
-              >
-                <img
-                  src={photo.url}
-                  alt={photo.tagline || "Visriva Event Capture"}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-80 group-hover:opacity-95 transition-opacity" />
-
-                <div className="absolute bottom-0 left-0 right-0 p-4 text-left space-y-1">
-                  <span className="text-[9px] font-mono text-[#D4AF37] uppercase bg-black/60 px-2 py-0.5 rounded border border-[#D4AF37]/30 inline-block">
-                    Visriva Keepsake
-                  </span>
-                  <h4 className="font-serif text-sm font-bold text-white line-clamp-1">
-                    {photo.tagline || "Event Capture"}
-                  </h4>
-                  <div className="text-[10px] text-emerald-200/80 font-mono flex items-center space-x-1">
-                    <span>Click to Download</span>
-                    <ArrowRight className="w-3 h-3 text-[#D4AF37]" />
-                  </div>
-                </div>
-              </motion.div>
-            ))
-          )}
-        </div>
-
-      </section>
-
-      {/* LIGHTBOX MODAL */}
-      <AnimatePresence>
-        {selectedPhoto && (
+        {!loaded ? (
+          <div className="text-center font-mono text-xs text-emerald-100/50 py-20">Loading gallery gate…</div>
+        ) : unlocked && settings.kwikpicEmbedUrl ? (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-4"
           >
-            <div className="relative max-w-4xl w-full bg-[#041a12] border-2 border-[#D4AF37]/50 rounded-3xl p-6 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-xs text-emerald-200/80 flex items-center gap-2">
+                <Unlock className="w-4 h-4 text-[#D4AF37]" />
+                Gallery unlocked — search your face below
+              </p>
               <button
-                onClick={() => setSelectedPhoto(null)}
-                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer border border-white/20"
+                type="button"
+                onClick={() => {
+                  setUnlocked(false);
+                  setPassword("");
+                  sessionStorage.removeItem(UNLOCK_SESSION_KEY);
+                }}
+                className="text-[10px] uppercase tracking-wider text-emerald-100/50 hover:text-[#D4AF37] transition"
               >
-                <X className="w-5 h-5" />
+                Lock again
               </button>
+            </div>
 
-              <div className="max-h-[60vh] rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center bg-black/60">
-                <img
-                  src={selectedPhoto.url}
-                  alt={selectedPhoto.tagline || "Photo Display"}
-                  className="max-h-[60vh] w-auto object-contain"
-                />
+            <div className="w-full rounded-2xl overflow-hidden border border-[#D4AF37]/35 bg-black/50 shadow-[0_0_40px_rgba(212,175,55,0.12)]">
+              <iframe
+                title="Kwikpic AI Gallery"
+                src={settings.kwikpicEmbedUrl}
+                className="w-full min-h-[75vh] h-[80vh] border-0 bg-[#011F15]"
+                allow="camera; microphone; fullscreen"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+          </motion.div>
+        ) : unlocked && !settings.kwikpicEmbedUrl ? (
+          <div className="max-w-md mx-auto rounded-3xl border border-white/15 bg-white/[0.04] backdrop-blur-xl p-8 text-center space-y-3">
+            <Lock className="w-10 h-10 text-[#D4AF37] mx-auto opacity-80" />
+            <h2 className="font-serif text-xl font-bold">Password accepted</h2>
+            <p className="text-xs text-emerald-100/70">
+              The Kwikpic gallery link hasn&apos;t been added yet. Please check back shortly.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setUnlocked(false);
+                sessionStorage.removeItem(UNLOCK_SESSION_KEY);
+              }}
+              className="text-xs text-[#D4AF37] font-bold"
+            >
+              Back
+            </button>
+          </div>
+        ) : (
+          <motion.div
+            animate={shake ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
+            transition={{ duration: 0.45 }}
+            className="max-w-lg mx-auto"
+          >
+            <div className="rounded-3xl border border-white/15 bg-white/[0.04] backdrop-blur-xl shadow-[0_8px_40px_rgba(0,0,0,0.35)] p-6 sm:p-8 space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#f09433] via-[#dc2743] to-[#bc1888] flex items-center justify-center shadow-lg">
+                  <FaInstagram className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="font-serif text-xl font-bold text-white">Unlock your photos</h2>
+                  <p className="text-[11px] text-emerald-100/60">Two quick steps, then enter your password</p>
+                </div>
               </div>
 
-              <div className="text-center space-y-3">
-                <h3 className="font-serif text-xl sm:text-2xl font-bold text-white">
-                  {selectedPhoto.tagline || "Visriva Digital Capture"}
-                </h3>
-
-                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                  <button
-                    onClick={() => handleDownload(selectedPhoto.url)}
-                    className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-white/10 bg-black/35 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-[#D4AF37] text-[#011F15] text-[11px] font-black flex items-center justify-center">
+                      1
+                    </span>
+                    <p className="text-sm font-bold text-white">Follow our Instagram to unlock your photos</p>
+                  </div>
+                  <a
+                    href={settings.instagramUrl || "https://instagram.com/visriva.co"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider hover:scale-[1.02] transition"
                   >
-                    <Download className="w-4 h-4" />
-                    <span>Download Original</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleOrderExtraPrint(selectedPhoto)}
-                    className="px-5 py-2.5 rounded-xl bg-[#25D366] text-black font-extrabold text-xs uppercase tracking-wider hover:bg-white transition shadow-md cursor-pointer flex items-center space-x-1.5"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    <span>Order Physical Magnet / Tote Print</span>
-                  </button>
+                    <FaInstagram className="w-4 h-4" />
+                    Follow @visriva.co
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
                 </div>
 
-                {downloadSuccess && (
-                  <div className="text-xs text-emerald-300 font-bold flex items-center justify-center gap-1">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>Photo Saved to Device!</span>
+                <div className="rounded-2xl border border-white/10 bg-black/35 p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-[#D4AF37] text-[#011F15] text-[11px] font-black flex items-center justify-center">
+                      2
+                    </span>
+                    <p className="text-sm font-bold text-white">
+                      DM us the Event Name on Instagram to receive your access password
+                    </p>
                   </div>
-                )}
+                  <p className="text-[11px] text-emerald-100/65 leading-relaxed pl-8 flex items-start gap-2">
+                    <MessageCircle className="w-3.5 h-3.5 text-[#D4AF37] shrink-0 mt-0.5" />
+                    Open Instagram DMs, message the event name, and we&apos;ll reply with your gallery password.
+                  </p>
+                </div>
               </div>
+
+              <form onSubmit={handleUnlock} className="space-y-3 pt-1 border-t border-white/10">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">
+                  Access password
+                </label>
+                <div className="relative">
+                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#D4AF37]" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError("");
+                    }}
+                    placeholder="Enter password from Instagram DM"
+                    className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-black/55 border border-[#D4AF37]/35 text-white font-mono text-sm focus:border-[#D4AF37] outline-none"
+                    autoComplete="off"
+                  />
+                </div>
+                {error && <p className="text-xs text-rose-300">{error}</p>}
+                <button
+                  type="submit"
+                  className="w-full py-3.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-sm uppercase tracking-wider hover:scale-[1.02] transition flex items-center justify-center gap-2"
+                >
+                  <Unlock className="w-4 h-4" />
+                  Unlock Gallery
+                </button>
+              </form>
             </div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </section>
 
       <Footer />
     </main>
@@ -309,8 +260,14 @@ function GalleryContent() {
 
 export default function GalleryPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#011F15] text-white p-20 text-center font-mono">Loading Gallery...</div>}>
-      <GalleryContent />
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#011F15] text-white p-20 text-center font-mono text-sm">
+          Loading gallery…
+        </div>
+      }
+    >
+      <GalleryGatedContent />
     </Suspense>
   );
 }

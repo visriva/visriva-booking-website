@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { buildPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Guest Photo Gallery | Visriva Live Station",
+  title: "AI Event Gallery | Visriva Live Station",
   description:
-    "Download your event photos from Visriva Live Station. Enter your event code to access your private guest photo gallery.",
+    "Unlock your Visriva event photos with facial recognition. Follow @visriva.co on Instagram, get your password via DM, and find your moments.",
   path: "/gallery",
 });
 

@@ -47,6 +47,7 @@ import AdminEmptyTabState from "@/components/admin/AdminEmptyTabState";
 import TestimonialsCmsPanel from "@/components/admin/TestimonialsCmsPanel";
 import ReservePageCmsPanel from "@/components/admin/ReservePageCmsPanel";
 import CapturedMomentsCmsPanel from "@/components/admin/CapturedMomentsCmsPanel";
+import EventGallerySettingsPanel from "@/components/admin/EventGallerySettingsPanel";
 import type { AdminCategory, AdminTab } from "@/lib/adminNav";
 import { ADMIN_NAV, ADMIN_SUBNAV } from "@/lib/adminNav";
 import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
@@ -4471,6 +4472,10 @@ export default function AdminDashboardPage() {
 
           {activeTab === "capturedMomentsCMS" && activeCategory === "capturedMoments" && (
             <CapturedMomentsCmsPanel onToast={showToast} />
+          )}
+
+          {activeTab === "eventGallerySettings" && activeCategory === "capturedMoments" && (
+            <EventGallerySettingsPanel onToast={showToast} />
           )}
 
           {/* ══════════════════════════════════════════════════════════════
