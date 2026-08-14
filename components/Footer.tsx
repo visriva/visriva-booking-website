@@ -207,9 +207,14 @@ export default function Footer() {
         <div className="pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between text-xs text-emerald-100/60 gap-4">
           <p className="font-cavona">© {new Date().getFullYear()} Visriva Live Station. All rights reserved.</p>
           <div className="flex flex-wrap items-center justify-center sm:justify-end gap-x-6 gap-y-2">
-            <a href="/services/photo-booth" className="hover:text-[#D4AF37] transition-colors">Packages &amp; Pricing</a>
             <a href="/privacy-policy" className="hover:text-[#D4AF37] transition-colors">Privacy Policy</a>
             <a href="/data-deletion" className="hover:text-[#D4AF37] transition-colors">Data Deletion</a>
+            {toggles.showPricing !== false && (
+              <a href="/services/photo-booth" className="hover:text-[#D4AF37] transition-colors">Packages &amp; Pricing</a>
+            )}
+            {toggles.enableCapturedMoments !== false && (
+              <a href="/captured-moments" className="hover:text-[#D4AF37] transition-colors">Captured Moments</a>
+            )}
           </div>
         </div>
 

@@ -251,6 +251,20 @@ export default function Navbar({ onWhatsAppIconClick }: NavbarProps = {}) {
                 </a>
               )}
 
+              {toggles.enableCapturedMoments !== false && (
+                <a
+                  href="/captured-moments"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center justify-between text-[#D4AF37] font-bold py-2 px-3 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 hover:bg-[#D4AF37] hover:text-[#011F15] transition-all"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                    <span className="font-aylia text-sm uppercase tracking-wider">Captured Moments</span>
+                  </div>
+                  <span className="text-[10px] font-mono uppercase bg-[#D4AF37] text-black px-2 py-0.5 rounded font-bold">Download</span>
+                </a>
+              )}
+
               {/* Feature Portal 2: Guest Photo Portal */}
               {toggles.enableGuestGallery !== false && (
                 <a

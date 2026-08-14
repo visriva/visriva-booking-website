@@ -125,6 +125,14 @@ import {
   PlannersPageConfig,
   DEFAULT_PLANNERS_CONFIG,
   masterSyncAllConfigurations,
+  subscribeCapturedMoments,
+  saveCapturedMomentEvent,
+  deleteCapturedMomentEvent,
+  subscribeCapturedMomentsPageConfig,
+  saveCapturedMomentsPageConfig,
+  CapturedMomentEvent,
+  CapturedMomentsPageConfig,
+  DEFAULT_CAPTURED_MOMENTS_PAGE_CONFIG,
 } from "@/lib/firebase";
 import { fetchGoogleSheetColumns } from "@/lib/googleSheet";
 
@@ -185,9 +193,18 @@ export default function AdminDashboardPage() {
     "photo-booth" | "magnet-station" | "keychain-station" | "mug-printing"
   >("photo-booth");
   const [newGalTagline, setNewGalTagline] = useState("");
+  const [newGalEventCode, setNewGalEventCode] = useState("");
   const [newGalUrl, setNewGalUrl] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [deletingId, setDeletingId] = useState("");
+
+  const [capturedMomentsList, setCapturedMomentsList] = useState<CapturedMomentEvent[]>([]);
+  const [capturedMomentsPageConfig, setCapturedMomentsPageConfig] = useState<CapturedMomentsPageConfig>(
+    DEFAULT_CAPTURED_MOMENTS_PAGE_CONFIG
+  );
+  const [newCmEventCode, setNewCmEventCode] = useState("");
+  const [newCmDisplayName, setNewCmDisplayName] = useState("");
+  const [newCmDriveUrl, setNewCmDriveUrl] = useState("");
 
   // ── Crop Modal State ─────────────────────────────────────────────────────────
   const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -382,6 +399,12 @@ export default function AdminDashboardPage() {
     const unsubPlanners = subscribePlannersConfig((data) => {
       if (data) setPlannersConfig(data);
     });
+    const unsubCaptured = subscribeCapturedMoments((items) => {
+      if (items) setCapturedMomentsList(items);
+    });
+    const unsubCapturedPage = subscribeCapturedMomentsPageConfig((data) => {
+      if (data) setCapturedMomentsPageConfig(data);
+    });
 
     return () => {
       unsubMatrix();
@@ -401,6 +424,8 @@ export default function AdminDashboardPage() {
       unsubAIWhatsApp();
       unsubImpact();
       unsubPlanners();
+      unsubCaptured();
+      unsubCapturedPage();
     };
   }, []);
 
@@ -577,6 +602,69 @@ export default function AdminDashboardPage() {
       showToast(`Master Gallery toggle updated!`);
     } else {
       showToast("Failed to update visibility toggle", true);
+    }
+  };
+
+  const handleToggleShowPricing = async () => {
+    const updated = {
+      ...featureToggles,
+      showPricing: featureToggles.showPricing === false ? true : false,
+    };
+    setFeatureToggles(updated);
+    const res = await saveFeatureToggles(updated);
+    if (res.success) {
+      showToast(
+        updated.showPricing !== false
+          ? "Pricing is now VISIBLE site-wide"
+          : "Pricing is now HIDDEN across the entire website"
+      );
+    } else {
+      showToast("Failed to update pricing toggle", true);
+    }
+  };
+
+  const handleSaveCapturedMomentsPageConfig = async () => {
+    setIsSaving(true);
+    const res = await saveCapturedMomentsPageConfig(capturedMomentsPageConfig);
+    setIsSaving(false);
+    if (res.success) {
+      showToast("Captured Moments page settings saved!");
+    } else {
+      showToast(res.error || "Failed to save Captured Moments settings", true);
+    }
+  };
+
+  const handleAddCapturedMomentEvent = async () => {
+    if (!newCmEventCode.trim() || !newCmDisplayName.trim()) {
+      showToast("Event PIN and display name are required", true);
+      return;
+    }
+    setIsSaving(true);
+    const res = await saveCapturedMomentEvent({
+      eventCode: newCmEventCode.trim().toLowerCase(),
+      displayName: newCmDisplayName.trim(),
+      googleDriveUrl: newCmDriveUrl.trim(),
+      isActive: true,
+    });
+    setIsSaving(false);
+    if (res.success) {
+      showToast("Captured Moments event album added!");
+      setNewCmEventCode("");
+      setNewCmDisplayName("");
+      setNewCmDriveUrl("");
+    } else {
+      showToast(res.error || "Failed to add event", true);
+    }
+  };
+
+  const handleDeleteCapturedMomentEvent = async (id: string) => {
+    setIsSaving(true);
+    const res = await deleteCapturedMomentEvent(id);
+    setIsSaving(false);
+    if (res.success) {
+      showToast("Event album removed");
+    } else {
+      showToast(res.error || "Failed to delete event", true);
     }
   };
 
@@ -775,12 +863,14 @@ export default function AdminDashboardPage() {
       category: newGalCategory,
       url: newGalUrl.trim(),
       tagline: newGalTagline.trim() || "Visriva Luxury Experience",
+      eventCode: newGalEventCode.trim().toLowerCase() || undefined,
     });
     setIsSaving(false);
 
     if (res.success) {
       setNewGalUrl("");
       setNewGalTagline("");
+      setNewGalEventCode("");
       showToast("Photo added to gallery & synced to live site!");
     } else {
       showToast(res.error || "Failed to add photo", true);
@@ -1342,6 +1432,42 @@ export default function AdminDashboardPage() {
 
           {/* TAB 3: PRICING & SERVICES MATRIX */}
           {activeTab === "pricingServices" && (activeCategory === "services" || activeCategory === "reserve") && (
+            <div className="space-y-8">
+              <div
+                className={`p-6 sm:p-8 rounded-3xl border-2 transition-all duration-300 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 ${
+                  featureToggles.showPricing !== false
+                    ? "bg-emerald-500/10 border-emerald-500/40 shadow-[0_0_24px_rgba(16,185,129,0.15)]"
+                    : "bg-red-500/10 border-red-500/40 shadow-[0_0_24px_rgba(239,68,68,0.15)]"
+                }`}
+              >
+                <div className="space-y-2 max-w-2xl">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-[#D4AF37]" />
+                    <span className="text-xs font-bold uppercase tracking-widest font-mono text-[#D4AF37]">
+                      Site-wide pricing master switch
+                    </span>
+                  </div>
+                  <h2 className="font-serif text-2xl font-bold text-white">
+                    {featureToggles.showPricing !== false ? "Pricing is LIVE on the website" : "Pricing is HIDDEN site-wide"}
+                  </h2>
+                  <p className="text-xs text-emerald-100/75 leading-relaxed">
+                    One tap turns off all package prices — booking widget, service pages, footer pricing link, and estimate breakdowns across www.visriva.com.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleShowPricing}
+                  className={`px-8 py-4 rounded-full text-sm font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shadow-lg shrink-0 ${
+                    featureToggles.showPricing !== false
+                      ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+                      : "bg-red-500 hover:bg-red-600 text-white"
+                  }`}
+                >
+                  <Power className="w-5 h-5" />
+                  <span>{featureToggles.showPricing !== false ? "Pricing: ON" : "Pricing: OFF"}</span>
+                </button>
+              </div>
+
             <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
                 <div>
@@ -1603,11 +1729,149 @@ export default function AdminDashboardPage() {
                 ))}
               </div>
             </div>
+            </div>
           )}
 
           {/* TAB 4: GALLERY MANAGER & MASTER VISIBILITY */}
           {activeTab === "galleryManager" && activeCategory === "crm" && (
             <div className="space-y-8">
+
+              {/* CAPTURED MOMENTS — Google Drive + Instagram gate */}
+              <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+                  <div>
+                    <h2 className="font-serif text-2xl font-bold text-white flex items-center gap-2">
+                      <FaInstagram className="w-5 h-5 text-[#D4AF37]" />
+                      Captured Moments Portal
+                    </h2>
+                    <p className="text-xs text-emerald-100/70 mt-1">
+                      Manage /captured-moments — event PINs, Google Drive album links, and Instagram follow gate.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSaveCapturedMomentsPageConfig}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    Save page settings
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">Instagram username</label>
+                    <input
+                      type="text"
+                      value={capturedMomentsPageConfig.instagramUsername}
+                      onChange={(e) =>
+                        setCapturedMomentsPageConfig({ ...capturedMomentsPageConfig, instagramUsername: e.target.value })
+                      }
+                      placeholder="visriva.co"
+                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white font-mono text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">Page subtitle</label>
+                    <input
+                      type="text"
+                      value={capturedMomentsPageConfig.pageSubtitle}
+                      onChange={(e) =>
+                        setCapturedMomentsPageConfig({ ...capturedMomentsPageConfig, pageSubtitle: e.target.value })
+                      }
+                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white text-sm"
+                    />
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-white/10 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={capturedMomentsPageConfig.instagramGateEnabled}
+                    onChange={(e) =>
+                      setCapturedMomentsPageConfig({
+                        ...capturedMomentsPageConfig,
+                        instagramGateEnabled: e.target.checked,
+                      })
+                    }
+                    className="w-5 h-5 accent-[#D4AF37]"
+                  />
+                  <span className="text-sm text-white">Require Instagram follow before downloads</span>
+                </label>
+
+                <div className="border-t border-white/10 pt-6 space-y-4">
+                  <h3 className="font-serif text-lg font-bold text-white">Event albums (Google Drive)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input
+                      type="text"
+                      value={newCmEventCode}
+                      onChange={(e) => setNewCmEventCode(e.target.value)}
+                      placeholder="Event PIN (rahul-ananya)"
+                      className="px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white font-mono text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={newCmDisplayName}
+                      onChange={(e) => setNewCmDisplayName(e.target.value)}
+                      placeholder="Display name"
+                      className="px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white text-sm"
+                    />
+                    <input
+                      type="url"
+                      value={newCmDriveUrl}
+                      onChange={(e) => setNewCmDriveUrl(e.target.value)}
+                      placeholder="Google Drive folder URL"
+                      className="px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white text-sm"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddCapturedMomentEvent}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 rounded-xl bg-[#D4AF37] text-[#011F15] font-bold text-xs uppercase tracking-wider hover:scale-105 transition flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add event album
+                  </button>
+
+                  <div className="space-y-3">
+                    {capturedMomentsList.length === 0 ? (
+                      <p className="text-xs text-emerald-100/60">No event albums yet. Paste a shared Google Drive folder link per event.</p>
+                    ) : (
+                      capturedMomentsList.map((ev) => (
+                        <div
+                          key={ev.id}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-black/40 border border-white/10"
+                        >
+                          <div>
+                            <p className="font-bold text-white text-sm">{ev.displayName}</p>
+                            <p className="text-[10px] font-mono text-[#D4AF37]">PIN: {ev.eventCode}</p>
+                            {ev.googleDriveUrl && (
+                              <a
+                                href={ev.googleDriveUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] text-emerald-200/70 hover:text-[#D4AF37] truncate block max-w-md"
+                              >
+                                {ev.googleDriveUrl}
+                              </a>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCapturedMomentEvent(ev.id)}
+                            className="px-3 py-2 rounded-lg bg-red-500/20 text-red-300 text-xs font-bold flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Remove
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
               
               {/* SECTION 0: RECOMMENDED IMAGE DIMENSIONS & FORMAT GUIDE */}
               <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 bg-gradient-to-r from-black/60 via-[#01281c]/80 to-black/60 space-y-4">
@@ -1924,6 +2188,19 @@ export default function AdminDashboardPage() {
                     </div>
 
                     <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">Event PIN (Captured Moments)</label>
+                      <input
+                        type="text"
+                        value={newGalEventCode}
+                        onChange={(e) => setNewGalEventCode(e.target.value)}
+                        placeholder="e.g. rahul-ananya"
+                        className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white font-mono text-sm focus:border-[#D4AF37]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1 sm:col-span-2">
                       <label className="text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">Custom Tagline (Playfair Display)</label>
                       <input
                         type="text"
@@ -2662,6 +2939,27 @@ export default function AdminDashboardPage() {
                     </p>
                     <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-mono uppercase font-bold ${featureToggles.enableFrameCustomizer ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
                       {featureToggles.enableFrameCustomizer ? "ACTIVE / ONLINE" : "DISABLED BY ADMIN"}
+                    </span>
+                  </div>
+
+                  {/* Switch 4: Captured Moments */}
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-white">Captured Moments (/captured-moments)</span>
+                      <input
+                        type="checkbox"
+                        checked={featureToggles.enableCapturedMoments !== false}
+                        onChange={(e) =>
+                          setFeatureToggles({ ...featureToggles, enableCapturedMoments: e.target.checked })
+                        }
+                        className="w-5 h-5 accent-[#D4AF37] cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-xs text-emerald-100/70 leading-relaxed">
+                      Guest download portal with Instagram follow gate and Google Drive albums.
+                    </p>
+                    <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-mono uppercase font-bold ${featureToggles.enableCapturedMoments !== false ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-rose-500/20 text-rose-300 border border-rose-400/40"}`}>
+                      {featureToggles.enableCapturedMoments !== false ? "ACTIVE / ONLINE" : "DISABLED BY ADMIN"}
                     </span>
                   </div>
                 </div>

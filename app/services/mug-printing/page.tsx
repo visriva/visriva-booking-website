@@ -141,6 +141,7 @@ export default function MugPrintingServicePage() {
       </section>
 
       {/* 3. PRICING & MINIMUMS */}
+      {toggles.showPricing !== false && (
       <section className="py-12 pb-24">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="glass-card rounded-2xl p-8 sm:p-12 border border-white/10 space-y-6">
@@ -168,6 +169,7 @@ export default function MugPrintingServicePage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Sticky Floating CTA */}
       <div className="fixed bottom-6 right-6 z-50">

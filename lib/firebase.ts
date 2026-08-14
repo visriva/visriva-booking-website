@@ -200,8 +200,31 @@ export interface GalleryItem {
   url: string;
   tagline: string;
   storagePath?: string;
+  eventCode?: string;
   createdAt?: unknown;
 }
+
+export interface CapturedMomentEvent {
+  id: string;
+  eventCode: string;
+  displayName: string;
+  googleDriveUrl?: string;
+  coverImageUrl?: string;
+  isActive: boolean;
+  createdAt?: string;
+}
+
+export interface CapturedMomentsPageConfig {
+  instagramUsername: string;
+  instagramGateEnabled: boolean;
+  pageSubtitle: string;
+}
+
+export const DEFAULT_CAPTURED_MOMENTS_PAGE_CONFIG: CapturedMomentsPageConfig = {
+  instagramUsername: "visriva.co",
+  instagramGateEnabled: true,
+  pageSubtitle: "Enter your event PIN to unlock high-res captures. Follow us on Instagram to download.",
+};
 
 export interface MasterSyncPayload {
   globalSettings?: GlobalSettingsConfig;
@@ -326,6 +349,10 @@ export interface FeatureTogglesConfig {
   enableMugService?: boolean;
   enableToteTshirtService?: boolean;
   showOperatorInNavbar?: boolean;
+  /** When false, hides all package prices site-wide (booking widget, service pages, footer). */
+  showPricing?: boolean;
+  /** Public /captured-moments guest download portal */
+  enableCapturedMoments?: boolean;
 }
 
 export const DEFAULT_FEATURE_TOGGLES: FeatureTogglesConfig = {
@@ -338,6 +365,8 @@ export const DEFAULT_FEATURE_TOGGLES: FeatureTogglesConfig = {
   enableMugService: true,
   enableToteTshirtService: true,
   showOperatorInNavbar: true,
+  showPricing: true,
+  enableCapturedMoments: true,
 };
 
 export interface BentoGridCard {
@@ -2938,6 +2967,209 @@ export async function deleteGalleryItem(
   }
 
   return { success: true };
+}
+
+const CAPTURED_MOMENTS_LOCAL_KEY = "visriva_captured_moments";
+const CAPTURED_MOMENTS_PAGE_LOCAL_KEY = "visriva_captured_moments_page";
+
+export function subscribeCapturedMoments(
+  callback: (events: CapturedMomentEvent[]) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem(CAPTURED_MOMENTS_LOCAL_KEY);
+      if (local) {
+        try {
+          callback(JSON.parse(local));
+          return;
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    callback([]);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("captured_moments_updated", handleUpdate);
+  }
+
+  if (isDummyKey) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("captured_moments_updated", handleUpdate);
+      }
+    };
+  }
+
+  try {
+    const colRef = collection(db, "captured_moments");
+    const unsub = onSnapshot(
+      colRef,
+      (snapshot) => {
+        const events: CapturedMomentEvent[] = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<CapturedMomentEvent, "id">),
+        }));
+        callback(events);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(CAPTURED_MOMENTS_LOCAL_KEY, JSON.stringify(events));
+        }
+      },
+      (err) => console.warn("Captured moments snapshot warning:", err.message)
+    );
+
+    return () => {
+      unsub();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("captured_moments_updated", handleUpdate);
+      }
+    };
+  } catch {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("captured_moments_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveCapturedMomentEvent(
+  event: Omit<CapturedMomentEvent, "id"> & { id?: string }
+): Promise<{ success: boolean; id?: string; error?: string }> {
+  try {
+    const payload = {
+      eventCode: event.eventCode.trim().toLowerCase(),
+      displayName: event.displayName.trim(),
+      googleDriveUrl: event.googleDriveUrl?.trim() || "",
+      coverImageUrl: event.coverImageUrl?.trim() || "",
+      isActive: event.isActive,
+      createdAt: event.createdAt || new Date().toISOString(),
+    };
+
+    if (event.id) {
+      await setDoc(doc(db, "captured_moments", event.id), payload, { merge: true });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("captured_moments_updated"));
+      }
+      return { success: true, id: event.id };
+    }
+
+    const ref = await addDoc(collection(db, "captured_moments"), payload);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("captured_moments_updated"));
+    }
+    return { success: true, id: ref.id };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to save event";
+    return { success: false, error: message };
+  }
+}
+
+export async function deleteCapturedMomentEvent(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await deleteDoc(doc(db, "captured_moments", id));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("captured_moments_updated"));
+    }
+    return { success: true };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to delete event";
+    return { success: false, error: message };
+  }
+}
+
+export function subscribeCapturedMomentsPageConfig(
+  callback: (config: CapturedMomentsPageConfig) => void
+): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem(CAPTURED_MOMENTS_PAGE_LOCAL_KEY);
+      if (local) {
+        try {
+          callback({ ...DEFAULT_CAPTURED_MOMENTS_PAGE_CONFIG, ...JSON.parse(local) });
+          return;
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    callback(DEFAULT_CAPTURED_MOMENTS_PAGE_CONFIG);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("captured_moments_page_updated", handleUpdate);
+  }
+
+  if (isDummyKey) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("captured_moments_page_updated", handleUpdate);
+      }
+    };
+  }
+
+  try {
+    const docRef = doc(db, "config", "captured_moments_page");
+    const unsub = onSnapshot(
+      docRef,
+      (snapshot) => {
+        const data = snapshot.exists() ? (snapshot.data() as Partial<CapturedMomentsPageConfig>) : {};
+        const merged = { ...DEFAULT_CAPTURED_MOMENTS_PAGE_CONFIG, ...data };
+        callback(merged);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(CAPTURED_MOMENTS_PAGE_LOCAL_KEY, JSON.stringify(merged));
+        }
+      },
+      (err) => console.warn("Captured moments page config warning:", err.message)
+    );
+
+    return () => {
+      unsub();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("captured_moments_page_updated", handleUpdate);
+      }
+    };
+  } catch {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("captured_moments_page_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function saveCapturedMomentsPageConfig(
+  config: CapturedMomentsPageConfig
+): Promise<{ success: boolean; error?: string }> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(CAPTURED_MOMENTS_PAGE_LOCAL_KEY, JSON.stringify(config));
+    window.dispatchEvent(new Event("captured_moments_page_updated"));
+  }
+
+  if (isDummyKey) return { success: true };
+
+  try {
+    await setDoc(doc(db, "config", "captured_moments_page"), config, { merge: true });
+    return { success: true };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to save page config";
+    return { success: false, error: message };
+  }
 }
 
 /**

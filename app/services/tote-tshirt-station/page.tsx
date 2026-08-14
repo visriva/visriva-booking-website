@@ -179,6 +179,7 @@ export default function ToteTshirtStationPage() {
               </div>
 
               {/* ESTIMATED BUDGET DISPLAY */}
+              {toggles.showPricing !== false && (
               <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-center space-y-1">
                 <div className="text-xs text-emerald-200/80 font-mono">Estimated Package Investment</div>
                 <div className="text-3xl font-extrabold font-serif text-[#D4AF37]">
@@ -186,6 +187,7 @@ export default function ToteTshirtStationPage() {
                 </div>
                 <div className="text-[10px] text-white/50 font-mono">*Includes live heat press, crew technician &amp; raw merch stock.</div>
               </div>
+              )}
 
               <Link
                 href="/#booking-engine"

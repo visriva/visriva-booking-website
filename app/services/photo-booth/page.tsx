@@ -219,6 +219,7 @@ export default function PhotoBoothServicePage() {
       <WhatsIncluded />
 
       {/* 4. DUAL-HARDWARE TOGGLE & PRICING CARDS */}
+      {toggles.showPricing !== false && (
       <section className="py-16 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
@@ -349,6 +350,7 @@ export default function PhotoBoothServicePage() {
 
         </div>
       </section>
+      )}
 
       {/* 5. SHARED LOGISTICS & TERMS */}
       <SharedTerms serviceType="photo-booth" />

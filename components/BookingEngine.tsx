@@ -363,6 +363,8 @@ export default function BookingEngine() {
     };
   }, [pax, selectedServices, reportingTime, endingTime, settings, pbHardware, selectedPbPkgId, selectedMagPkgId, selectedKcPkgId, selectedMugPkgId, selectedTotePkgId, appliedPerk, featureToggles]);
 
+  const showPricing = featureToggles.showPricing !== false;
+
   const toggleService = (serviceId: string) => {
     const match = ALL_SERVICE_OPTIONS.find((s) => s.id === serviceId);
     if (match && featureToggles[match.toggleKey as keyof FeatureTogglesConfig] === false) {
@@ -809,7 +811,11 @@ export default function BookingEngine() {
                                 <div>
                                   <div className="flex items-center justify-between">
                                     <span className="font-serif font-bold text-xs text-white">{pkg.name}</span>
-                                    <span className="font-mono text-xs font-bold text-[#D4AF37]">₹{pkg.price.toLocaleString("en-IN")}</span>
+                                    {showPricing ? (
+                                      <span className="font-mono text-xs font-bold text-[#D4AF37]">₹{pkg.price.toLocaleString("en-IN")}</span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-emerald-200/70 uppercase">Quote</span>
+                                    )}
                                   </div>
                                   <span className="text-[10px] text-emerald-100/60 font-mono block mt-0.5">{pkg.subtitle || pkg.duration}</span>
                                 </div>
@@ -849,7 +855,11 @@ export default function BookingEngine() {
                                 <div>
                                   <div className="flex items-center justify-between">
                                     <span className="font-serif font-bold text-xs text-white">{pkg.name}</span>
-                                    <span className="font-mono text-xs font-bold text-[#D4AF37]">₹{pkg.price.toLocaleString("en-IN")}</span>
+                                    {showPricing ? (
+                                      <span className="font-mono text-xs font-bold text-[#D4AF37]">₹{pkg.price.toLocaleString("en-IN")}</span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-emerald-200/70 uppercase">Quote</span>
+                                    )}
                                   </div>
                                   <span className="text-[10px] text-emerald-100/60 font-mono block mt-0.5">{pkg.subtitle || pkg.duration}</span>
                                 </div>
@@ -882,7 +892,11 @@ export default function BookingEngine() {
                                 <div>
                                   <div className="flex items-center justify-between">
                                     <span className="font-serif font-bold text-xs text-white">{pkg.name}</span>
-                                    <span className="font-mono text-xs font-bold text-[#D4AF37]">₹{pkg.price.toLocaleString("en-IN")}</span>
+                                    {showPricing ? (
+                                      <span className="font-mono text-xs font-bold text-[#D4AF37]">₹{pkg.price.toLocaleString("en-IN")}</span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-emerald-200/70 uppercase">Quote</span>
+                                    )}
                                   </div>
                                   <span className="text-[10px] text-emerald-100/60 font-mono block mt-0.5">{pkg.subtitle || pkg.duration}</span>
                                 </div>
@@ -915,7 +929,11 @@ export default function BookingEngine() {
                                 <div>
                                   <div className="flex items-center justify-between">
                                     <span className="font-serif font-bold text-xs text-white">{pkg.name}</span>
-                                    <span className="font-mono text-xs font-bold text-[#D4AF37]">₹{pkg.price.toLocaleString("en-IN")}</span>
+                                    {showPricing ? (
+                                      <span className="font-mono text-xs font-bold text-[#D4AF37]">₹{pkg.price.toLocaleString("en-IN")}</span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-emerald-200/70 uppercase">Quote</span>
+                                    )}
                                   </div>
                                   <span className="text-[10px] text-emerald-100/60 font-mono block mt-0.5">{pkg.subtitle || pkg.duration}</span>
                                 </div>
@@ -948,7 +966,11 @@ export default function BookingEngine() {
                                 <div>
                                   <div className="flex items-center justify-between">
                                     <span className="font-serif font-bold text-xs text-white">{pkg.name}</span>
-                                    <span className="font-mono text-xs font-bold text-[#D4AF37]">₹{pkg.price.toLocaleString("en-IN")}</span>
+                                    {showPricing ? (
+                                      <span className="font-mono text-xs font-bold text-[#D4AF37]">₹{pkg.price.toLocaleString("en-IN")}</span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-emerald-200/70 uppercase">Quote</span>
+                                    )}
                                   </div>
                                   <span className="text-[10px] text-emerald-100/60 font-mono block mt-0.5">{pkg.subtitle || pkg.duration}</span>
                                 </div>
@@ -1157,6 +1179,7 @@ export default function BookingEngine() {
                     isComboEligible={budgetInfo.isComboEligible}
                     discountAmount={budgetInfo.discountAmount}
                     submitting={submitting}
+                    hidePricing={!showPricing}
                   />
                   {errorMsg && (
                     <div className="hidden xl:flex p-4 rounded-xl bg-red-950/80 border border-red-500/50 text-red-200 text-xs items-center gap-2">

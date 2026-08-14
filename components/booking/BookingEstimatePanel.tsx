@@ -12,6 +12,7 @@ interface Props {
   discountAmount: number;
   submitting: boolean;
   showSubmit?: boolean;
+  hidePricing?: boolean;
 }
 
 export default function BookingEstimatePanel({
@@ -22,14 +23,26 @@ export default function BookingEstimatePanel({
   discountAmount,
   submitting,
   showSubmit = true,
+  hidePricing = false,
 }: Props) {
   return (
     <div className="rounded-2xl border border-[#D4AF37]/40 bg-gradient-to-b from-[#D4AF37]/10 via-[#011F15]/90 to-[#011F15] p-5 sm:p-6 shadow-[0_0_40px_rgba(212,175,55,0.12)] space-y-4">
       <div className="flex items-center gap-2 text-[#D4AF37] text-[10px] uppercase tracking-[0.2em] font-bold">
         <TrendingUp className="w-4 h-4" />
-        <span>Live estimate</span>
+        <span>{hidePricing ? "Your package" : "Live estimate"}</span>
       </div>
 
+      {hidePricing ? (
+        <div className="space-y-3">
+          <p className="font-serif text-2xl sm:text-3xl font-bold text-white leading-snug">
+            Custom quote on request
+          </p>
+          <p className="text-xs text-emerald-100/65 leading-relaxed border border-white/10 rounded-xl px-3 py-2.5 bg-black/30">
+            Share your date and stations — our team will send a tailored proposal within hours.
+          </p>
+        </div>
+      ) : (
+        <>
       {isComboEligible ? (
         <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-400/40 text-emerald-200 text-xs font-semibold flex items-center justify-between gap-2">
           <span className="flex items-center gap-2">
@@ -78,6 +91,9 @@ export default function BookingEstimatePanel({
             </p>
           ))}
         </div>
+      )}
+
+        </>
       )}
 
       {showSubmit && (
