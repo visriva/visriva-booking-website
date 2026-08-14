@@ -46,6 +46,7 @@ import AdminDashboardHome from "@/components/admin/AdminDashboardHome";
 import AdminEmptyTabState from "@/components/admin/AdminEmptyTabState";
 import TestimonialsCmsPanel from "@/components/admin/TestimonialsCmsPanel";
 import ReservePageCmsPanel from "@/components/admin/ReservePageCmsPanel";
+import CapturedMomentsCmsPanel from "@/components/admin/CapturedMomentsCmsPanel";
 import type { AdminCategory, AdminTab } from "@/lib/adminNav";
 import { ADMIN_NAV, ADMIN_SUBNAV } from "@/lib/adminNav";
 import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
@@ -125,14 +126,6 @@ import {
   PlannersPageConfig,
   DEFAULT_PLANNERS_CONFIG,
   masterSyncAllConfigurations,
-  subscribeCapturedMoments,
-  saveCapturedMomentEvent,
-  deleteCapturedMomentEvent,
-  subscribeCapturedMomentsPageConfig,
-  saveCapturedMomentsPageConfig,
-  CapturedMomentEvent,
-  CapturedMomentsPageConfig,
-  DEFAULT_CAPTURED_MOMENTS_PAGE_CONFIG,
 } from "@/lib/firebase";
 import { fetchGoogleSheetColumns } from "@/lib/googleSheet";
 
@@ -197,14 +190,6 @@ export default function AdminDashboardPage() {
   const [newGalUrl, setNewGalUrl] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [deletingId, setDeletingId] = useState("");
-
-  const [capturedMomentsList, setCapturedMomentsList] = useState<CapturedMomentEvent[]>([]);
-  const [capturedMomentsPageConfig, setCapturedMomentsPageConfig] = useState<CapturedMomentsPageConfig>(
-    DEFAULT_CAPTURED_MOMENTS_PAGE_CONFIG
-  );
-  const [newCmEventCode, setNewCmEventCode] = useState("");
-  const [newCmDisplayName, setNewCmDisplayName] = useState("");
-  const [newCmDriveUrl, setNewCmDriveUrl] = useState("");
 
   // ── Crop Modal State ─────────────────────────────────────────────────────────
   const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -399,12 +384,6 @@ export default function AdminDashboardPage() {
     const unsubPlanners = subscribePlannersConfig((data) => {
       if (data) setPlannersConfig(data);
     });
-    const unsubCaptured = subscribeCapturedMoments((items) => {
-      if (items) setCapturedMomentsList(items);
-    });
-    const unsubCapturedPage = subscribeCapturedMomentsPageConfig((data) => {
-      if (data) setCapturedMomentsPageConfig(data);
-    });
 
     return () => {
       unsubMatrix();
@@ -424,8 +403,6 @@ export default function AdminDashboardPage() {
       unsubAIWhatsApp();
       unsubImpact();
       unsubPlanners();
-      unsubCaptured();
-      unsubCapturedPage();
     };
   }, []);
 
@@ -620,51 +597,6 @@ export default function AdminDashboardPage() {
       );
     } else {
       showToast("Failed to update pricing toggle", true);
-    }
-  };
-
-  const handleSaveCapturedMomentsPageConfig = async () => {
-    setIsSaving(true);
-    const res = await saveCapturedMomentsPageConfig(capturedMomentsPageConfig);
-    setIsSaving(false);
-    if (res.success) {
-      showToast("Captured Moments page settings saved!");
-    } else {
-      showToast(res.error || "Failed to save Captured Moments settings", true);
-    }
-  };
-
-  const handleAddCapturedMomentEvent = async () => {
-    if (!newCmEventCode.trim() || !newCmDisplayName.trim()) {
-      showToast("Event PIN and display name are required", true);
-      return;
-    }
-    setIsSaving(true);
-    const res = await saveCapturedMomentEvent({
-      eventCode: newCmEventCode.trim().toLowerCase(),
-      displayName: newCmDisplayName.trim(),
-      googleDriveUrl: newCmDriveUrl.trim(),
-      isActive: true,
-    });
-    setIsSaving(false);
-    if (res.success) {
-      showToast("Captured Moments event album added!");
-      setNewCmEventCode("");
-      setNewCmDisplayName("");
-      setNewCmDriveUrl("");
-    } else {
-      showToast(res.error || "Failed to add event", true);
-    }
-  };
-
-  const handleDeleteCapturedMomentEvent = async (id: string) => {
-    setIsSaving(true);
-    const res = await deleteCapturedMomentEvent(id);
-    setIsSaving(false);
-    if (res.success) {
-      showToast("Event album removed");
-    } else {
-      showToast(res.error || "Failed to delete event", true);
     }
   };
 
@@ -1736,141 +1668,23 @@ export default function AdminDashboardPage() {
           {activeTab === "galleryManager" && activeCategory === "crm" && (
             <div className="space-y-8">
 
-              {/* CAPTURED MOMENTS — Google Drive + Instagram gate */}
-              <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-                  <div>
-                    <h2 className="font-serif text-2xl font-bold text-white flex items-center gap-2">
-                      <FaInstagram className="w-5 h-5 text-[#D4AF37]" />
-                      Captured Moments Portal
-                    </h2>
-                    <p className="text-xs text-emerald-100/70 mt-1">
-                      Manage /captured-moments — event PINs, Google Drive album links, and Instagram follow gate.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleSaveCapturedMomentsPageConfig}
-                    disabled={isSaving}
-                    className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition flex items-center gap-2"
-                  >
-                    <Save className="w-4 h-4" />
-                    Save page settings
-                  </button>
+              <div className="glass-card rounded-3xl p-5 sm:p-6 border border-[#D4AF37]/25 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h2 className="font-serif text-lg font-bold text-white flex items-center gap-2">
+                    <FaInstagram className="w-4 h-4 text-[#D4AF37]" />
+                    Captured Moments (guest Drive unlock)
+                  </h2>
+                  <p className="text-xs text-emerald-100/70">
+                    Event name + password + Google Drive folders are managed in the dedicated Captured Moments section.
+                  </p>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">Instagram username</label>
-                    <input
-                      type="text"
-                      value={capturedMomentsPageConfig.instagramUsername}
-                      onChange={(e) =>
-                        setCapturedMomentsPageConfig({ ...capturedMomentsPageConfig, instagramUsername: e.target.value })
-                      }
-                      placeholder="visriva.co"
-                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white font-mono text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1 md:col-span-2">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">Page subtitle</label>
-                    <input
-                      type="text"
-                      value={capturedMomentsPageConfig.pageSubtitle}
-                      onChange={(e) =>
-                        setCapturedMomentsPageConfig({ ...capturedMomentsPageConfig, pageSubtitle: e.target.value })
-                      }
-                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white text-sm"
-                    />
-                  </div>
-                </div>
-
-                <label className="flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-white/10 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={capturedMomentsPageConfig.instagramGateEnabled}
-                    onChange={(e) =>
-                      setCapturedMomentsPageConfig({
-                        ...capturedMomentsPageConfig,
-                        instagramGateEnabled: e.target.checked,
-                      })
-                    }
-                    className="w-5 h-5 accent-[#D4AF37]"
-                  />
-                  <span className="text-sm text-white">Require Instagram follow before downloads</span>
-                </label>
-
-                <div className="border-t border-white/10 pt-6 space-y-4">
-                  <h3 className="font-serif text-lg font-bold text-white">Event albums (Google Drive)</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <input
-                      type="text"
-                      value={newCmEventCode}
-                      onChange={(e) => setNewCmEventCode(e.target.value)}
-                      placeholder="Event PIN (rahul-ananya)"
-                      className="px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white font-mono text-sm"
-                    />
-                    <input
-                      type="text"
-                      value={newCmDisplayName}
-                      onChange={(e) => setNewCmDisplayName(e.target.value)}
-                      placeholder="Display name"
-                      className="px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white text-sm"
-                    />
-                    <input
-                      type="url"
-                      value={newCmDriveUrl}
-                      onChange={(e) => setNewCmDriveUrl(e.target.value)}
-                      placeholder="Google Drive folder URL"
-                      className="px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white text-sm"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddCapturedMomentEvent}
-                    disabled={isSaving}
-                    className="px-5 py-2.5 rounded-xl bg-[#D4AF37] text-[#011F15] font-bold text-xs uppercase tracking-wider hover:scale-105 transition flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add event album
-                  </button>
-
-                  <div className="space-y-3">
-                    {capturedMomentsList.length === 0 ? (
-                      <p className="text-xs text-emerald-100/60">No event albums yet. Paste a shared Google Drive folder link per event.</p>
-                    ) : (
-                      capturedMomentsList.map((ev) => (
-                        <div
-                          key={ev.id}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-black/40 border border-white/10"
-                        >
-                          <div>
-                            <p className="font-bold text-white text-sm">{ev.displayName}</p>
-                            <p className="text-[10px] font-mono text-[#D4AF37]">PIN: {ev.eventCode}</p>
-                            {ev.googleDriveUrl && (
-                              <a
-                                href={ev.googleDriveUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[10px] text-emerald-200/70 hover:text-[#D4AF37] truncate block max-w-md"
-                              >
-                                {ev.googleDriveUrl}
-                              </a>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteCapturedMomentEvent(ev.id)}
-                            className="px-3 py-2 rounded-lg bg-red-500/20 text-red-300 text-xs font-bold flex items-center gap-1"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            Remove
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleAdminNavigate("capturedMoments", "capturedMomentsCMS")}
+                  className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition shrink-0"
+                >
+                  Open Captured Moments CMS
+                </button>
               </div>
               
               {/* SECTION 0: RECOMMENDED IMAGE DIMENSIONS & FORMAT GUIDE */}
@@ -2188,14 +2002,15 @@ export default function AdminDashboardPage() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">Event PIN (Captured Moments)</label>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">Optional tag (legacy)</label>
                       <input
                         type="text"
                         value={newGalEventCode}
                         onChange={(e) => setNewGalEventCode(e.target.value)}
-                        placeholder="e.g. rahul-ananya"
+                        placeholder="optional"
                         className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white font-mono text-sm focus:border-[#D4AF37]"
                       />
+                      <p className="text-[10px] text-emerald-100/50">Drive albums: Admin → Captured Moments</p>
                     </div>
                   </div>
 
@@ -4387,7 +4202,7 @@ export default function AdminDashboardPage() {
           {/* ══════════════════════════════════════════════════════════════
               OPTION 14: REAL IMPACT & EVENT TRACK RECORD CMS
           ══════════════════════════════════════════════════════════════ */}
-          {activeTab === "impactStatsCMS" && activeCategory === "branding" && (
+          {activeTab === "impactStatsCMS" && activeCategory === "impact" && (
             <div className="space-y-6">
               {/* Header Card */}
               <div className="glass-card rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 space-y-4">
@@ -4652,6 +4467,10 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
             </div>
+          )}
+
+          {activeTab === "capturedMomentsCMS" && activeCategory === "capturedMoments" && (
+            <CapturedMomentsCmsPanel onToast={showToast} />
           )}
 
           {/* ══════════════════════════════════════════════════════════════

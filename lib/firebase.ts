@@ -223,7 +223,8 @@ export interface CapturedMomentsPageConfig {
 export const DEFAULT_CAPTURED_MOMENTS_PAGE_CONFIG: CapturedMomentsPageConfig = {
   instagramUsername: "visriva.co",
   instagramGateEnabled: true,
-  pageSubtitle: "Enter your event PIN to unlock high-res captures. Follow us on Instagram to download.",
+  pageSubtitle:
+    "Pick your event, enter the password from the host, follow @visriva.co, then unlock your Google Drive album.",
 };
 
 export interface MasterSyncPayload {

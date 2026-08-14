@@ -3,6 +3,7 @@ import {
   Briefcase,
   Calendar,
   CalendarCheck,
+  Camera,
   DollarSign,
   FileText,
   Heart,
@@ -10,11 +11,14 @@ import {
   MessageCircle,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
 
 export type AdminCategory =
   | "dashboard"
   | "branding"
+  | "impact"
+  | "capturedMoments"
   | "reserve"
   | "services"
   | "clients"
@@ -39,6 +43,7 @@ export type AdminTab =
   | "aiWhatsAppCMS"
   | "aiWhatsAppScanner"
   | "impactStatsCMS"
+  | "capturedMomentsCMS"
   | "testimonialsCMS"
   | "reservePageCMS"
   | "clientsCMS";
@@ -74,9 +79,23 @@ export const ADMIN_NAV: AdminNavItem[] = [
   {
     id: "branding",
     label: "Homepage",
-    description: "Hero, bento grid, stats & client feedback",
+    description: "Hero, bento grid & client feedback",
     icon: FileText,
     defaultTab: "websiteText",
+  },
+  {
+    id: "impact",
+    label: "Real Impact",
+    description: "Event track record, stats & partner brands",
+    icon: TrendingUp,
+    defaultTab: "impactStatsCMS",
+  },
+  {
+    id: "capturedMoments",
+    label: "Captured Moments",
+    description: "Event albums, passwords & Google Drive unlock",
+    icon: Camera,
+    defaultTab: "capturedMomentsCMS",
   },
   {
     id: "reserve",
@@ -144,8 +163,13 @@ export const ADMIN_SUBNAV: Record<Exclude<AdminCategory, "dashboard">, AdminSubN
     { id: "websiteText", label: "Homepage Copy" },
     { id: "heroCardStudio", label: "Hero Cards" },
     { id: "bentoGrid", label: "Bento Grid" },
-    { id: "impactStatsCMS", label: "Impact Stats" },
     { id: "testimonialsCMS", label: "Client Feedback" },
+  ],
+  impact: [
+    { id: "impactStatsCMS", label: "Track Record" },
+  ],
+  capturedMoments: [
+    { id: "capturedMomentsCMS", label: "Event Albums" },
   ],
   reserve: [
     { id: "reservePageCMS", label: "Page Content" },
@@ -183,8 +207,10 @@ export interface AdminSitePage {
 
 export const ADMIN_SITE_PAGES: AdminSitePage[] = [
   { path: "/", label: "Homepage", category: "branding", tab: "websiteText" },
-  { path: "/reserve", label: "Reserve / Booking", category: "reserve", tab: "reservePageCMS" },
+  { path: "/", label: "Real Impact Stats", category: "impact", tab: "impactStatsCMS", note: "Homepage track record counters" },
+  { path: "/captured-moments", label: "Captured Moments", category: "capturedMoments", tab: "capturedMomentsCMS", note: "Guest Drive unlock portal" },
   { path: "/clients", label: "Clients Page", category: "clients", tab: "clientsCMS" },
+  { path: "/reserve", label: "Reserve / Booking", category: "reserve", tab: "reservePageCMS" },
   { path: "/gallery", label: "Gallery", category: "crm", tab: "galleryManager" },
   { path: "/services/photo-booth", label: "Photo Booth Service", category: "services", tab: "serviceToggles" },
   { path: "/services/magnet-station", label: "Magnet Station", category: "services", tab: "serviceToggles" },

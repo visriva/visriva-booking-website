@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaInstagram } from "react-icons/fa";
-import { X, ExternalLink, CheckCircle2 } from "lucide-react";
+import { X, ExternalLink, CheckCircle2, FolderOpen } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -11,6 +11,7 @@ interface Props {
   onUnlock: () => void;
   instagramUrl: string;
   instagramUsername: string;
+  eventName?: string;
 }
 
 export default function InstagramGateModal({
@@ -19,6 +20,7 @@ export default function InstagramGateModal({
   onUnlock,
   instagramUrl,
   instagramUsername,
+  eventName,
 }: Props) {
   const [confirmed, setConfirmed] = useState(false);
 
@@ -59,12 +61,17 @@ export default function InstagramGateModal({
                 <FaInstagram className="w-7 h-7 text-white" />
               </div>
               <h3 className="font-serif text-xl sm:text-2xl font-bold text-white">
-                Follow us on Instagram
+                Follow to unlock Drive
               </h3>
               <p className="text-xs text-emerald-100/75 leading-relaxed">
-                To download your captured moments, please follow{" "}
-                <span className="text-[#D4AF37] font-bold">@{instagramUsername}</span> on Instagram.
-                It helps us share more live event magic with you.
+                {eventName ? (
+                  <>
+                    Almost there for <span className="text-white font-semibold">{eventName}</span>.{" "}
+                  </>
+                ) : null}
+                Follow{" "}
+                <span className="text-[#D4AF37] font-bold">@{instagramUsername}</span> on Instagram,
+                then confirm below to open your Google Drive photo album.
               </p>
             </div>
 
@@ -97,9 +104,14 @@ export default function InstagramGateModal({
               onClick={handleUnlock}
               className="w-full py-3.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-sm uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              Unlock downloads
+              <FolderOpen className="w-4 h-4" />
+              Unlock Google Drive album
             </button>
+
+            <p className="text-[10px] text-center text-emerald-100/45 flex items-center justify-center gap-1">
+              <CheckCircle2 className="w-3 h-3" />
+              Your Drive link opens right after you confirm
+            </p>
           </motion.div>
         </motion.div>
       )}
