@@ -17,6 +17,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/services/mug-printing", changeFrequency: "weekly", priority: 0.85 },
     { path: "/services/tote-tshirt-station", changeFrequency: "weekly", priority: 0.85 },
     { path: "/gallery", changeFrequency: "weekly", priority: 0.7 },
+    { path: "/captured-moments", changeFrequency: "weekly", priority: 0.7 },
+    { path: "/qr", changeFrequency: "weekly", priority: 0.85 },
     { path: "/frame-customizer", changeFrequency: "monthly", priority: 0.65 },
     { path: "/photo-booth-bengaluru", changeFrequency: "weekly", priority: 0.8 },
     { path: "/wedding-photo-booth-bangalore", changeFrequency: "weekly", priority: 0.8 },
