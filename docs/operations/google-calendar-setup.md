@@ -5,7 +5,7 @@ Sync Visriva availability with your Google Calendar in two directions.
 ## Where to set it up
 
 1. Open **https://www.visriva.com/admin/operations**
-2. PIN: **G1**
+2. Sign in with your Operations PIN (team PINs are not listed on the page)
 3. **Availability** tab → **Google Calendar Sync** panel (top)
 
 ---

@@ -1,14 +1,10 @@
-/** Operations Hub auth — PIN is G1 only (override via OPERATIONS_PIN env on server). */
+/** Operations Hub auth — team PINs validated server-side only (never shown in UI). */
 
 export const OPS_TRUST_KEY = "visriva_ops_trusted";
 export const OPS_TRUST_DAYS = 90;
 
 export function normalizeOperationsPin(pin: string): string {
   return pin.trim().toLowerCase();
-}
-
-export function isOperationsPinValid(pin: string): boolean {
-  return normalizeOperationsPin(pin) === "g1";
 }
 
 export function setOperationsTrustedLocal(): void {
@@ -42,6 +38,17 @@ export async function createOperationsSession(pin: string): Promise<boolean> {
     headers: { "Content-Type": "application/json" },
     credentials: "include",
     body: JSON.stringify({ pin }),
+  });
+  return res.ok;
+}
+
+/** Re-issue session cookie when this browser was previously trusted (no PIN resent). */
+export async function refreshOperationsSession(): Promise<boolean> {
+  const res = await fetch("/api/operations/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ refresh: true }),
   });
   return res.ok;
 }

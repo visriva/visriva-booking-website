@@ -3,11 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { Lock, ShieldCheck, Loader2 } from "lucide-react";
 import {
-  isOperationsPinValid,
   isOperationsTrustedLocal,
   setOperationsTrustedLocal,
   createOperationsSession,
+  refreshOperationsSession,
   checkOperationsSession,
+  clearOperationsTrustedLocal,
 } from "@/lib/operationsAuth";
 
 interface Props {
@@ -28,9 +29,12 @@ export default function OperationsGate({ children }: Props) {
       const serverOk = await checkOperationsSession();
       const localOk = isOperationsTrustedLocal();
       if (!cancelled) {
-        setAuthenticated(serverOk || localOk);
-        if (localOk && !serverOk) {
-          await createOperationsSession("G1");
+        if (serverOk) {
+          setAuthenticated(true);
+        } else if (localOk) {
+          const refreshed = await refreshOperationsSession();
+          if (refreshed) setAuthenticated(true);
+          else clearOperationsTrustedLocal();
         }
         setChecking(false);
       }
@@ -43,8 +47,8 @@ export default function OperationsGate({ children }: Props) {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinError("");
-    if (!isOperationsPinValid(pin)) {
-      setPinError("Invalid PIN. Operations access requires G1.");
+    if (!pin.trim()) {
+      setPinError("Enter your Operations PIN.");
       return;
     }
     setLoggingIn(true);
@@ -55,7 +59,7 @@ export default function OperationsGate({ children }: Props) {
       setAuthenticated(true);
       setPin("");
     } else {
-      setPinError("Session could not be created. Try again.");
+      setPinError("Invalid PIN. Access denied.");
     }
   };
 
