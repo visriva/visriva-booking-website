@@ -34,6 +34,7 @@ export type AdminTab =
   | "pricingServices"
   | "galleryManager"
   | "bookingCRM"
+  | "contractsCMS"
   | "operatorTab"
   | "featureToggles"
   | "bentoGrid"
@@ -188,6 +189,7 @@ export const ADMIN_SUBNAV: Record<Exclude<AdminCategory, "dashboard">, AdminSubN
   clients: [{ id: "clientsCMS", label: "Clients Page" }],
   crm: [
     { id: "bookingCRM", label: "Booking Leads" },
+    { id: "contractsCMS", label: "Contracts" },
     { id: "galleryManager", label: "Gallery" },
     { id: "globalSettings", label: "Contact Info" },
   ],
@@ -215,6 +217,7 @@ export const ADMIN_SITE_PAGES: AdminSitePage[] = [
   { path: "/clients", label: "Clients Page", category: "clients", tab: "clientsCMS" },
   { path: "/reserve", label: "Reserve / Booking", category: "reserve", tab: "reservePageCMS" },
   { path: "/gallery", label: "Gallery (legacy CMS)", category: "crm", tab: "galleryManager" },
+  { path: "/contract", label: "Event Contracts", category: "crm", tab: "contractsCMS", note: "Per-event agreements & deposit invoices" },
   { path: "/services/photo-booth", label: "Photo Booth Service", category: "services", tab: "serviceToggles" },
   { path: "/services/magnet-station", label: "Magnet Station", category: "services", tab: "serviceToggles" },
   { path: "/contact", label: "Contact (footer & global)", category: "crm", tab: "globalSettings", note: "Phone, email, WhatsApp" },

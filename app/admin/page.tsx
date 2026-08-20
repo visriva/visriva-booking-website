@@ -48,6 +48,7 @@ import TestimonialsCmsPanel from "@/components/admin/TestimonialsCmsPanel";
 import ReservePageCmsPanel from "@/components/admin/ReservePageCmsPanel";
 import CapturedMomentsCmsPanel from "@/components/admin/CapturedMomentsCmsPanel";
 import EventGallerySettingsPanel from "@/components/admin/EventGallerySettingsPanel";
+import ContractsCmsPanel from "@/components/admin/ContractsCmsPanel";
 import type { AdminCategory, AdminTab } from "@/lib/adminNav";
 import { ADMIN_NAV, ADMIN_SUBNAV } from "@/lib/adminNav";
 import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
@@ -2112,6 +2113,10 @@ export default function AdminDashboardPage() {
               </div>
 
             </div>
+          )}
+
+          {activeTab === "contractsCMS" && activeCategory === "crm" && (
+            <ContractsCmsPanel onToast={showToast} />
           )}
 
           {/* TAB 5: BOOKING CRM PIPELINE (KANBAN BOARD) */}

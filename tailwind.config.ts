@@ -9,6 +9,8 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        emeraldBase: "#011F15", // Brand alias → same as emerald-950
+        goldAccent: "#D4AF37", // Brand alias → same as gold-500
         emerald: {
           950: "#011F15", // Primary deep emerald background
           900: "#033524", // Card / Section dark emerald

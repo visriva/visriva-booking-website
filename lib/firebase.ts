@@ -3173,6 +3173,305 @@ export async function saveCapturedMomentsPageConfig(
   }
 }
 
+// ─── EVENT CONTRACTS CMS ─────────────────────────────────────────────────────
+
+export type ContractStatus = "draft" | "sent" | "signed";
+
+export interface EventContract {
+  id: string;
+  clientName: string;
+  clientPhone?: string;
+  eventType: string;
+  eventDate: string;
+  venue: string;
+  services: string[];
+  totalAmount: number;
+  customHashtag?: string;
+  clientLogoUrl?: string;
+  isGstInvoice: boolean;
+  companyName?: string;
+  companyGstin?: string;
+  status: ContractStatus;
+  signatureName?: string;
+  signedAt?: string;
+  termsAcceptedAt?: string;
+  leadId?: string;
+  invoiceNumber: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type EventContractInput = Omit<EventContract, "id" | "invoiceNumber" | "createdAt" | "updatedAt"> & {
+  id?: string;
+  invoiceNumber?: string;
+};
+
+const CONTRACTS_LOCAL_KEY = "visriva_event_contracts";
+
+function makeInvoiceNumber(id: string) {
+  const year = new Date().getFullYear();
+  return `VIS-${year}-${id.slice(0, 6).toUpperCase()}`;
+}
+
+export function subscribeContracts(callback: (contracts: EventContract[]) => void): () => void {
+  const loadLocal = () => {
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem(CONTRACTS_LOCAL_KEY);
+      if (local) {
+        try {
+          callback(JSON.parse(local));
+          return;
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    callback([]);
+  };
+
+  loadLocal();
+
+  const handleUpdate = () => loadLocal();
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("contracts_updated", handleUpdate);
+  }
+
+  if (isDummyKey) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("contracts_updated", handleUpdate);
+      }
+    };
+  }
+
+  try {
+    const colRef = collection(db, "contracts");
+    const unsub = onSnapshot(
+      colRef,
+      (snapshot) => {
+        const contracts: EventContract[] = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<EventContract, "id">),
+        }));
+        contracts.sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
+        callback(contracts);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(CONTRACTS_LOCAL_KEY, JSON.stringify(contracts));
+        }
+      },
+      (err) => console.warn("Contracts snapshot warning:", err.message)
+    );
+
+    return () => {
+      unsub();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("contracts_updated", handleUpdate);
+      }
+    };
+  } catch {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleUpdate);
+        window.removeEventListener("contracts_updated", handleUpdate);
+      }
+    };
+  }
+}
+
+export async function getContract(id: string): Promise<EventContract | null> {
+  if (!id) return null;
+  if (isDummyKey) {
+    if (typeof window === "undefined") return null;
+    const local = localStorage.getItem(CONTRACTS_LOCAL_KEY);
+    if (!local) return null;
+    try {
+      const list = JSON.parse(local) as EventContract[];
+      return list.find((c) => c.id === id) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const snap = await getDoc(doc(db, "contracts", id));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...(snap.data() as Omit<EventContract, "id">) };
+  } catch (e) {
+    console.warn("getContract error:", e);
+    return null;
+  }
+}
+
+export async function saveContract(
+  input: EventContractInput
+): Promise<{ success: boolean; id?: string; invoiceNumber?: string; error?: string }> {
+  try {
+    const now = new Date().toISOString();
+    const id = input.id;
+    const invoiceNumber = input.invoiceNumber || (id ? makeInvoiceNumber(id) : "");
+
+    const payload = {
+      clientName: input.clientName.trim(),
+      clientPhone: input.clientPhone?.trim() || "",
+      eventType: input.eventType.trim(),
+      eventDate: input.eventDate.trim(),
+      venue: input.venue.trim(),
+      services: Array.isArray(input.services) ? input.services.map((s) => s.trim()).filter(Boolean) : [],
+      totalAmount: Math.max(0, Number(input.totalAmount) || 0),
+      customHashtag: input.customHashtag?.trim() || "",
+      clientLogoUrl: input.clientLogoUrl?.trim() || "",
+      isGstInvoice: Boolean(input.isGstInvoice),
+      companyName: input.companyName?.trim() || "",
+      companyGstin: input.companyGstin?.trim() || "",
+      status: (input.status || "draft") as ContractStatus,
+      signatureName: input.signatureName?.trim() || "",
+      signedAt: input.signedAt || "",
+      termsAcceptedAt: input.termsAcceptedAt || "",
+      leadId: input.leadId || "",
+      updatedAt: now,
+    };
+
+    if (isDummyKey) {
+      const list: EventContract[] =
+        typeof window !== "undefined"
+          ? (() => {
+              try {
+                return JSON.parse(localStorage.getItem(CONTRACTS_LOCAL_KEY) || "[]");
+              } catch {
+                return [];
+              }
+            })()
+          : [];
+      const newId = id || `local_${Date.now()}`;
+      const inv = invoiceNumber || makeInvoiceNumber(newId);
+      const next: EventContract = {
+        id: newId,
+        ...payload,
+        invoiceNumber: inv,
+        createdAt: list.find((c) => c.id === newId)?.createdAt || now,
+      };
+      const merged = [next, ...list.filter((c) => c.id !== newId)];
+      if (typeof window !== "undefined") {
+        localStorage.setItem(CONTRACTS_LOCAL_KEY, JSON.stringify(merged));
+        window.dispatchEvent(new Event("contracts_updated"));
+      }
+      return { success: true, id: newId, invoiceNumber: inv };
+    }
+
+    if (id) {
+      const existing = await getDoc(doc(db, "contracts", id));
+      const inv = invoiceNumber || (existing.exists() ? String(existing.data()?.invoiceNumber || makeInvoiceNumber(id)) : makeInvoiceNumber(id));
+      await setDoc(
+        doc(db, "contracts", id),
+        {
+          ...payload,
+          invoiceNumber: inv,
+          createdAt: existing.exists() ? existing.data()?.createdAt || now : now,
+        },
+        { merge: true }
+      );
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("contracts_updated"));
+      return { success: true, id, invoiceNumber: inv };
+    }
+
+    const ref = await addDoc(collection(db, "contracts"), {
+      ...payload,
+      invoiceNumber: "PENDING",
+      createdAt: now,
+    });
+    const inv = makeInvoiceNumber(ref.id);
+    await setDoc(doc(db, "contracts", ref.id), { invoiceNumber: inv }, { merge: true });
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("contracts_updated"));
+    return { success: true, id: ref.id, invoiceNumber: inv };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to save contract";
+    return { success: false, error: message };
+  }
+}
+
+export async function updateContractStatus(
+  id: string,
+  status: ContractStatus
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await saveContract({
+      id,
+      ...(await getContract(id).then((c) => {
+        if (!c) throw new Error("Contract not found");
+        const { id: _id, invoiceNumber: _inv, createdAt: _c, updatedAt: _u, ...rest } = c;
+        return rest;
+      })),
+      status,
+    });
+    return res.success ? { success: true } : { success: false, error: res.error };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed to update status" };
+  }
+}
+
+export async function signContract(
+  id: string,
+  signatureName: string
+): Promise<{ success: boolean; error?: string }> {
+  const name = signatureName.trim();
+  if (!name) return { success: false, error: "Signature name required" };
+  const now = new Date().toISOString();
+
+  if (isDummyKey) {
+    const existing = await getContract(id);
+    if (!existing) return { success: false, error: "Contract not found" };
+    const { id: _id, invoiceNumber, createdAt, updatedAt: _u, ...rest } = existing;
+    return saveContract({
+      id,
+      ...rest,
+      invoiceNumber,
+      signatureName: name,
+      signedAt: now,
+      termsAcceptedAt: now,
+      status: "signed",
+    });
+  }
+
+  try {
+    await setDoc(
+      doc(db, "contracts", id),
+      {
+        signatureName: name,
+        signedAt: now,
+        termsAcceptedAt: now,
+        status: "signed",
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("contracts_updated"));
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed to sign" };
+  }
+}
+
+export async function deleteContract(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (isDummyKey) {
+      if (typeof window !== "undefined") {
+        const list: EventContract[] = JSON.parse(localStorage.getItem(CONTRACTS_LOCAL_KEY) || "[]");
+        localStorage.setItem(CONTRACTS_LOCAL_KEY, JSON.stringify(list.filter((c) => c.id !== id)));
+        window.dispatchEvent(new Event("contracts_updated"));
+      }
+      return { success: true };
+    }
+    await deleteDoc(doc(db, "contracts", id));
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("contracts_updated"));
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed to delete" };
+  }
+}
+
 // ─── EVENT GALLERY SETTINGS (Kwikpic Instagram gate) ─────────────────────────
 
 export interface EventGallerySettings {
