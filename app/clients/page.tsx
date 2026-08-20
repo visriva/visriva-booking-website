@@ -34,6 +34,7 @@ import {
   type TestimonialsConfig,
 } from "@/lib/firebase";
 import { DEFAULT_TESTIMONIALS_CONFIG } from "@/lib/testimonials";
+import EventProofStrip from "@/components/EventProofStrip";
 
 const WHY_CLIENT = [
   {
@@ -466,6 +467,10 @@ export default function ClientsPage() {
           <p className="text-base text-emerald-100/80 max-w-xl mx-auto">
             Reserve your date online or message us on WhatsApp — we typically respond within 2 hours.
           </p>
+
+          <div className="max-w-3xl mx-auto text-left">
+            <EventProofStrip compact />
+          </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link

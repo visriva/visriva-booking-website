@@ -40,6 +40,7 @@ import AIConciergeWidget from "./AIConciergeWidget";
 import DateAvailabilityPicker from "./DateAvailabilityPicker";
 import BookingEstimatePanel from "./booking/BookingEstimatePanel";
 import BookingProgressStepper from "./booking/BookingProgressStepper";
+import EventProofStrip from "./EventProofStrip";
 
 const INPUT_CLASS =
   "w-full bg-[#011F15]/80 border border-white/10 focus:border-[#D4AF37]/60 focus:ring-2 focus:ring-[#D4AF37]/15 rounded-xl px-4 py-3.5 text-white text-sm outline-none transition-all placeholder:text-white/30";
@@ -492,6 +493,10 @@ export default function BookingEngine() {
           <p className="font-sans text-emerald-100/75 text-base sm:text-lg font-light max-w-2xl mx-auto">
             Check live availability, build your package, and get an instant estimate — no payment required.
           </p>
+        </div>
+
+        <div className="mb-8 sm:mb-10">
+          <EventProofStrip compact />
         </div>
 
         {/* If Form Submitted Successfully -> Render Calendly Widget View */}

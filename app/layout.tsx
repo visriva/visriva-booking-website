@@ -64,8 +64,14 @@ export const metadata: Metadata = {
     shortcut: "/mycomapnylogo.png",
     apple: "/mycomapnylogo.png",
   },
-  ...(process.env.GOOGLE_SITE_VERIFICATION
-    ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION } }
+  ...(process.env.GOOGLE_SITE_VERIFICATION || process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+    ? {
+        verification: {
+          google:
+            process.env.GOOGLE_SITE_VERIFICATION ||
+            process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+        },
+      }
     : {}),
 };
 
