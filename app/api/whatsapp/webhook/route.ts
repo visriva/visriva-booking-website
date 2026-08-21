@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { configureEvolutionTls } from "@/lib/evolutionApi";
 import { processInboundWhatsApp } from "@/lib/whatsappInbound";
 import { saveBotSettings } from "@/lib/chatStore";
-import { getMetaConfig, verifyMetaWebhookChallenge } from "@/lib/metaWhatsApp";
+import {
+  getMetaConfig,
+  verifyMetaWebhookChallenge,
+  verifyMetaSignature,
+  metaSignatureConfigured,
+} from "@/lib/metaWhatsApp";
 
 export const runtime = "nodejs";
 
@@ -33,13 +38,26 @@ export async function GET(req: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json().catch(() => null);
+    // Read the RAW body first — Meta's signature is computed over these exact
+    // bytes, so we must not re-stringify a parsed object before verifying.
+    const raw = await request.text();
+    const body = raw ? JSON.parse(raw) : null;
     if (!body) {
       return NextResponse.json({ status: "success", note: "empty body" });
     }
 
     // ── Meta Cloud API inbound ───────────────────────────────────────────────
     if (body.object === "whatsapp_business_account") {
+      // Enforce X-Hub-Signature-256 when an app secret is configured.
+      // Kill switch for emergencies: WHATSAPP_WEBHOOK_ENFORCE_SIGNATURE=false
+      const enforce = process.env.WHATSAPP_WEBHOOK_ENFORCE_SIGNATURE !== "false";
+      if (enforce && metaSignatureConfigured()) {
+        const sig = request.headers.get("x-hub-signature-256");
+        if (!verifyMetaSignature(raw, sig)) {
+          console.warn("[Webhook] Meta signature verification FAILED — rejecting");
+          return NextResponse.json({ status: "error", error: "invalid signature" }, { status: 401 });
+        }
+      }
       const result = await processInboundWhatsApp(body, { skipAi: true });
       return NextResponse.json({ status: "success", source: "meta", ...result });
     }

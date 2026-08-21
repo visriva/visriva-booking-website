@@ -3,6 +3,8 @@
  * Primary path (no QR session required).
  */
 
+import crypto from "crypto";
+
 export interface MetaConfig {
   phoneNumberId: string;
   accessToken: string;
@@ -153,4 +155,39 @@ export function verifyMetaWebhookChallenge(
     return challenge;
   }
   return null;
+}
+
+/** True when at least one Meta/WhatsApp app secret is configured. */
+export function metaSignatureConfigured(): boolean {
+  return !!(process.env.WHATSAPP_APP_SECRET || process.env.META_APP_SECRET);
+}
+
+/**
+ * Verify Meta's `X-Hub-Signature-256` header against the RAW request body.
+ * Meta signs each webhook POST with HMAC-SHA256(appSecret, rawBody) as
+ * `sha256=<hex>`. We check against every configured app secret so a
+ * mislabelled secret doesn't reject legitimate traffic. `rawBody` MUST be the
+ * exact bytes received (do not re-stringify a parsed object).
+ */
+export function verifyMetaSignature(rawBody: string, signatureHeader: string | null): boolean {
+  const header = (signatureHeader || "").trim();
+  if (!header.startsWith("sha256=")) return false;
+  const provided = header.slice("sha256=".length);
+
+  const secrets = [process.env.WHATSAPP_APP_SECRET, process.env.META_APP_SECRET].filter(
+    (s): s is string => !!s
+  );
+  if (secrets.length === 0) return false;
+
+  for (const secret of secrets) {
+    const expected = crypto.createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
+    try {
+      const a = Buffer.from(provided, "hex");
+      const b = Buffer.from(expected, "hex");
+      if (a.length === b.length && crypto.timingSafeEqual(a, b)) return true;
+    } catch {
+      // malformed hex in header — treat as invalid
+    }
+  }
+  return false;
 }

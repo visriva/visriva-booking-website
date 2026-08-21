@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { signOpsToken, verifyOpsToken, opsSessionSecretConfigured } from "@/lib/opsSession";
 
 export const runtime = "nodejs";
 
@@ -26,22 +27,36 @@ function setSessionCookies() {
     maxAge: MAX_AGE,
     path: "/",
   };
-  jar.set(OPS_COOKIE, "1", opts);
-  jar.set(OPS_REFRESH, "1", opts);
+  const session = signOpsToken(MAX_AGE);
+  const refresh = signOpsToken(MAX_AGE);
+  if (!session || !refresh) {
+    // No signing secret configured — refuse to issue a session rather than
+    // fall back to a forgeable static value.
+    throw new Error("ops-session-secret-missing");
+  }
+  jar.set(OPS_COOKIE, session, opts);
+  jar.set(OPS_REFRESH, refresh, opts);
 }
 
 export async function GET() {
   const cookie = cookies().get(OPS_COOKIE);
-  return NextResponse.json({ authenticated: cookie?.value === "1" });
+  return NextResponse.json({ authenticated: verifyOpsToken(cookie?.value) });
 }
 
 export async function POST(req: Request) {
   try {
+    if (!opsSessionSecretConfigured()) {
+      return NextResponse.json(
+        { error: "Operations sessions are not configured on the server." },
+        { status: 500 }
+      );
+    }
+
     const body = await req.json();
 
     if (body?.refresh === true) {
       const refresh = cookies().get(OPS_REFRESH);
-      if (refresh?.value !== "1") {
+      if (!verifyOpsToken(refresh?.value)) {
         return NextResponse.json({ error: "Refresh not allowed" }, { status: 401 });
       }
       setSessionCookies();

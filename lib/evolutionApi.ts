@@ -136,7 +136,12 @@ export function getWebhookHeaders(): Record<string, string> | undefined {
 
 export function verifyCronSecret(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
+  if (!secret) {
+    // Fail closed: without a configured secret we cannot authenticate the
+    // caller, so reject rather than allow the cron endpoint to run open.
+    console.warn("[cron] CRON_SECRET not set — rejecting request");
+    return false;
+  }
   const auth = req.headers.get("authorization");
   return auth === `Bearer ${secret}`;
 }
