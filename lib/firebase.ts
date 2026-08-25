@@ -479,6 +479,17 @@ export interface WebsiteTextConfig {
   whyChooseDescription?: string;
   whyChooseBullets?: string[];
   whyChooseHighlights?: { val: string; label: string }[];
+  concernsBadge?: string;
+  concernsTitle?: string;
+  concernsDescription?: string;
+  /**
+   * Pre-sale objection handling, rendered immediately before the booking
+   * engine. `icon` keys map to a fixed lucide set in ClientConcerns.tsx; an
+   * unknown key falls back to a neutral icon rather than crashing the page.
+   */
+  concerns?: { icon?: string; question: string; answer: string }[];
+  /** Venue logistics surfaced pre-sale instead of only inside the contract. */
+  venueChecklist?: { label: string; value: string }[];
 }
 
 export const DEFAULT_WEBSITE_TEXT: WebsiteTextConfig = {
@@ -514,6 +525,41 @@ export const DEFAULT_WEBSITE_TEXT: WebsiteTextConfig = {
     { val: "4K", label: "Studio Optics" },
     { val: "Custom", label: "Branding Overlays" },
     { val: "100%", label: "On-Site Support" },
+  ],
+  concernsBadge: "Before You Book",
+  concernsTitle: "The Four Things Clients Actually Ask",
+  concernsDescription:
+    "Straight answers on queues, theming, reliability and cost — the things worth knowing before you send an enquiry, not after.",
+  concerns: [
+    {
+      icon: "users",
+      question: "We're expecting 500+ guests. Will there be a queue?",
+      answer:
+        "Prints land in 8 seconds, and we scale the rig to your headcount instead of sending one booth to every event. Past 400 guests that means dual print engines and three attendants working in parallel. Set your guest count in the estimator below and it will show you the exact setup we'd deploy.",
+    },
+    {
+      icon: "palette",
+      question: "Will it clash with our décor and theme?",
+      answer:
+        "Every print template is designed around your event — palette, motifs, monogram, sponsor marks. Nothing is off-the-shelf. Preview a live frame further up this page, and we sign the final artwork off with you well before the date.",
+    },
+    {
+      icon: "shield",
+      question: "What happens if the equipment fails mid-event?",
+      answer:
+        "We carry a 100% on-site uptime guarantee. Our technical crew arrives a full 60 minutes before doors to test the rig end to end, and a white-glove operator stays with the station all evening — the booth is never left to run itself.",
+    },
+    {
+      icon: "wallet",
+      question: "Will there be charges we didn't see coming?",
+      answer:
+        "Your quote covers operating staff, equipment and every print consumable, with travel and logistics stated transparently — no per-print fees. Standard coverage runs four hours; if the evening runs long, the overtime rate is on your written estimate before you commit, never added afterwards.",
+    },
+  ],
+  venueChecklist: [
+    { label: "Power", value: "One dedicated 5A / 230V outlet within 15m of the station" },
+    { label: "Crew Arrival", value: "60 minutes before your doors open" },
+    { label: "Standard Coverage", value: "4 hours, with any overtime quoted upfront" },
   ],
 };
 

@@ -39,6 +39,7 @@ import {
   TrendingUp,
   QrCode,
   Power,
+  HelpCircle,
 } from "lucide-react";
 import { FaInstagram, FaLinkedin } from "react-icons/fa";
 import AdminShell from "@/components/admin/AdminShell";
@@ -3188,6 +3189,157 @@ export default function AdminDashboardPage() {
                               setWebsiteText({ ...websiteText, whyChooseHighlights: newH });
                             }}
                             className="w-full px-2.5 py-1 rounded bg-white/5 border border-white/10 text-emerald-200 text-xs"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Card 4: Section 4 CMS - Before You Book (Client Concerns) */}
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-6">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-gold-gradient text-[#011F15] flex items-center justify-center font-bold">
+                      <HelpCircle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-white">Section 4 CMS: Before You Book</h3>
+                      <p className="text-xs text-emerald-100/70">
+                        The objection-handling block shown just before the booking engine. Keep these answers in step with the contract terms — clients read them as promises.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSaveWebsiteText}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-xs uppercase tracking-wider shadow-gold-sm hover:scale-105 transition cursor-pointer flex items-center space-x-1.5"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Section 4 CMS</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-mono text-emerald-200 mb-1">Badge Text</label>
+                    <input
+                      type="text"
+                      value={websiteText.concernsBadge ?? DEFAULT_WEBSITE_TEXT.concernsBadge ?? ""}
+                      onChange={(e) => setWebsiteText({ ...websiteText, concernsBadge: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white text-xs focus:border-[#D4AF37] focus:outline-none"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-mono text-emerald-200 mb-1">Section Heading</label>
+                    <input
+                      type="text"
+                      value={websiteText.concernsTitle ?? DEFAULT_WEBSITE_TEXT.concernsTitle ?? ""}
+                      onChange={(e) => setWebsiteText({ ...websiteText, concernsTitle: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white text-xs focus:border-[#D4AF37] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-emerald-200 mb-1">Section Paragraph Description</label>
+                  <textarea
+                    rows={2}
+                    value={websiteText.concernsDescription ?? DEFAULT_WEBSITE_TEXT.concernsDescription ?? ""}
+                    onChange={(e) => setWebsiteText({ ...websiteText, concernsDescription: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/20 text-white text-xs focus:border-[#D4AF37] focus:outline-none leading-relaxed"
+                  />
+                </div>
+
+                {/* Concern Q&A Cards Editor */}
+                <div className="space-y-3 pt-3 border-t border-white/10">
+                  <h4 className="font-serif text-sm font-bold text-[#D4AF37]">Client Concern Cards</h4>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {(websiteText.concerns || DEFAULT_WEBSITE_TEXT.concerns || []).map((concern, idx) => (
+                      <div key={idx} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                        <span className="block text-[10px] font-mono text-[#D4AF37]">Concern #{idx + 1}</span>
+                        <div>
+                          <label className="block text-[9px] font-mono text-emerald-200/70">Icon</label>
+                          <select
+                            value={concern.icon || "users"}
+                            onChange={(e) => {
+                              const next = [...(websiteText.concerns || DEFAULT_WEBSITE_TEXT.concerns || [])];
+                              next[idx] = { ...next[idx], icon: e.target.value };
+                              setWebsiteText({ ...websiteText, concerns: next });
+                            }}
+                            className="w-full px-2.5 py-1.5 rounded bg-black/50 border border-white/10 text-white text-xs cursor-pointer"
+                          >
+                            <option value="users">Guests / Queue</option>
+                            <option value="palette">Theme / Décor</option>
+                            <option value="shield">Reliability</option>
+                            <option value="wallet">Pricing</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-mono text-emerald-200/70">Question</label>
+                          <input
+                            type="text"
+                            value={concern.question}
+                            onChange={(e) => {
+                              const next = [...(websiteText.concerns || DEFAULT_WEBSITE_TEXT.concerns || [])];
+                              next[idx] = { ...next[idx], question: e.target.value };
+                              setWebsiteText({ ...websiteText, concerns: next });
+                            }}
+                            className="w-full px-2.5 py-1.5 rounded bg-white/5 border border-white/10 text-white font-bold text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-mono text-emerald-200/70">Answer</label>
+                          <textarea
+                            rows={4}
+                            value={concern.answer}
+                            onChange={(e) => {
+                              const next = [...(websiteText.concerns || DEFAULT_WEBSITE_TEXT.concerns || [])];
+                              next[idx] = { ...next[idx], answer: e.target.value };
+                              setWebsiteText({ ...websiteText, concerns: next });
+                            }}
+                            className="w-full px-2.5 py-1.5 rounded bg-white/5 border border-white/10 text-emerald-200 text-xs leading-relaxed"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Venue Checklist Editor */}
+                <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                  <h4 className="font-serif text-sm font-bold text-[#D4AF37]">Venue Requirement Strip</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {(websiteText.venueChecklist || DEFAULT_WEBSITE_TEXT.venueChecklist || []).map((item, idx) => (
+                      <div key={idx} className="p-3 rounded-xl bg-black/40 border border-white/15 space-y-2">
+                        <span className="block text-[10px] font-mono text-[#D4AF37]">Item #{idx + 1}</span>
+                        <div>
+                          <label className="block text-[9px] font-mono text-emerald-200/70">Label</label>
+                          <input
+                            type="text"
+                            value={item.label}
+                            onChange={(e) => {
+                              const next = [...(websiteText.venueChecklist || DEFAULT_WEBSITE_TEXT.venueChecklist || [])];
+                              next[idx] = { ...next[idx], label: e.target.value };
+                              setWebsiteText({ ...websiteText, venueChecklist: next });
+                            }}
+                            className="w-full px-2.5 py-1 rounded bg-white/5 border border-white/10 text-white font-bold text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-mono text-emerald-200/70">Value</label>
+                          <textarea
+                            rows={2}
+                            value={item.value}
+                            onChange={(e) => {
+                              const next = [...(websiteText.venueChecklist || DEFAULT_WEBSITE_TEXT.venueChecklist || [])];
+                              next[idx] = { ...next[idx], value: e.target.value };
+                              setWebsiteText({ ...websiteText, venueChecklist: next });
+                            }}
+                            className="w-full px-2.5 py-1 rounded bg-white/5 border border-white/10 text-emerald-200 text-xs leading-relaxed"
                           />
                         </div>
                       </div>
