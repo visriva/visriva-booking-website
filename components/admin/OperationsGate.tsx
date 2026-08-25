@@ -10,6 +10,7 @@ import {
   checkOperationsSession,
   clearOperationsTrustedLocal,
 } from "@/lib/operationsAuth";
+import { hasAdminClaim, waitForAuthReady } from "@/lib/adminFirebaseSignIn";
 
 interface Props {
   children: React.ReactNode;
@@ -28,16 +29,30 @@ export default function OperationsGate({ children }: Props) {
     (async () => {
       const serverOk = await checkOperationsSession();
       const localOk = isOperationsTrustedLocal();
-      if (!cancelled) {
-        if (serverOk) {
-          setAuthenticated(true);
-        } else if (localOk) {
-          const refreshed = await refreshOperationsSession();
+      if (cancelled) return;
+
+      if (serverOk) {
+        // The cookie authorises server routes, but the Hub's finance dashboard
+        // reads finance_transactions straight from the browser and
+        // firestore.rules now gate that on the Firebase `admin` claim. That
+        // claim lives in a separate Firebase session which can lapse or be
+        // cleared independently of the cookie, so re-mint it before opening.
+        // If minting fails the gate still opens — the cookie is legitimately
+        // valid and the rest of the Hub runs through server routes.
+        await waitForAuthReady();
+        if (!cancelled && !(await hasAdminClaim())) {
+          await refreshOperationsSession();
+        }
+        if (!cancelled) setAuthenticated(true);
+      } else if (localOk) {
+        const refreshed = await refreshOperationsSession();
+        if (!cancelled) {
           if (refreshed) setAuthenticated(true);
           else clearOperationsTrustedLocal();
         }
-        setChecking(false);
       }
+
+      if (!cancelled) setChecking(false);
     })();
     return () => {
       cancelled = true;

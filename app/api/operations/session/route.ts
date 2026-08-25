@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { signOpsToken, verifyOpsToken, opsSessionSecretConfigured } from "@/lib/opsSession";
+import { mintAdminClaimToken } from "@/lib/adminClaimToken";
+import { rateLimit, clientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -8,14 +10,19 @@ const OPS_COOKIE = "visriva_ops_session";
 const OPS_REFRESH = "visriva_ops_refresh";
 const MAX_AGE = 90 * 24 * 60 * 60; // 90 days — trusted device
 
-/** Team PINs for Operations Hub. Override with OPERATIONS_PINS (comma-separated). */
+/**
+ * Team PINs for the Operations Hub — set OPERATIONS_PINS (comma-separated).
+ *
+ * There is deliberately NO fallback list. This previously defaulted to the
+ * team's first names, which are effectively public; because a valid PIN here now
+ * also mints a Firebase `admin` claim (see firestore.rules), a guessable PIN
+ * would hand over the finance ledger and customer WhatsApp history.
+ */
 function allowedPins(): string[] {
-  const fromEnv = (process.env.OPERATIONS_PINS || "")
+  return (process.env.OPERATIONS_PINS || "")
     .split(",")
     .map((p) => p.trim().toLowerCase())
     .filter(Boolean);
-  if (fromEnv.length > 0) return fromEnv;
-  return ["drupitha", "punith", "arpitha", "jeevan"];
 }
 
 function setSessionCookies() {
@@ -60,18 +67,43 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Refresh not allowed" }, { status: 401 });
       }
       setSessionCookies();
-      return NextResponse.json({ ok: true, authenticated: true });
+      // Re-mint so a refreshed tab regains its Firestore identity too.
+      const firebaseToken = await mintAdminClaimToken();
+      return NextResponse.json({ ok: true, authenticated: true, firebaseToken });
+    }
+
+    // Throttle PIN guessing.
+    const limit = rateLimit(`ops-session:${clientIp(req)}`, 8, 60_000);
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "Too many attempts. Try again shortly." },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+      );
+    }
+
+    const pins = allowedPins();
+    if (pins.length === 0) {
+      return NextResponse.json(
+        { error: "Operations access is not configured. Set OPERATIONS_PINS on the server." },
+        { status: 503 }
+      );
     }
 
     const pin = String(body?.pin || "")
       .trim()
       .toLowerCase();
-    if (!pin || !allowedPins().includes(pin)) {
+    if (!pin || !pins.includes(pin)) {
       return NextResponse.json({ error: "Invalid operations PIN" }, { status: 401 });
     }
 
     setSessionCookies();
-    return NextResponse.json({ ok: true, authenticated: true });
+
+    // The Hub reads the finance ledger directly from the browser, which
+    // firestore.rules now gates on the `admin` claim. Hand back a custom token
+    // so the client can establish that Firebase identity.
+    const firebaseToken = await mintAdminClaimToken();
+
+    return NextResponse.json({ ok: true, authenticated: true, firebaseToken });
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }

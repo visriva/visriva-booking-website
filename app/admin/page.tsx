@@ -52,8 +52,8 @@ import ContractsCmsPanel from "@/components/admin/ContractsCmsPanel";
 import type { AdminCategory, AdminTab } from "@/lib/adminNav";
 import { ADMIN_NAV, ADMIN_SUBNAV } from "@/lib/adminNav";
 import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
-import { isAuthorizedAdminPassword } from "@/lib/adminAuth";
 import { isAdminSessionValid, setAdminSession } from "@/components/admin/AdminGate";
+import { signInAdminWithPin, hasAdminClaim, waitForAuthReady } from "@/lib/adminFirebaseSignIn";
 import { doc, setDoc } from "firebase/firestore";
 import {
   subscribePricingMatrix,
@@ -321,9 +321,19 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Restore admin session (shared with /admin/operations)
+  // Restore admin session (shared with /admin/operations).
+  // Requires the Firebase `admin` claim too — without it firestore.rules denies
+  // every read, so showing the panel as unlocked would be misleading.
   useEffect(() => {
-    if (isAdminSessionValid()) setAuthenticated(true);
+    let cancelled = false;
+    (async () => {
+      if (!isAdminSessionValid()) return;
+      await waitForAuthReady();
+      if (!cancelled && (await hasAdminClaim())) setAuthenticated(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Poll WhatsApp status when the scanner tab is opened
@@ -419,14 +429,17 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isAuthorizedAdminPassword(pin)) {
+    // PIN is verified server-side, which returns a Firebase custom token
+    // carrying the `admin` claim that firestore.rules requires.
+    const res = await signInAdminWithPin(pin);
+    if (res.ok) {
       setAdminSession();
       setAuthenticated(true);
       setPinError("");
     } else {
-      setPinError("Invalid PIN. Access requires authorized admin password.");
+      setPinError(res.error || "Invalid PIN. Access requires authorized admin password.");
     }
   };
 
