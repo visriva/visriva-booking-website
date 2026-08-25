@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getOperatorConfigServer } from "@/lib/firebase";
+import { getOperatorConfigAdmin } from "@/lib/operatorConfigAdmin";
 import { configureEvolutionTls, getEvolutionConfig, getEvolutionHeaders } from "@/lib/evolutionApi";
 
 configureEvolutionTls();
@@ -7,7 +7,7 @@ configureEvolutionTls();
 export async function POST(req: Request) {
   try {
     const { name, phone, token, galleryUrl, templateName, templateLanguage, isMarketing, ttlSeconds } = await req.json();
-    const opConfig = await getOperatorConfigServer();
+    const opConfig = await getOperatorConfigAdmin();
 
     if (!phone) {
       return NextResponse.json(

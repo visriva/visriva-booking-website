@@ -1,13 +1,44 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
-import { onAuthStateChanged, signInWithEmailAndPassword, User } from "firebase/auth";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+
+/**
+ * Being signed in is no longer sufficient. firestore.rules gate wa_* on the
+ * `admin` claim, so after sign-in we ask the server to grant it (it checks the
+ * email against ADMIN_EMAILS) and then force-refresh the ID token so the claim
+ * is actually present on subsequent Firestore reads.
+ */
+async function ensureAdminClaim(user: User): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const existing = await user.getIdTokenResult();
+    if (existing.claims.admin === true) return { ok: true };
+
+    const res = await fetch("/api/admin/grant-claim", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await user.getIdToken()}` },
+    });
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) {
+      return { ok: false, error: data.error || "Access could not be verified." };
+    }
+
+    // Claims only reach the rules engine after a token refresh.
+    const refreshed = await user.getIdTokenResult(true);
+    return refreshed.claims.admin === true
+      ? { ok: true }
+      : { ok: false, error: "Access granted but not yet active. Try signing in again." };
+  } catch {
+    return { ok: false, error: "Network error while verifying access." };
+  }
+}
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  
+  const [authorized, setAuthorized] = useState(false);
+
   // Login form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,7 +48,17 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      setLoading(false);
+      if (!currentUser) {
+        setAuthorized(false);
+        setLoading(false);
+        return;
+      }
+      void (async () => {
+        const result = await ensureAdminClaim(currentUser);
+        setAuthorized(result.ok);
+        if (!result.ok) setError(result.error || "Not authorised.");
+        setLoading(false);
+      })();
     });
 
     return () => unsubscribe();
@@ -60,9 +101,38 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // If user is authenticated, render the protected children
-  if (user) {
+  // Authenticated AND carrying the admin claim the rules require.
+  if (user && authorized) {
     return <>{children}</>;
+  }
+
+  // Signed in but not on the allowlist — say so instead of rendering a
+  // dashboard whose every Firestore read would fail with permission-denied.
+  if (user && !authorized) {
+    return (
+      <div style={styles.loginContainer}>
+        <div style={styles.loginCard}>
+          <div style={styles.loginHeader}>
+            <div style={styles.iconBox}>🚫</div>
+            <h2 style={styles.loginTitle}>Not authorised</h2>
+            <p style={styles.loginSubtitle}>
+              {user.email} is signed in, but not permitted to use the agent dashboard.
+            </p>
+          </div>
+          {error && <div style={styles.errorBox}>{error}</div>}
+          <button
+            type="button"
+            onClick={() => void signOut(auth)}
+            style={styles.submitBtn}
+          >
+            Sign out
+          </button>
+          <div style={styles.footerInfo}>
+            <p>Add this address to ADMIN_EMAILS on the server to grant access.</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // If not authenticated, render the dark-themed login screen

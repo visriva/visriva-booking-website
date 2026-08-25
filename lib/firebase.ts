@@ -1586,19 +1586,9 @@ export async function saveOperatorConfig(
   }
 }
 
-export async function getOperatorConfigServer(): Promise<OperatorConfig> {
-  if (isDummyKey) return DEFAULT_OPERATOR_CONFIG;
-  try {
-    const docRef = doc(db, "config", "operator");
-    const snapshot = await getDoc(docRef);
-    if (snapshot.exists()) {
-      return { ...DEFAULT_OPERATOR_CONFIG, ...(snapshot.data() as OperatorConfig) };
-    }
-  } catch (e) {
-    console.error("Error reading operator config:", e);
-  }
-  return DEFAULT_OPERATOR_CONFIG;
-}
+// getOperatorConfigServer() was removed: it read config/operator with the client
+// SDK, which firestore.rules now deny for unauthenticated server calls. Server
+// routes must use getOperatorConfigAdmin() from lib/operatorConfigAdmin.ts.
 
 export interface OperatorTokenItem {
   id: string;
@@ -2904,10 +2894,16 @@ export async function deleteGalleryItem(
 
   if (typeof window !== "undefined" && !isDummyKey) {
     try {
+      // The route now requires the `admin` claim, so pass the Firebase ID token
+      // established at PIN login (lib/adminFirebaseSignIn).
+      const idToken = await auth.currentUser?.getIdToken().catch(() => undefined);
       const res = await fetch("/api/gallery/delete", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, storagePath: resolvedPath, storageUrl }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({ id }),
       });
       if (res.ok) {
         completedSteps.push("server");
