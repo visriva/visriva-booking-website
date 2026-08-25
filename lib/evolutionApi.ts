@@ -44,24 +44,17 @@ async function loadFirestoreOperatorOverrides(): Promise<Partial<EvolutionConfig
 /** Optional backup Evolution VPS — for send failover only. */
 export async function getBackupEvolutionConfig(): Promise<EvolutionConfig | null> {
   try {
-    const { initializeApp, getApps, getApp } = await import("firebase/app");
-    const { getFirestore, doc, getDoc } = await import("firebase/firestore");
+    // Must use firebase-admin: config/operator is admin-only under
+    // firestore.rules, and this runs server-side with no auth identity. The
+    // client SDK previously used here would now be denied and silently
+    // disable failover.
+    const { adminDb } = await import("@/lib/firebaseAdmin");
+    if (!adminDb) return null;
 
-    const firebaseConfig = {
-      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "visriva-live-station",
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-    };
+    const snap = await adminDb.collection("config").doc("operator").get();
+    if (!snap.exists) return null;
 
-    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-    const db = getFirestore(app);
-    const snap = await getDoc(doc(db, "config", "operator"));
-    if (!snap.exists()) return null;
-
-    const data = snap.data();
+    const data = snap.data() || {};
     const url = data.backupEvoApiUrl ? normalizeUrl(String(data.backupEvoApiUrl)) : null;
     const key = data.backupEvoApiKey ? String(data.backupEvoApiKey) : null;
     const instance = data.backupInstanceName ? String(data.backupInstanceName) : "visriva-live";
@@ -136,7 +129,12 @@ export function getWebhookHeaders(): Record<string, string> | undefined {
 
 export function verifyCronSecret(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
+  if (!secret) {
+    // Fail closed: without a configured secret we cannot authenticate the
+    // caller, so reject rather than allow the cron endpoint to run open.
+    console.warn("[cron] CRON_SECRET not set — rejecting request");
+    return false;
+  }
   const auth = req.headers.get("authorization");
   return auth === `Bearer ${secret}`;
 }

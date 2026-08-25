@@ -39,22 +39,34 @@ import {
 } from "@/lib/firebase";
 import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
 import OperatorPrintStatusBanner from "@/components/OperatorPrintStatusBanner";
-import { hasAdminPasswordsConfigured, isAuthorizedAdminPassword } from "@/lib/adminAuth";
+import { signInAdminWithPin, hasAdminClaim, waitForAuthReady } from "@/lib/adminFirebaseSignIn";
 
 const DEFAULT_TOKENS: TokenItem[] = [];
 
 export default function OperatorCommandCenterPage() {
   const [pin, setPin] = useState("");
-  const [authenticated, setAuthenticated] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return (
-        sessionStorage.getItem("visriva_operator_auth") === "true" ||
-        localStorage.getItem("visriva_operator_auth") === "true"
-      );
-    }
-    return false;
-  });
+  const [authenticated, setAuthenticated] = useState<boolean>(false);
   const [authError, setAuthError] = useState("");
+  const [authenticating, setAuthenticating] = useState(false);
+
+  // Restore a previous session only if the Firebase `admin` claim is still live.
+  // Trusting the local flag alone would render the console while every read of
+  // config/operator and config/operator_tokens is denied by firestore.rules.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (typeof window === "undefined") return;
+      const flagged =
+        sessionStorage.getItem("visriva_operator_auth") === "true" ||
+        localStorage.getItem("visriva_operator_auth") === "true";
+      if (!flagged) return;
+      await waitForAuthReady();
+      if (!cancelled && (await hasAdminClaim())) setAuthenticated(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [opConfig, setOpConfig] = useState<OperatorConfig>(DEFAULT_OPERATOR_CONFIG);
   const [featureToggles, setFeatureToggles] = useState<FeatureTogglesConfig>(DEFAULT_FEATURE_TOGGLES);
@@ -235,19 +247,22 @@ export default function OperatorCommandCenterPage() {
   const [customFieldAnswers, setCustomFieldAnswers] = useState<Record<string, string>>({});
 
   // PIN / Password Unlock Handler
-  const handleAuthenticate = (e: React.FormEvent) => {
+  //
+  // The PIN is verified server-side, which returns a Firebase custom token
+  // carrying the `admin` claim. The operator console reads config/operator and
+  // config/operator_tokens (guest names + phones), both of which firestore.rules
+  // now restricts to that claim — so the Firebase sign-in is what actually
+  // grants access, not this local flag.
+  const handleAuthenticate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const entered = pin.trim().toLowerCase();
-    const targetPin = (opConfig.pin || "visriva2026").toLowerCase();
+    if (authenticating) return;
 
-    const isMatch =
-      entered === targetPin ||
-      entered === "visriva2026" ||
-      (opConfig.allowAdminPass !== false &&
-        hasAdminPasswordsConfigured() &&
-        isAuthorizedAdminPassword(entered));
+    setAuthenticating(true);
+    setAuthError("");
 
-    if (isMatch) {
+    const res = await signInAdminWithPin(pin);
+
+    if (res.ok) {
       setAuthenticated(true);
       setAuthError("");
       if (typeof window !== "undefined") {
@@ -255,8 +270,9 @@ export default function OperatorCommandCenterPage() {
         localStorage.setItem("visriva_operator_auth", "true");
       }
     } else {
-      setAuthError("Invalid Crew Security PIN or Admin Password.");
+      setAuthError(res.error || "Invalid Crew Security PIN or Admin Password.");
     }
+    setAuthenticating(false);
   };
 
   // Add New Token with Phone Formatting and Timestamping

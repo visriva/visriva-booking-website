@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import { Lock, ShieldCheck } from "lucide-react";
-import { isAuthorizedAdminPassword } from "@/lib/adminAuth";
+import {
+  signInAdminWithPin,
+  hasAdminClaim,
+  waitForAuthReady,
+} from "@/lib/adminFirebaseSignIn";
 
 const AUTH_KEY = "visriva_admin_session";
 const SESSION_HOURS = 12;
@@ -26,21 +30,42 @@ export default function AdminGate({ children }: { children: React.ReactNode }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [pinError, setPinError] = useState("");
   const [checking, setChecking] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
+  // The real gate is the Firebase `admin` claim that firestore.rules checks —
+  // sessionStorage alone would leave every Firestore read denied.
   useEffect(() => {
-    setAuthenticated(isAdminSessionValid());
-    setChecking(false);
+    let cancelled = false;
+    (async () => {
+      await waitForAuthReady();
+      const ok = (await hasAdminClaim()) && isAdminSessionValid();
+      if (cancelled) return;
+      setAuthenticated(ok);
+      setChecking(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isAuthorizedAdminPassword(pin)) {
+    if (submitting) return;
+
+    setSubmitting(true);
+    setPinError("");
+
+    // PIN is verified server-side, which returns a Firebase custom token.
+    const res = await signInAdminWithPin(pin);
+
+    if (res.ok) {
       setAdminSession();
       setAuthenticated(true);
-      setPinError("");
+      setPin("");
     } else {
-      setPinError("Invalid PIN. Access denied.");
+      setPinError(res.error || "Invalid PIN. Access denied.");
     }
+    setSubmitting(false);
   };
 
   if (checking) {
@@ -79,9 +104,10 @@ export default function AdminGate({ children }: { children: React.ReactNode }) {
           {pinError && <p className="text-xs text-rose-400 text-center">{pinError}</p>}
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-sm uppercase tracking-wider"
+            disabled={submitting}
+            className="w-full py-3 rounded-xl bg-gold-gradient text-[#011F15] font-extrabold text-sm uppercase tracking-wider disabled:opacity-60"
           >
-            Unlock Panel
+            {submitting ? "Verifying…" : "Unlock Panel"}
           </button>
         </form>
       </div>

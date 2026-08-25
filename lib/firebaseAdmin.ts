@@ -5,6 +5,7 @@
 
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 
 let app: App | undefined;
 
@@ -67,3 +68,14 @@ export const adminDb = app
       return firestore;
     })()
   : null;
+
+/**
+ * Auth Admin client — use in API routes only (server-side).
+ *
+ * Used to mint short-lived Firebase custom tokens carrying an `admin` claim
+ * after a PIN has been verified server-side. That claim is what firestore.rules
+ * checks via `isAdmin()`, so the browser can read the finance ledger and
+ * WhatsApp history without those collections being world-readable.
+ */
+export const adminAuth = app ? getAuth(app) : null;
+

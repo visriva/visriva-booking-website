@@ -1,5 +1,7 @@
 /** Operations Hub auth — team PINs validated server-side only (never shown in UI). */
 
+import { signInWithMintedToken, signOutAdmin } from "@/lib/adminFirebaseSignIn";
+
 export const OPS_TRUST_KEY = "visriva_ops_trusted";
 export const OPS_TRUST_DAYS = 90;
 
@@ -32,6 +34,23 @@ export function isOperationsTrustedLocal(): boolean {
   }
 }
 
+/**
+ * Establish the Firebase Auth session that firestore.rules requires.
+ *
+ * The Hub's finance dashboard reads finance_transactions directly from the
+ * browser, and that collection is now gated on the `admin` claim. The session
+ * route returns a custom token alongside the cookie; exchanging it here is what
+ * makes those reads succeed.
+ */
+async function adoptFirebaseSession(res: Response): Promise<void> {
+  try {
+    const data = (await res.json()) as { firebaseToken?: string | null };
+    if (data?.firebaseToken) await signInWithMintedToken(data.firebaseToken);
+  } catch {
+    // Cookie session still valid for server routes; Firestore reads may be denied.
+  }
+}
+
 export async function createOperationsSession(pin: string): Promise<boolean> {
   const res = await fetch("/api/operations/session", {
     method: "POST",
@@ -39,7 +58,9 @@ export async function createOperationsSession(pin: string): Promise<boolean> {
     credentials: "include",
     body: JSON.stringify({ pin }),
   });
-  return res.ok;
+  if (!res.ok) return false;
+  await adoptFirebaseSession(res);
+  return true;
 }
 
 /** Re-issue session cookie when this browser was previously trusted (no PIN resent). */
@@ -50,7 +71,9 @@ export async function refreshOperationsSession(): Promise<boolean> {
     credentials: "include",
     body: JSON.stringify({ refresh: true }),
   });
-  return res.ok;
+  if (!res.ok) return false;
+  await adoptFirebaseSession(res);
+  return true;
 }
 
 export async function checkOperationsSession(): Promise<boolean> {
@@ -70,4 +93,5 @@ export async function checkOperationsSession(): Promise<boolean> {
 export async function destroyOperationsSession(): Promise<void> {
   await fetch("/api/operations/session", { method: "DELETE", credentials: "include" });
   clearOperationsTrustedLocal();
+  await signOutAdmin();
 }

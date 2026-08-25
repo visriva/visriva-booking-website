@@ -1,87 +1,167 @@
 rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Visriva Live Station — Firestore security rules
+//
+// Model: the browser gets ONLY what the public site genuinely needs. Every
+// admin/ops read and write requires a real Firebase Auth identity carrying the
+// `admin` custom claim, minted server-side after a PIN check
+// (app/api/admin/firebase-token, app/api/operations/session).
+//
+// Previously nearly every collection was `allow read, write: if true`, which
+// meant anyone holding the public NEXT_PUBLIC_FIREBASE_* config (shipped in the
+// client bundle by design) could read and modify the finance ledger, customer
+// WhatsApp history and all booking leads directly, bypassing the app.
+//
+// NOTE: firebase-admin (server API routes) bypasses these rules entirely, so
+// tightening them here does not affect server-side code paths.
+// ─────────────────────────────────────────────────────────────────────────────
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── CMS config — public read, no client-side deletes ───────────────────
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    // A signed-in operator/admin. The `admin` claim is set server-side only.
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Any authenticated session (admin claim not required).
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidBookingCreate() {
+      return request.resource.data.keys().hasAll(['eventDate', 'venue', 'pax', 'services'])
+        && request.resource.data.pax is int
+        && request.resource.data.pax > 0
+        && request.resource.data.pax < 100000
+        && request.resource.data.services is list;
+    }
+
+    // A customer signing their own contract from the shareable /contract/[id]
+    // link. They are NOT signed in, so this is deliberately narrow: only the
+    // five signature fields may change, status must move to "signed", and an
+    // already-signed contract cannot be re-signed or altered.
+    function isContractSigning() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return changed.hasOnly(['signatureName', 'signedAt', 'termsAcceptedAt', 'status', 'updatedAt'])
+        && request.resource.data.status == 'signed'
+        && resource.data.status != 'signed'
+        && request.resource.data.signatureName is string
+        && request.resource.data.signatureName.size() > 0
+        && request.resource.data.signatureName.size() < 200;
+    }
+
+    // Config singletons that must NOT be world-readable:
+    //  - operator          → holds the operator PIN
+    //  - operator_tokens   → guestName + guestPhone for every pickup (PII)
+    //  - whatsapp_bot      → bot wiring/credentials
+    //  - calendar_settings → private iCal feed URLs
+    //  - finance_settings  → finance/Sheets wiring
+    // Everything else under config/ renders the public site (pricing_matrix,
+    // hero_cards, testimonials, feature_toggles, website_text, …) and stays open.
+    function isPrivateConfig(docId) {
+      return docId in [
+        'operator',
+        'operator_tokens',
+        'whatsapp_bot',
+        'calendar_settings',
+        'finance_settings'
+      ];
+    }
+
+    // ─── Public site content — world-readable, admin-writable ────────────────
+    // Public pages render from these, so read must stay open. Writes come from
+    // the admin CMS and now require the admin claim.
+
     match /config/{docId} {
-      allow read: if true;
-      allow create, update: if true;
+      allow read: if !isPrivateConfig(docId) || isAdmin();
+      allow create, update: if isAdmin();
       allow delete: if false;
     }
 
     match /services/{serviceId} {
       allow read: if true;
-      allow create, update: if true;
+      allow create, update: if isAdmin();
       allow delete: if false;
     }
 
     match /site_content/{docId} {
       allow read: if true;
-      allow create, update: if true;
+      allow create, update: if isAdmin();
       allow delete: if false;
     }
 
-    // ─── Gallery — public read; admin CMS add/update/delete ───────────────────
     match /galleries/{itemId} {
       allow read: if true;
-      allow create, update, delete: if true;
+      allow create, update, delete: if isAdmin();
     }
 
     match /captured_moments/{eventId} {
       allow read: if true;
-      allow create, update, delete: if true;
+      allow create, update, delete: if isAdmin();
     }
 
-    // ─── Event contracts (shareable client agreements) ───────────────────────
+    // ─── Event contracts ─────────────────────────────────────────────────────
+    // Read stays public: contracts are shared with clients as unguessable
+    // /contract/[id] links and the page loads client-side without a login.
     match /contracts/{contractId} {
       allow read: if true;
-      allow create, update, delete: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() || isContractSigning();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Bookings ────────────────────────────────────────────────────────────
+    // Anyone may submit a validated lead. Only admins may read them back —
+    // this closes public read access to every lead's name, phone and venue.
+    match /bookings/{bookingId} {
+      allow create: if isValidBookingCreate();
+      allow read, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // ─── Finance ledger — admin only ─────────────────────────────────────────
+    match /finance_transactions/{txId} {
+      allow read, create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Customer WhatsApp history (PII) — admin only ─────────────────────────
+    match /chats/{phone} {
+      allow read, write: if isAdmin();
+      match /messages/{messageId} {
+        allow read, write: if isAdmin();
+      }
+    }
+
+    // ─── WhatsApp AI agent — admin only ──────────────────────────────────────
+    match /wa_conversations/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /wa_agent_settings/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /wa_kb_documents/{document=**} {
+      allow read, write: if isAdmin();
     }
 
     // ─── Live print queue (webbooth → webprinter) ────────────────────────────
+    // RESIDUAL RISK, INTENTIONALLY LEFT OPEN FOR NOW: booth and printer
+    // devices run unauthenticated on the event-day LAN (app/webbooth,
+    // app/webprinter, app/event-setup). Requiring auth here without first
+    // adding anonymous sign-in to those devices would break a live event.
+    // Follow-up: signInAnonymously() on booth devices, then swap `if true`
+    // below for `isSignedIn()`. Job docs are transient and hold guest photos.
     match /print_jobs/{jobId} {
       allow read, create, update: if true;
       allow delete: if false;
     }
 
-    // ─── Bookings — public create with validation, no client deletes ─────────
-    match /bookings/{bookingId} {
-      allow create: if isValidBookingCreate();
-      allow read, update: if true;
-      allow delete: if false;
-    }
-
-    // ─── WhatsApp AI Agent ───────────────────────────────────────────────────
-    // TODO: require request.auth != null once all API routes use firebase-admin
-    match /wa_conversations/{document=**} {
-      allow read, write: if true;
-    }
-    match /wa_agent_settings/{document=**} {
-      allow read, write: if true;
-    }
-    match /wa_kb_documents/{document=**} {
-      allow read, write: if true;
-    }
-
-    // ─── Operations Hub — finance ledger (PIN-gated in app; rules match CMS pattern) ─
-    match /finance_transactions/{txId} {
-      allow read, create, update, delete: if true;
-    }
-
-    // ─── Legacy WhatsApp CRM (admin/whatsapp inbox) ───────────────────────────
-    match /chats/{phone} {
-      allow read, write: if true;
-      match /messages/{messageId} {
-        allow read, write: if true;
-      }
-    }
-  }
-
-  function isValidBookingCreate() {
-    return request.resource.data.keys().hasAll(['eventDate', 'venue', 'pax', 'services'])
-      && request.resource.data.pax is int
-      && request.resource.data.pax > 0
-      && request.resource.data.pax < 100000
-      && request.resource.data.services is list;
+    // Anything not matched above is denied by default.
   }
 }
