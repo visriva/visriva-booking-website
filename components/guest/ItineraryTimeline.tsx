@@ -3,29 +3,90 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Clock, MapPin } from "lucide-react";
-import type { GuestEventConfig } from "@/lib/guestExperience";
+import type { GuestEventConfig, ItineraryItem } from "@/lib/guestExperience";
 import { getItineraryStatus } from "@/lib/guestExperience";
+import { getSupabaseGuestBrowser, type AgendaItemRow } from "@/lib/supabaseGuest";
 
 interface Props {
   event: GuestEventConfig;
 }
 
+function formatHm(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function rowToItem(row: AgendaItemRow): ItineraryItem {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description || "",
+    startTime: formatHm(row.start_time),
+    endTime: formatHm(row.end_time),
+    location: row.location_name || undefined,
+  };
+}
+
+/** Live status using absolute timestamptz from Supabase when present. */
+function statusFromIso(startIso: string, endIso: string, now: Date): "upcoming" | "live" | "past" {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  if (now < start) return "upcoming";
+  if (now > end) return "past";
+  return "live";
+}
+
 export default function ItineraryTimeline({ event }: Props) {
   const [now, setNow] = useState(() => new Date());
+  const [remote, setRemote] = useState<AgendaItemRow[] | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(t);
   }, []);
 
-  const items = useMemo(
-    () =>
-      event.itinerary.map((item) => ({
-        item,
-        status: getItineraryStatus(item, event.eventDate, now),
-      })),
-    [event, now]
-  );
+  useEffect(() => {
+    const supabase = getSupabaseGuestBrowser();
+    if (!supabase) return;
+
+    const load = async () => {
+      const { data } = await supabase
+        .from("agenda_items")
+        .select("*")
+        .order("start_time", { ascending: true });
+      if (data?.length) setRemote(data as AgendaItemRow[]);
+    };
+    void load();
+
+    const channel = supabase
+      .channel("guest-agenda-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "agenda_items" },
+        () => {
+          void load();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const items = useMemo(() => {
+    if (remote?.length) {
+      return remote.map((row) => ({
+        item: rowToItem(row),
+        status: statusFromIso(row.start_time, row.end_time, now),
+      }));
+    }
+    return event.itinerary.map((item) => ({
+      item,
+      status: getItineraryStatus(item, event.eventDate, now),
+    }));
+  }, [event, now, remote]);
 
   return (
     <section className="px-4 py-6">

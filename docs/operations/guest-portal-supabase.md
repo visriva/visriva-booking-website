@@ -1,95 +1,143 @@
 # Guest Experience Portal — Supabase setup
 
-Powers live announcements, photo wall uploads, and guestbook for `/guest/[eventId]`.
+Schema used by `/guest/[eventId]`: `guests`, `agenda_items`, `photos`, `announcements`, storage bucket `event_photos`.
 
-Without these tables the portal still works in **demo fallback** mode (rotating sample announcements + Unsplash photos).
+Without Supabase env + tables, the portal still runs in **demo fallback** mode.
 
-## 1. Env vars (Vercel + `.env.local`)
+## 1. Env vars
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-# Optional AI (else Gemini, else local keyword fallback)
+# Optional AI
 OPENROUTER_API_KEY=
 OPENROUTER_MODEL=openai/gpt-4o-mini
 ```
 
-## 2. SQL (Supabase SQL editor)
+## 2. Database schema (SQL Editor)
 
 ```sql
--- Announcements (enable Realtime on this table in Dashboard → Database → Replication)
-create table if not exists public.guest_announcements (
-  id uuid primary key default gen_random_uuid(),
-  event_id text not null,
-  message text not null,
-  created_at timestamptz not null default now()
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 1. GUESTS (personalized greetings / table numbers)
+CREATE TABLE IF NOT EXISTS guests (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  table_number VARCHAR(10),
+  seat_number VARCHAR(10),
+  access_code VARCHAR(20) UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
-create index if not exists guest_announcements_event_idx on public.guest_announcements (event_id, created_at desc);
 
-create table if not exists public.guest_photos (
-  id uuid primary key default gen_random_uuid(),
-  event_id text not null,
-  url text not null,
-  guest_name text,
-  created_at timestamptz not null default now()
+-- 2. AGENDA / ITINERARY
+CREATE TABLE IF NOT EXISTS agenda_items (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  start_time TIMESTAMPTZ NOT NULL,
+  end_time TIMESTAMPTZ NOT NULL,
+  location_name TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
-create index if not exists guest_photos_event_idx on public.guest_photos (event_id, created_at desc);
 
-create table if not exists public.guest_guestbook (
-  id uuid primary key default gen_random_uuid(),
-  event_id text not null,
-  name text not null,
-  message text not null,
-  network_opt_in boolean not null default false,
-  created_at timestamptz not null default now()
+-- 3. PHOTO WALL metadata
+CREATE TABLE IF NOT EXISTS photos (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  guest_id UUID REFERENCES guests(id) ON DELETE SET NULL,
+  guest_name TEXT,
+  storage_path TEXT NOT NULL,
+  public_url TEXT NOT NULL,
+  is_approved BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
-create index if not exists guest_guestbook_event_idx on public.guest_guestbook (event_id, created_at desc);
 
-alter table public.guest_announcements enable row level security;
-alter table public.guest_photos enable row level security;
-alter table public.guest_guestbook enable row level security;
-
--- Public event-day reads/writes (tighten later with event tokens if needed)
-create policy "announcements_read" on public.guest_announcements for select using (true);
-create policy "announcements_insert" on public.guest_announcements for insert with check (true);
-
-create policy "photos_read" on public.guest_photos for select using (true);
-create policy "photos_insert" on public.guest_photos for insert with check (true);
-
-create policy "guestbook_read" on public.guest_guestbook for select using (true);
-create policy "guestbook_insert" on public.guest_guestbook for insert with check (true);
+-- 4. LIVE ANNOUNCEMENTS
+CREATE TABLE IF NOT EXISTS announcements (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  message TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
-Enable **Realtime** for `guest_announcements` in the Supabase dashboard.
-
-## 3. Storage bucket
-
-1. Storage → New bucket → name `guest-photos` → **Public**
-2. Policies (example — open for event day; tighten in production):
+## 3. Enable Realtime
 
 ```sql
-create policy "guest_photos_public_read"
+alter publication supabase_realtime add table agenda_items;
+alter publication supabase_realtime add table photos;
+alter publication supabase_realtime add table announcements;
+```
+
+(If a table is already in the publication, Postgres will error — skip that line.)
+
+Also confirm in Dashboard → Database → Replication that these tables are enabled.
+
+## 4. Storage bucket `event_photos`
+
+1. Storage → New bucket → **event_photos** → **Public**
+2. Policies:
+
+```sql
+create policy "event_photos_public_read"
 on storage.objects for select
-using (bucket_id = 'guest-photos');
+using (bucket_id = 'event_photos');
 
-create policy "guest_photos_public_upload"
+create policy "event_photos_public_upload"
 on storage.objects for insert
-with check (bucket_id = 'guest-photos');
+with check (bucket_id = 'event_photos');
 ```
 
-## 4. Smoke test
+## 5. Row Level Security (anonymous QR guests)
 
-1. Open `https://www.visriva.com/guest/demo?name=Priya&table=12&seat=A`
-2. Insert an announcement row with `event_id = 'demo'` — banner should update live
-3. Upload a photo from a phone — appears on the wall
-4. Ask the concierge “What time is cake cutting?”
+```sql
+ALTER TABLE guests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE agenda_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE photos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
 
-## 5. Event-day QR
+CREATE POLICY "Allow public read-only access to agenda"
+  ON agenda_items FOR SELECT USING (true);
 
-Print QR codes pointing to:
+CREATE POLICY "Allow public read-only access to announcements"
+  ON announcements FOR SELECT USING (true);
 
-`https://www.visriva.com/guest/YOUR_EVENT_ID?name=`
+CREATE POLICY "Allow public read-only access to guests"
+  ON guests FOR SELECT USING (true);
 
-(or prefill name/table/seat per place card if you generate unique links).
+CREATE POLICY "Allow public to view approved photos"
+  ON photos FOR SELECT USING (is_approved = true);
 
-Marketing hub remains at `/qr` with a link into `/guest/demo`.
+CREATE POLICY "Allow anonymous photo uploads"
+  ON photos FOR INSERT WITH CHECK (true);
+```
+
+Writes for agenda / announcements / guests should use the **service role** in Admin (or Supabase dashboard), not the anon key.
+
+## 6. Sample seed (optional)
+
+```sql
+INSERT INTO announcements (message, is_active)
+VALUES ('Welcome — the Visriva Live Station is open for keepsakes.', true);
+
+INSERT INTO agenda_items (title, description, start_time, end_time, location_name) VALUES
+  ('Welcome drinks', 'Soft check-in at the foyer', NOW() + interval '0 minutes', NOW() + interval '45 minutes', 'Foyer'),
+  ('Visriva Photo Booth', 'Instant prints all evening', NOW() + interval '45 minutes', NOW() + interval '4 hours', 'Photo Booth bay');
+
+INSERT INTO guests (full_name, table_number, seat_number, access_code)
+VALUES ('Priya Sharma', '12', 'A', 'PRIYA12');
+```
+
+## 7. How the app uses this
+
+| Feature | Table / bucket | Realtime |
+|---------|----------------|----------|
+| VIP card | `guests` via `?code=` access_code | — |
+| Itinerary | `agenda_items` (fallback: demo config) | `postgres_changes` |
+| Announcements | `announcements` where `is_active` | `postgres_changes` |
+| Photo wall | `photos` + `event_photos` bucket | `postgres_changes` on INSERT |
+
+Guest opens: `/guest/demo?code=PRIYA12` or `?name=Priya&table=12&seat=A`
+
+## 8. Guestbook
+
+Guestbook still uses local/demo storage until you add a dedicated table; photo wall + agenda + announcements are on this schema.

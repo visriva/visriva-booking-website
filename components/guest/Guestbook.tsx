@@ -1,19 +1,27 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Heart, Users } from "lucide-react";
-import { getSupabaseGuestBrowser, type GuestGuestbookRow } from "@/lib/supabaseGuest";
 
 interface Props {
   eventId: string;
   guestName: string;
 }
 
-const DEMO_ENTRIES: GuestGuestbookRow[] = [
+interface WishEntry {
+  id: string;
+  name: string;
+  message: string;
+  network_opt_in: boolean;
+  created_at: string;
+}
+
+const STORAGE_PREFIX = "visriva_guestbook_";
+
+const DEMO_ENTRIES: WishEntry[] = [
   {
     id: "d1",
-    event_id: "demo",
     name: "Ananya",
     message: "What a magical evening — the photo booth was unforgettable!",
     network_opt_in: true,
@@ -21,7 +29,6 @@ const DEMO_ENTRIES: GuestGuestbookRow[] = [
   },
   {
     id: "d2",
-    event_id: "demo",
     name: "Rohan",
     message: "Congratulations — sending love from table 8.",
     network_opt_in: true,
@@ -30,53 +37,49 @@ const DEMO_ENTRIES: GuestGuestbookRow[] = [
 ];
 
 export default function Guestbook({ eventId, guestName }: Props) {
-  const [entries, setEntries] = useState<GuestGuestbookRow[]>([]);
+  const [entries, setEntries] = useState<WishEntry[]>([]);
   const [message, setMessage] = useState("");
   const [networkOptIn, setNetworkOptIn] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<"wishes" | "network">("wishes");
 
-  const load = useCallback(async () => {
-    const supabase = getSupabaseGuestBrowser();
-    if (!supabase) {
-      setEntries(DEMO_ENTRIES);
-      return;
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`${STORAGE_PREFIX}${eventId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as WishEntry[];
+        if (Array.isArray(parsed) && parsed.length) {
+          setEntries(parsed);
+          return;
+        }
+      }
+    } catch {
+      /* ignore */
     }
-    const { data } = await supabase
-      .from("guest_guestbook")
-      .select("*")
-      .eq("event_id", eventId)
-      .order("created_at", { ascending: false })
-      .limit(60);
-    setEntries((data as GuestGuestbookRow[]) || DEMO_ENTRIES);
+    setEntries(DEMO_ENTRIES);
   }, [eventId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const persist = (next: WishEntry[]) => {
+    setEntries(next);
+    try {
+      localStorage.setItem(`${STORAGE_PREFIX}${eventId}`, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  };
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !guestName) return;
     setSaving(true);
-    const row: GuestGuestbookRow = {
+    const row: WishEntry = {
       id: `local-${Date.now()}`,
-      event_id: eventId,
       name: guestName,
       message: message.trim(),
       network_opt_in: networkOptIn,
       created_at: new Date().toISOString(),
     };
-    const supabase = getSupabaseGuestBrowser();
-    if (supabase) {
-      await supabase.from("guest_guestbook").insert({
-        event_id: eventId,
-        name: guestName,
-        message: row.message,
-        network_opt_in: networkOptIn,
-      });
-    }
-    setEntries((prev) => [row, ...prev]);
+    persist([row, ...entries.filter((x) => !x.id.startsWith("d"))]);
     setMessage("");
     setSaving(false);
   };

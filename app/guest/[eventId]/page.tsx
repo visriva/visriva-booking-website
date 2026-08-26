@@ -20,6 +20,7 @@ import {
   saveGuestIdentity,
   type GuestIdentity,
 } from "@/lib/guestExperience";
+import { getSupabaseGuestBrowser, type GuestRow } from "@/lib/supabaseGuest";
 
 function GuestDashboardInner() {
   const params = useParams();
@@ -31,20 +32,53 @@ function GuestDashboardInner() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const fromUrl = resolveGuestFromSearchParams(searchParams);
-    const stored = loadGuestIdentity(event.id);
-    if (fromUrl.name) {
-      const next: GuestIdentity = {
-        name: fromUrl.name,
-        tableNumber: fromUrl.tableNumber || stored?.tableNumber || "—",
-        seatNumber: fromUrl.seatNumber || stored?.seatNumber || "—",
-      };
-      saveGuestIdentity(event.id, next);
-      setIdentity(next);
-    } else if (stored) {
-      setIdentity(stored);
+    let cancelled = false;
+
+    async function resolve() {
+      const fromUrl = resolveGuestFromSearchParams(searchParams);
+      const stored = loadGuestIdentity(event.id);
+      const supabase = getSupabaseGuestBrowser();
+
+      if (fromUrl.accessCode && supabase) {
+        const { data } = await supabase
+          .from("guests")
+          .select("*")
+          .eq("access_code", fromUrl.accessCode)
+          .maybeSingle();
+        if (!cancelled && data) {
+          const row = data as GuestRow;
+          const next: GuestIdentity = {
+            name: row.full_name,
+            tableNumber: row.table_number || "—",
+            seatNumber: row.seat_number || "—",
+            guestId: row.id,
+          };
+          saveGuestIdentity(event.id, next);
+          setIdentity(next);
+          setReady(true);
+          return;
+        }
+      }
+
+      if (fromUrl.name) {
+        const next: GuestIdentity = {
+          name: fromUrl.name,
+          tableNumber: fromUrl.tableNumber || stored?.tableNumber || "—",
+          seatNumber: fromUrl.seatNumber || stored?.seatNumber || "—",
+          guestId: stored?.guestId,
+        };
+        saveGuestIdentity(event.id, next);
+        if (!cancelled) setIdentity(next);
+      } else if (stored) {
+        if (!cancelled) setIdentity(stored);
+      }
+      if (!cancelled) setReady(true);
     }
-    setReady(true);
+
+    void resolve();
+    return () => {
+      cancelled = true;
+    };
   }, [event.id, searchParams]);
 
   if (!ready) {
@@ -80,7 +114,11 @@ function GuestDashboardInner() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
             <ItineraryTimeline event={event} />
             <VenueMap event={event} />
-            <PhotoWall eventId={event.id} guestName={identity.name} />
+            <PhotoWall
+              eventId={event.id}
+              guestName={identity.name}
+              guestId={identity.guestId}
+            />
             <Guestbook eventId={event.id} guestName={identity.name} />
             <GuestConcierge event={event} guestName={identity.name} />
           </motion.div>

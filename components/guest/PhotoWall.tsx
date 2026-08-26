@@ -4,11 +4,16 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Camera, Loader2, Upload } from "lucide-react";
 import { compressImageFile } from "@/lib/firebase";
-import { getSupabaseGuestBrowser, type GuestPhotoRow } from "@/lib/supabaseGuest";
+import {
+  GUEST_PHOTO_BUCKET,
+  getSupabaseGuestBrowser,
+  type PhotoRow,
+} from "@/lib/supabaseGuest";
 
 interface Props {
   eventId: string;
   guestName: string;
+  guestId?: string | null;
 }
 
 const DEMO_PHOTOS = [
@@ -18,39 +23,84 @@ const DEMO_PHOTOS = [
   "https://images.unsplash.com/photo-1520854221256-17451cc331bf?w=600&q=80",
 ];
 
-export default function PhotoWall({ eventId, guestName }: Props) {
-  const [photos, setPhotos] = useState<{ id: string; url: string; guest_name?: string }[]>([]);
+type WallPhoto = { id: string; url: string; guest_name?: string };
+
+export default function PhotoWall({ eventId, guestName, guestId }: Props) {
+  const [photos, setPhotos] = useState<WallPhoto[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [usingDemo, setUsingDemo] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const mapRows = (data: PhotoRow[]): WallPhoto[] =>
+    data.map((r) => ({
+      id: r.id,
+      url: r.public_url,
+      guest_name: r.guest_name || undefined,
+    }));
 
   const loadPhotos = useCallback(async () => {
     const supabase = getSupabaseGuestBrowser();
     if (!supabase) {
+      setUsingDemo(true);
       setPhotos(DEMO_PHOTOS.map((url, i) => ({ id: `demo-${i}`, url })));
       return;
     }
     const { data, error: err } = await supabase
-      .from("guest_photos")
+      .from("photos")
       .select("*")
-      .eq("event_id", eventId)
+      .eq("is_approved", true)
       .order("created_at", { ascending: false })
       .limit(48);
     if (err || !data?.length) {
+      setUsingDemo(true);
       setPhotos(DEMO_PHOTOS.map((url, i) => ({ id: `demo-${i}`, url })));
       return;
     }
-    setPhotos(
-      (data as GuestPhotoRow[]).map((r) => ({
-        id: r.id,
-        url: r.url,
-        guest_name: r.guest_name || undefined,
-      }))
-    );
-  }, [eventId]);
+    setUsingDemo(false);
+    setPhotos(mapRows(data as PhotoRow[]));
+  }, []);
 
   useEffect(() => {
     void loadPhotos();
+
+    const supabase = getSupabaseGuestBrowser();
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel("custom-all-channel")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "photos" },
+        (payload) => {
+          const row = payload.new as PhotoRow;
+          if (!row?.public_url || row.is_approved === false) return;
+          setUsingDemo(false);
+          setPhotos((prev) => {
+            if (prev.some((p) => p.id === row.id)) return prev;
+            return [
+              {
+                id: row.id,
+                url: row.public_url,
+                guest_name: row.guest_name || undefined,
+              },
+              ...prev.filter((p) => !p.id.startsWith("demo-")),
+            ];
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "photos" },
+        () => {
+          void loadPhotos();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [loadPhotos]);
 
   const handleUpload = async (file: File) => {
@@ -63,26 +113,38 @@ export default function PhotoWall({ eventId, guestName }: Props) {
       const supabase = getSupabaseGuestBrowser();
 
       if (!supabase) {
-        setPhotos((prev) => [{ id: `local-${Date.now()}`, url: dataUrl, guest_name: guestName }, ...prev]);
+        setPhotos((prev) => [
+          { id: `local-${Date.now()}`, url: dataUrl, guest_name: guestName },
+          ...prev,
+        ]);
         setUploading(false);
         return;
       }
 
       const path = `${eventId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
-      const { error: upErr } = await supabase.storage.from("guest-photos").upload(path, blob, {
+      const { error: upErr } = await supabase.storage.from(GUEST_PHOTO_BUCKET).upload(path, blob, {
         contentType: "image/jpeg",
         upsert: false,
       });
       if (upErr) throw upErr;
 
-      const { data: pub } = supabase.storage.from("guest-photos").getPublicUrl(path);
-      const url = pub.publicUrl;
-      await supabase.from("guest_photos").insert({
-        event_id: eventId,
-        url,
+      const { data: pub } = supabase.storage.from(GUEST_PHOTO_BUCKET).getPublicUrl(path);
+      const public_url = pub.publicUrl;
+
+      const { error: insErr } = await supabase.from("photos").insert({
+        guest_id: guestId || null,
         guest_name: guestName || null,
+        storage_path: path,
+        public_url,
+        is_approved: true,
       });
-      setPhotos((prev) => [{ id: `new-${Date.now()}`, url, guest_name: guestName }, ...prev]);
+      if (insErr) throw insErr;
+      // Realtime INSERT handler will refresh the wall; optimistic add:
+      setUsingDemo(false);
+      setPhotos((prev) => [
+        { id: `opt-${Date.now()}`, url: public_url, guest_name: guestName },
+        ...prev.filter((p) => !p.id.startsWith("demo-")),
+      ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -98,7 +160,8 @@ export default function PhotoWall({ eventId, guestName }: Props) {
         </p>
         <h2 className="font-serif text-2xl font-bold">Live photo wall</h2>
         <p className="text-xs text-[var(--guest-muted)] mt-1">
-          Share moments from your phone — they appear here instantly.
+          Share moments from your phone — they appear here instantly
+          {usingDemo ? " (demo images until Supabase is connected)" : ""}.
         </p>
       </div>
 

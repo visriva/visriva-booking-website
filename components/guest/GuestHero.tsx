@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Hash, Wifi, Armchair, Sparkles } from "lucide-react";
 import type { GuestEventConfig, GuestIdentity } from "@/lib/guestExperience";
 import { saveGuestIdentity } from "@/lib/guestExperience";
+import { getSupabaseGuestBrowser, type GuestRow } from "@/lib/supabaseGuest";
 
 interface Props {
   event: GuestEventConfig;
@@ -16,6 +17,9 @@ export default function GuestHero({ event, identity, onIdentitySaved }: Props) {
   const [name, setName] = useState("");
   const [table, setTable] = useState("");
   const [seat, setSeat] = useState("");
+  const [accessCode, setAccessCode] = useState("");
+  const [lookingUp, setLookingUp] = useState(false);
+  const [lookupError, setLookupError] = useState("");
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +28,38 @@ export default function GuestHero({ event, identity, onIdentitySaved }: Props) {
       name: name.trim(),
       tableNumber: table.trim() || "—",
       seatNumber: seat.trim() || "—",
+    };
+    saveGuestIdentity(event.id, next);
+    onIdentitySaved(next);
+  };
+
+  const handleCodeLookup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accessCode.trim()) return;
+    setLookingUp(true);
+    setLookupError("");
+    const supabase = getSupabaseGuestBrowser();
+    if (!supabase) {
+      setLookupError("Guest database not connected — enter your name below.");
+      setLookingUp(false);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("guests")
+      .select("*")
+      .eq("access_code", accessCode.trim())
+      .maybeSingle();
+    setLookingUp(false);
+    if (error || !data) {
+      setLookupError("Code not found. Check your place card or enter details manually.");
+      return;
+    }
+    const row = data as GuestRow;
+    const next: GuestIdentity = {
+      name: row.full_name,
+      tableNumber: row.table_number || "—",
+      seatNumber: row.seat_number || "—",
+      guestId: row.id,
     };
     saveGuestIdentity(event.id, next);
     onIdentitySaved(next);
@@ -41,9 +77,34 @@ export default function GuestHero({ event, identity, onIdentitySaved }: Props) {
         </p>
         <h1 className="font-serif text-3xl font-bold leading-tight mb-2">Welcome</h1>
         <p className="text-sm text-[var(--guest-muted)] mb-5">
-          Enter your name to unlock your VIP card for {event.title}.
+          Unlock your VIP card for {event.title}.
         </p>
+
+        <form onSubmit={handleCodeLookup} className="guest-glass rounded-3xl p-5 space-y-3 mb-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--guest-gold)]">
+            Have an access code?
+          </p>
+          <input
+            value={accessCode}
+            onChange={(e) => setAccessCode(e.target.value)}
+            placeholder="e.g. PRIYA12"
+            className="w-full rounded-xl bg-black/20 border border-white/10 px-4 py-3 text-sm font-mono outline-none focus:border-[var(--guest-gold)] uppercase"
+          />
+          {lookupError && <p className="text-[11px] text-rose-400">{lookupError}</p>}
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            type="submit"
+            disabled={lookingUp}
+            className="w-full rounded-xl border border-[var(--guest-gold)]/40 text-[var(--guest-gold)] font-bold text-xs uppercase tracking-wider py-3 disabled:opacity-50"
+          >
+            {lookingUp ? "Looking up…" : "Find my table"}
+          </motion.button>
+        </form>
+
         <form onSubmit={handleSave} className="guest-glass rounded-3xl p-5 space-y-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--guest-muted)]">
+            Or enter manually
+          </p>
           <input
             required
             value={name}

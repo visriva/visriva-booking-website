@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Megaphone } from "lucide-react";
 import type { GuestEventConfig } from "@/lib/guestExperience";
-import { getSupabaseGuestBrowser, type GuestAnnouncementRow } from "@/lib/supabaseGuest";
+import { getSupabaseGuestBrowser, type AnnouncementRow } from "@/lib/supabaseGuest";
 
 interface Props {
   event: GuestEventConfig;
@@ -21,30 +21,30 @@ export default function AnnouncementBanner({ event }: Props) {
     async function loadLatest() {
       if (!supabase) return;
       const { data } = await supabase
-        .from("guest_announcements")
+        .from("announcements")
         .select("*")
-        .eq("event_id", event.id)
+        .eq("is_active", true)
         .order("created_at", { ascending: false })
         .limit(1);
-      const row = (data as GuestAnnouncementRow[] | null)?.[0];
+      const row = (data as AnnouncementRow[] | null)?.[0];
       if (row?.message) setMessage(row.message);
     }
 
     if (supabase) {
       void loadLatest();
       channel = supabase
-        .channel(`announcements:${event.id}`)
+        .channel("guest-announcements-realtime")
         .on(
           "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "guest_announcements",
-            filter: `event_id=eq.${event.id}`,
-          },
+          { event: "*", schema: "public", table: "announcements" },
           (payload) => {
-            const row = payload.new as GuestAnnouncementRow;
-            if (row?.message) setMessage(row.message);
+            const row = (payload.new || payload.old) as AnnouncementRow;
+            if (payload.eventType === "DELETE") {
+              void loadLatest();
+              return;
+            }
+            if (row?.is_active && row.message) setMessage(row.message);
+            else void loadLatest();
           }
         )
         .subscribe();
@@ -62,7 +62,7 @@ export default function AnnouncementBanner({ event }: Props) {
       if (demoTimer) clearInterval(demoTimer);
       if (supabase && channel) void supabase.removeChannel(channel);
     };
-  }, [event.id, event.demoAnnouncements]);
+  }, [event.demoAnnouncements]);
 
   if (!message) return null;
 

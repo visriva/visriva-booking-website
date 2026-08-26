@@ -44,6 +44,8 @@ export interface GuestIdentity {
   name: string;
   tableNumber: string;
   seatNumber: string;
+  /** Supabase guests.id when resolved via access_code */
+  guestId?: string;
 }
 
 export const DEMO_EVENT: GuestEventConfig = {
@@ -150,11 +152,12 @@ export function getEventConfig(eventId: string): GuestEventConfig {
 
 export function resolveGuestFromSearchParams(
   params: URLSearchParams | { get: (k: string) => string | null }
-): Partial<GuestIdentity> {
+): Partial<GuestIdentity> & { accessCode?: string } {
   return {
     name: params.get("name")?.trim() || undefined,
     tableNumber: params.get("table")?.trim() || undefined,
     seatNumber: params.get("seat")?.trim() || undefined,
+    accessCode: params.get("code")?.trim() || undefined,
   };
 }
 
@@ -169,6 +172,7 @@ export function loadGuestIdentity(eventId: string): GuestIdentity | null {
       name: parsed.name,
       tableNumber: parsed.tableNumber || "—",
       seatNumber: parsed.seatNumber || "—",
+      guestId: parsed.guestId,
     };
   } catch {
     return null;
@@ -183,6 +187,7 @@ export function saveGuestIdentity(eventId: string, identity: GuestIdentity): voi
       name: identity.name.trim(),
       tableNumber: identity.tableNumber.trim() || "—",
       seatNumber: identity.seatNumber.trim() || "—",
+      guestId: identity.guestId,
     })
   );
 }
