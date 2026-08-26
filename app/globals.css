@@ -216,3 +216,56 @@
   }
 }
 
+/* ─── Guest Experience portal (scoped under .guest-portal) ───────────────── */
+.guest-portal {
+  --guest-bg: #011f15;
+  --guest-fg: #f7f4ee;
+  --guest-muted: rgba(247, 244, 238, 0.62);
+  --guest-card: rgba(3, 53, 36, 0.55);
+  --guest-border: rgba(212, 175, 55, 0.28);
+  --guest-gold: #d4af37;
+  min-height: 100dvh;
+  background: radial-gradient(ellipse at top, #054731 0%, #011f15 55%, #010f0c 100%);
+  color: var(--guest-fg);
+}
+
+.guest-portal.light {
+  --guest-bg: #f7f4ee;
+  --guest-fg: #0a1f18;
+  --guest-muted: rgba(10, 31, 24, 0.58);
+  --guest-card: rgba(255, 255, 255, 0.72);
+  --guest-border: rgba(1, 31, 21, 0.12);
+  --guest-gold: #b89223;
+  background: linear-gradient(180deg, #e8efea 0%, #f7f4ee 40%, #efeae0 100%);
+  color: var(--guest-fg);
+}
+
+.guest-glass {
+  background: var(--guest-card);
+  border: 1px solid var(--guest-border);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.guest-portal.light .guest-glass {
+  box-shadow: 0 10px 32px rgba(1, 31, 21, 0.08);
+}
+
+@keyframes guest-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.15);
+  }
+}
+
+.guest-live-dot {
+  animation: guest-live-pulse 1.6s ease-in-out infinite;
+}
+
+

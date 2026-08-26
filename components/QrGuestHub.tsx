@@ -41,6 +41,13 @@ type HubLink = {
 
 const LINKS: HubLink[] = [
   {
+    href: "/guest/demo",
+    label: "Event Guest Portal",
+    sub: "VIP card · itinerary · photo wall",
+    icon: Gift,
+    accent: true,
+  },
+  {
     href: "/gallery",
     label: "AI Photo Gallery",
     sub: "Find your face · Kwikpic unlock",

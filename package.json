@@ -14,7 +14,7 @@
   "dependencies": {
     "@google/genai": "^2.16.0",
     "@react-google-maps/api": "^2.20.8",
-    "@supabase/supabase-js": "^2.112.2",
+    "@supabase/supabase-js": "^2.112.4",
     "@types/canvas-confetti": "^1.9.0",
     "@vercel/speed-insights": "^2.0.0",
     "autoprefixer": "10.4.17",

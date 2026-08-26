@@ -20,6 +20,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/captured-moments", changeFrequency: "weekly", priority: 0.7 },
     { path: "/clients", changeFrequency: "weekly", priority: 0.8 },
     { path: "/qr", changeFrequency: "weekly", priority: 0.85 },
+    { path: "/guest/demo", changeFrequency: "weekly", priority: 0.75 },
     { path: "/frame-customizer", changeFrequency: "monthly", priority: 0.65 },
     { path: "/photo-booth-bengaluru", changeFrequency: "weekly", priority: 0.8 },
     { path: "/wedding-photo-booth-bangalore", changeFrequency: "weekly", priority: 0.8 },
