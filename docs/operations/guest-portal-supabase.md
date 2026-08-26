@@ -134,10 +134,14 @@ VALUES ('Priya Sharma', '12', 'A', 'PRIYA12');
 | VIP card | `guests` via `?code=` access_code | — |
 | Itinerary | `agenda_items` (fallback: demo config) | `postgres_changes` |
 | Announcements | `announcements` where `is_active` | `postgres_changes` |
-| Photo wall | `photos` + `event_photos` bucket | `postgres_changes` on INSERT |
+| Photo wall | `photos` + `event_photos` bucket | `postgres_changes` on INSERT + UPDATE (`is_approved`) |
 
 Guest opens: `/guest/demo?code=PRIYA12` or `?name=Priya&table=12&seat=A`
 
 ## 8. Guestbook
 
-Guestbook still uses local/demo storage until you add a dedicated table; photo wall + agenda + announcements are on this schema.
+Guestbook stays local/demo until you add a dedicated table; photo wall + agenda + announcements are on this schema.
+
+## 9. AI photo moderation
+
+See **[guest-photo-moderation.md](./guest-photo-moderation.md)** — Sightengine Edge Function + webhook so uploads default to `is_approved = false` until safe.
