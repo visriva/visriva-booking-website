@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Instagram, Power, Save, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Power, Save, ShieldCheck } from "lucide-react";
 import AdminGate from "@/components/admin/AdminGate";
 import AdminShell from "@/components/admin/AdminShell";
 import { saveFeatureToggles, subscribeFeatureToggles, FeatureTogglesConfig } from "@/lib/firebase";
@@ -143,7 +143,7 @@ function AdminQrPageInner() {
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-[#D4AF37]/25 bg-[#D4AF37]/10 p-4 font-bold">Kinya Coffee × WATO Offer</div>
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 font-bold"><Instagram className="mr-2 inline h-4 w-4" />@visriva.co</div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 font-bold">@visriva.co</div>
           </div>
         </div>
       </div>
