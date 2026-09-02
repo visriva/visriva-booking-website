@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, useMotionTemplate, useMotionValue, useSpring, useTransform } from "framer-motion";
 import {
   Camera,
+  Coffee,
   FolderOpen,
   MessageCircle,
   Phone,
@@ -40,6 +41,13 @@ type HubLink = {
 };
 
 const LINKS: HubLink[] = [
+  {
+    href: "/kinya-wato",
+    label: "Kinya Coffee · WATO Offer",
+    sub: "₹100 off · pay ₹100 for 2 photo strips",
+    icon: Coffee,
+    accent: true,
+  },
   {
     href: "/guest/demo",
     label: "Event Guest Portal",
@@ -293,6 +301,34 @@ export default function QrGuestHub() {
             </div>
           </motion.div>
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: 0.18 }}
+          className="mb-5"
+        >
+          <Link
+            href="/kinya-wato"
+            className="group relative flex overflow-hidden rounded-[24px] border border-[#D4AF37]/50 bg-gradient-to-br from-[#D4AF37] to-[#B89223] p-4 shadow-[0_12px_32px_rgba(212,175,55,0.28)]"
+          >
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#01140e]/15 text-[#01140e]">
+              <Coffee className="h-6 w-6" />
+            </span>
+            <span className="ml-3 min-w-0 flex-1 text-left">
+              <span className="block text-[9px] font-extrabold uppercase tracking-[0.22em] text-[#01140e]/70">
+                Tonight’s booth deal
+              </span>
+              <span className="mt-0.5 block font-serif text-xl font-bold text-[#01140e]">
+                Kinya Coffee · WATO Offer
+              </span>
+              <span className="mt-0.5 block text-[11px] font-semibold text-[#01140e]/80">
+                ₹200 strips − ₹100 off → pay ₹100 for 2
+              </span>
+            </span>
+            <ArrowUpRight className="h-5 w-5 shrink-0 self-center text-[#01140e]/70" />
+          </Link>
+        </motion.div>
 
         {/* Guest links */}
         <motion.section
