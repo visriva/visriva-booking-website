@@ -30,9 +30,9 @@ function LimitedHub() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 shadow-[0_0_40px_rgba(212,175,55,0.15)]"><Sparkles className="h-7 w-7 text-[#D4AF37]" /></div>
           <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.35em] text-[#D4AF37]">Live Station Guest Hub</p>
           <h1 className="font-serif text-4xl font-bold tracking-[0.18em] text-transparent sm:text-5xl bg-gradient-to-br from-white via-white to-[#D4AF37] bg-clip-text">VISRIVA</h1>
-          <p className="mt-2 text-[11px] uppercase tracking-[0.24em] text-white/45">Tonight’s exclusive guest offers</p>
+          <p className="mt-2 text-[11px] uppercase tracking-[0.24em] text-white/45">Tonight’s exclusive guest offer</p>
         </header>
-        <section className="space-y-4 animate-[fadeIn_.65s_ease-out_.1s_both]">
+        <section className="animate-[fadeIn_.65s_ease-out_.1s_both]">
           <a
             href="/kinya-wato"
             aria-label="Open Kinya Coffee WATO offer"
@@ -43,7 +43,6 @@ function LimitedHub() {
             <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#01140e]/15 text-[#01140e]">{opening ? <span className="h-7 w-7 animate-spin rounded-full border-2 border-[#01140e]/30 border-t-[#01140e]" /> : <Coffee className="h-7 w-7" />}</span>
             <span className="relative ml-4 min-w-0 flex-1"><span className="block text-[9px] font-extrabold uppercase tracking-[0.25em] text-[#01140e]/65">{opening ? "Opening offer…" : "Exclusive tonight"}</span><span className="mt-1 block font-serif text-2xl font-bold leading-tight text-[#01140e]">Kinya Coffee · WATO Offer</span><span className="mt-1.5 block text-xs font-bold text-[#01140e]/75">Enter code COFFEE → unlock ₹100 OFF</span></span>
           </a>
-          <a href="https://instagram.com/visriva.co" target="_blank" rel="noopener noreferrer" className="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/15 bg-white/5 px-5 py-4 text-sm font-bold uppercase tracking-[0.12em] text-white/85 backdrop-blur-xl transition-transform active:scale-[0.98]"><FaInstagram className="h-5 w-5" />Follow @visriva.co</a>
         </section>
         <p className="mt-auto pt-10 text-center text-[10px] uppercase tracking-[0.22em] text-white/25">Visriva · Luxury live keepsakes</p>
       </div>
