@@ -54,7 +54,7 @@ import type { AdminCategory, AdminTab } from "@/lib/adminNav";
 import { ADMIN_NAV, ADMIN_SUBNAV } from "@/lib/adminNav";
 import AIWhatsAppAssistantModal from "@/components/AIWhatsAppAssistantModal";
 import { isAdminSessionValid, setAdminSession } from "@/components/admin/AdminGate";
-import { signInAdminWithPin, hasAdminClaim, waitForAuthReady } from "@/lib/adminFirebaseSignIn";
+import { signInAdminWithPin, hasAdminClaim, waitForAuthReady, signOutAdmin } from "@/lib/adminFirebaseSignIn";
 import { doc, setDoc } from "firebase/firestore";
 import {
   subscribePricingMatrix,
@@ -459,6 +459,7 @@ export default function AdminDashboardPage() {
 
   const handleAdminLogout = () => {
     if (typeof window !== "undefined") sessionStorage.removeItem("visriva_admin_session");
+    void signOutAdmin();
     setAuthenticated(false);
     setPin("");
   };

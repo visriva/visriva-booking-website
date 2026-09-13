@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { signOpsToken, verifyOpsToken, opsSessionSecretConfigured } from "@/lib/opsSession";
 import { mintAdminClaimToken } from "@/lib/adminClaimToken";
-import { rateLimit, clientIp } from "@/lib/rateLimit";
+import { allowedOperationsPins } from "@/lib/crewPins";
 
 export const runtime = "nodejs";
 
@@ -11,18 +11,12 @@ const OPS_REFRESH = "visriva_ops_refresh";
 const MAX_AGE = 90 * 24 * 60 * 60; // 90 days — trusted device
 
 /**
- * Team PINs for the Operations Hub — set OPERATIONS_PINS (comma-separated).
- *
- * There is deliberately NO fallback list. This previously defaulted to the
- * team's first names, which are effectively public; because a valid PIN here now
- * also mints a Firebase `admin` claim (see firestore.rules), a guessable PIN
- * would hand over the finance ledger and customer WhatsApp history.
+ * Team PINs for the Operations Hub.
+ * OPERATIONS_PINS env (comma-separated) is merged with the same crew PINs as /admin.
+ * Values are never shown on the login screen.
  */
 function allowedPins(): string[] {
-  return (process.env.OPERATIONS_PINS || "")
-    .split(",")
-    .map((p) => p.trim().toLowerCase())
-    .filter(Boolean);
+  return allowedOperationsPins();
 }
 
 function setSessionCookies() {

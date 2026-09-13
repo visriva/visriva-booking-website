@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { mintAdminClaimToken } from "@/lib/adminClaimToken";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
+import { allowedAdminPins, pinsFromEnv } from "@/lib/crewPins";
 
 export const runtime = "nodejs";
 
@@ -14,24 +15,19 @@ export const runtime = "nodejs";
  *     NEXT_PUBLIC_ADMIN_PASSWORDS plus a hardcoded MASTER_PIN of "4848";
  *   - the operator check compared against config/operator.pin, which the
  *     browser read straight out of a world-readable Firestore doc.
- * Both were readable in DevTools. The "4848" master PIN is NOT honoured here.
+ * Both were readable in DevTools. Crew PINs are verified here only and never
+ * listed on the login screen.
  *
  * config/operator is now admin-read-only, but firebase-admin bypasses rules, so
  * the operator PIN can stay managed from the admin CMS without being public.
  */
 
 function envPins(name: string): string[] {
-  return (process.env[name] || "")
-    .split(",")
-    .map((p) => p.trim().toLowerCase())
-    .filter(Boolean);
+  return pinsFromEnv(name);
 }
 
 function adminPins(): string[] {
-  // NEXT_PUBLIC_ADMIN_PASSWORDS is a migration fallback only — it still ships in
-  // the client bundle. Set ADMIN_PASSWORDS and remove the public one.
-  const primary = envPins("ADMIN_PASSWORDS");
-  return primary.length > 0 ? primary : envPins("NEXT_PUBLIC_ADMIN_PASSWORDS");
+  return allowedAdminPins();
 }
 
 /** Operator PIN from the admin-managed config doc, read with the admin SDK. */
