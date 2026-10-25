@@ -13,6 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/reserve", changeFrequency: "daily", priority: 0.95 },
     { path: "/services/photo-booth", changeFrequency: "weekly", priority: 0.9 },
     { path: "/ai-photo-booth-experiences", changeFrequency: "weekly", priority: 0.85 },
+    { path: "/vr-engagement", changeFrequency: "weekly", priority: 0.85 },
     { path: "/services/magnet-station", changeFrequency: "weekly", priority: 0.85 },
     { path: "/services/keychain-station", changeFrequency: "weekly", priority: 0.85 },
     { path: "/services/mug-printing", changeFrequency: "weekly", priority: 0.85 },
