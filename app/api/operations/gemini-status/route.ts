@@ -5,7 +5,7 @@ import { isOperationsApiAuthorized } from "@/lib/operationsApiAuth";
 export const runtime = "nodejs";
 
 export async function GET() {
-  if (!isOperationsApiAuthorized()) {
+  if (!(await isOperationsApiAuthorized())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

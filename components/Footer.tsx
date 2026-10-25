@@ -212,6 +212,8 @@ export default function Footer() {
             {toggles.showPricing !== false && (
               <a href="/services/photo-booth" className="hover:text-[#D4AF37] transition-colors">Packages &amp; Pricing</a>
             )}
+            <a href="/ai-photo-booth-experiences" className="hover:text-[#D4AF37] transition-colors">AI Photo Booth</a>
+            <a href="/vr-engagement" className="hover:text-[#D4AF37] transition-colors">VR Engagement</a>
             {toggles.enableCapturedMoments !== false && (
               <a href="/captured-moments" className="hover:text-[#D4AF37] transition-colors">Captured Moments</a>
             )}
